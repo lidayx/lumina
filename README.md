@@ -1,48 +1,249 @@
-# Lumina（快搜）
+# Lumina（快搜）⚡️
 
-快如闪电的跨平台搜索启动器。基于 Electron + TypeScript + React + Vite 构建，内置应用/文件/网页/命令/计算器/书签/设置等搜索与操作能力，支持全局快捷键与系统托盘常驻。
+> **免费的 Alfred 和 uTools 替代品** - 快如闪电的跨平台应用搜索启动器
 
-## 目录
+[![GitHub stars](https://img.shields.io/github/stars/yourusername/lumina.svg?style=social)](https://github.com/yourusername/lumina)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![macOS](https://img.shields.io/badge/platform-macOS-blue.svg)](https://www.apple.com/macos/)
+[![Windows](https://img.shields.io/badge/platform-Windows-blue.svg)](https://www.microsoft.com/windows)
+[![Linux](https://img.shields.io/badge/platform-Linux-blue.svg)](https://www.linux.org/)
 
-- [特性概览](#特性概览)
-- [系统要求](#系统要求)
-- [安装与开发](#安装与开发)
-- [构建与发布](#构建与发布)
-- [运行时行为](#运行时行为)
-- [快捷键](#快捷键)
-- [项目结构](#项目结构)
-- [架构与模块](#架构与模块)
-- [预加载 API（Renderer 可用）](#预加载-apirenderer-可用)
-- [图标与品牌](#图标与品牌)
-- [版本管理](#版本管理)
-- [开发规范与贡献](#开发规范与贡献)
-- [许可证](#许可证)
-- [FAQ](#faq)
+**Lumina** 是一个开源的应用程序启动器，灵感来自 macOS Spotlight、Alfred 和 uTools。提供快速的应用搜索、文件查找、网页搜索、书签管理等核心功能，支持 macOS、Windows 和 Linux。
 
-## 特性概览
+🎯 **如果你正在寻找 Alfred 的免费替代品，或者喜欢 uTools 的便利性，Lumina 值得一试！**
 
-- 应用搜索与启动：索引本机应用，模糊搜索，快速启动
-- 文件搜索与打开：按路径/名称搜索，快速打开
-- 网页搜索与历史：多搜索引擎、历史记录、常用站点
-- 命令执行：预设命令、模糊搜索、历史追踪，支持直接执行原始命令
-- 计算器：输入表达式即可计算
-- 书签：加载与搜索浏览器书签
-- 设置：浏览器默认项、搜索引擎管理、常规设置等
-- 系统托盘：常驻托盘，窗口关闭后后台运行
-- 单实例：避免重复打开，激活已运行实例
-- 索引机制：首次启动自动完整索引，之后定期索引（默认每 10 分钟）
+## ✨ 为什么选择 Lumina？
 
-## 系统要求
+| 特性 | Lumina | Alfred | uTools |
+|------|--------|--------|--------|
+| 价格 | 🆓 **免费开源** | 💰 £34（终身） | 💰 ¥299/年 |
+| 开源 | ✅ MIT 开源 | ❌ 闭源 | ❌ 闭源 |
+| 跨平台 | ✅ macOS/Win/Linux | ❌ 仅 macOS | ❌ 仅 Win/macOS |
+| 自定义 | ✅ 完全可控 | ⚠️ 受限 | ⚠️ 受限 |
+| 隐私 | ✅ 本地运行 | ⚠️ 有云同步 | ⚠️ 有云功能 |
+| 应用搜索 | ✅ | ✅ | ✅ |
+| 文件搜索 | ✅ | ✅ | ✅ |
+| 书签管理 | ✅ | ✅ | ✅ |
+| 计算器 | ✅ | ✅ | ✅ |
+| 插件系统 | 📝 计划中 | ✅ | ✅ |
 
-- Node.js 18+
-- macOS / Windows / Linux（跨平台）
+> 💡 **Lumina 适合你，如果你**：喜欢 Alfred/uTools 的功能，但需要跨平台支持、更注重隐私、或者预算有限。
 
-## 安装与开发
+---
+
+## 📋 目录
+
+- [快速开始](#-快速开始)
+- [主要功能](#-主要功能)
+- [与 Alfred/uTools 对比](#-与-alfredutools-对比)
+- [截图展示](#-截图展示-敬请期待)
+- [安装方法](#-安装方法)
+- [使用指南](#-使用指南)
+- [系统要求](#-系统要求)
+- [开发者指南](#-开发者指南)
+- [常见问题](#-常见问题)
+- [贡献](#-贡献)
+- [许可证](#-许可证)
+
+## ⚡ 快速开始
+
+### 对于用户
+
+1. **下载**：前往 [Releases](../../releases) 下载最新版本
+2. **安装**：拖拽到 Applications（macOS）或双击安装（Windows/Linux）
+3. **启动**：按下 `Shift + Space` 打开搜索
+4. **享受**：开始使用吧！
+
+### 对于开发者
 
 ```bash
 # 克隆项目
-git clone https://github.com/yourusername/electron-quick.git
-cd electron-quick
+git clone https://github.com/yourusername/lumina.git
+cd lumina
+
+# 安装依赖
+npm install
+
+# 启动开发模式
+npm run dev
+```
+
+---
+
+## 🎯 主要功能
+
+### 🔍 应用搜索与启动
+- 智能索引所有已安装的应用
+- 模糊搜索：输入应用名、拼音或首字母
+- 一键启动，支持快捷键操作
+- 跨平台：macOS、Windows、Linux 全支持
+
+### 📁 文件搜索
+- 按文件名、路径快速搜索
+- 配置搜索范围（默认包含 Documents、Downloads、Desktop）
+- 支持系统原生搜索 API，快速响应
+- 一键打开文件或文件夹
+
+### 🌐 网页搜索
+- 支持多个搜索引擎：百度、谷歌、必应、DuckDuckGo 等
+- 历史记录追踪常用网站
+- 自定义搜索引擎
+- 快捷键快速切换引擎
+
+### 📚 书签管理
+- 自动加载浏览器书签（Chrome、Safari、Firefox、Edge 等）
+- 支持多浏览器、多配置文件的自动识别
+- 实时同步书签更新
+- 快速搜索和访问
+
+### 🧮 计算器
+- 实时计算数学表达式
+- 支持基本运算、三角函数、单位转换等
+- 输入即计算，无需额外操作
+
+### ⚡ 命令执行
+- 执行系统命令
+- 命令历史记录
+- 快速重复常用命令
+
+### ⚙️ 个性化设置
+- 自定义搜索引擎
+- 设置默认浏览器
+- 配置文件搜索范围
+- 开机自启动、最小化到托盘
+- 快速启动模式
+
+### 🎨 用户体验
+- 全局快捷键：`Shift + Space`
+- 智能窗口大小调整
+- 系统托盘常驻
+- 单实例运行
+- 现代化 UI 设计
+
+---
+
+## 🆚 与 Alfred/uTools 对比
+
+### Lumina vs Alfred
+
+**Lumina 优势：**
+- ✅ 完全免费开源
+- ✅ 跨平台支持（Windows、Linux）
+- ✅ 源代码可自由修改
+- ✅ 社区驱动，快速迭代
+
+**Alfred 优势：**
+- ✅ 插件生态更丰富
+- ✅ 工作流功能更强大
+- ✅ macOS 深度集成
+- ✅ 有更多高级功能（剪贴板历史、文件操作等）
+
+### Lumina vs uTools
+
+**Lumina 优势：**
+- ✅ 完全免费开源
+- ✅ Linux 支持
+- ✅ 代码开源可控
+- ✅ 本地运行，隐私更好
+- ✅ 无需网络功能
+
+**uTools 优势：**
+- ✅ 插件市场成熟
+- ✅ 更多实用工具（OCR、翻译等）
+- ✅ 云同步功能
+- ✅ 社区活跃
+
+---
+
+## 📷 截图展示（敬请期待）
+
+> 我们正在准备漂亮的截图！欢迎贡献截图 📸
+
+---
+
+## 💾 安装方法
+
+### macOS
+
+1. 从 [Releases](../../releases) 下载 `Lumina-xxx-arm64.dmg`
+2. 双击打开 DMG 文件
+3. 将 Lumina.app 拖拽到 Applications 文件夹
+4. 在 Launchpad 中启动 Lumina
+
+⚠️ **首次安装**：在"系统偏好设置 > 安全性与隐私"中允许打开未签名的应用。
+
+### Windows
+
+1. 从 [Releases](../../releases) 下载 `Lumina-xxx-Setup.exe`
+2. 双击安装程序
+3. 按照向导完成安装
+4. 在开始菜单中找到 Lumina
+
+### Linux
+
+**AppImage:**
+1. 下载 `Lumina-xxx.AppImage`
+2. 添加执行权限：`chmod +x Lumina-xxx.AppImage`
+3. 双击运行
+
+**DEB 包:**
+```bash
+sudo dpkg -i Lumina-xxx.deb
+```
+
+---
+
+## 📖 使用指南
+
+### 基本操作
+
+1. **打开搜索**：按下 `Shift + Space`
+2. **搜索内容**：输入关键词
+3. **选择结果**：使用 ↑↓ 键导航
+4. **执行操作**：按 Enter 键
+5. **关闭窗口**：按 Esc 键（应用会保持在系统托盘）
+
+### 快捷键
+
+- `Shift + Space`：打开/显示主窗口
+- `Enter`：执行选中的项目
+- `Esc`：关闭窗口（不会退出应用）
+- `↑↓`：在结果列表中导航
+
+### 高级技巧
+
+- **应用搜索**：直接输入应用名称即可
+- **文件搜索**：输入 `file <关键词>` 来搜索文件
+- **计算器**：直接输入数学表达式
+- **网页搜索**：输入关键词后选择搜索引擎图标
+- **书签**：输入书签名称或 URL
+
+更多详细文档：
+- [快速开始指南](docs/快速开始.md)
+- [启动设置说明](docs/启动设置使用说明.md)
+- [技术架构](docs/技术架构设计.md)
+
+---
+
+## 💻 系统要求
+
+### 运行 Lumina
+- **macOS**: 10.15 (Catalina) 或更高版本
+- **Windows**: Windows 10 或更高版本
+- **Linux**: 主流发行版（Ubuntu、Fedora、Debian 等）
+
+### 开发者
+- Node.js 18+ 
+- npm 或 yarn
+
+---
+
+## 🔧 开发者指南
+
+```bash
+# 克隆项目
+git clone https://github.com/yourusername/lumina.git
+cd lumina
 
 # 安装依赖
 npm install
@@ -251,17 +452,72 @@ npm run version:major
 4. 推送分支：`git push origin feat/awesome`
 5. 提交 Pull Request
 
-## 许可证
+---
 
-本项目采用 MIT 许可证，详见 `LICENSE`。
+## ❓ 常见问题（FAQ）
 
-## FAQ
+### 使用问题
 
-- **全局快捷键无效？** 检查是否被系统或其他应用占用；必要时更换快捷键并重启应用。
-- **首次启动索引较慢？** 这是正常现象，完成后将进入周期索引并显著加速；可在设置中触发“重新索引”。
-- **图标未生效？** 确保 `build/icon.png` 存在并执行 `npm run generate:icon`，然后重新构建。
+**Q: 全局快捷键 `Shift + Space` 无效？**  
+A: 可能是被系统或其他应用占用。在 macOS 上，前往"系统偏好设置 > 键盘 > 快捷键"检查是否有冲突。可以更换快捷键并重启应用。
+
+**Q: 首次启动较慢？**  
+A: 首次启动会自动索引所有应用、文件和书签，可能需要几分钟。完成后将进入快速启动模式（约 1-2 秒）。
+
+**Q: 搜索结果不准确？**  
+A: 在设置中关闭"快速启动"模式，让应用重新索引数据。
+
+**Q: Safari 书签无法加载？**  
+A: macOS 需要授予"完全磁盘访问"权限：系统偏好设置 > 安全性与隐私 > 隐私 > 完全磁盘访问 > 勾选 Lumina。
+
+**Q: 文件搜索找不到某些文件？**  
+A: 在设置中添加需要搜索的目录，或开启"扫描深度"选项。
+
+**Q: 支持中文搜索吗？**  
+A: 完全支持！可以输入拼音、首字母或中文名称进行搜索。
+
+### 开发问题
+
+**Q: 图标未生效？**  
+确保 `build/icon.png` 存在，执行 `npm run generate:icon`，然后重新构建。
+
+**Q: 如何调试？**  
+开发模式下查看终端输出；生产模式下可以通过 `Cmd+Option+I` 打开开发者工具。
 
 更多问题与进阶说明：
-- 多窗口与路由：`docs/多窗口管理说明.md`
-- 快速入门与故障排除：`docs/快速开始.md`
-- 图标设置：`docs/图标设置教程.md`
+- [多窗口管理](docs/多窗口管理说明.md)
+- [快速入门与故障排除](docs/快速开始.md)
+- [图标设置](docs/图标设置教程.md)
+
+---
+
+## 🤝 贡献
+
+我们欢迎所有形式的贡献！
+
+1. Fork 本仓库
+2. 创建功能分支：`git checkout -b feature/AmazingFeature`
+3. 提交更改：`git commit -m 'Add some AmazingFeature'`
+4. 推送到分支：`git push origin feature/AmazingFeature`
+5. 打开 Pull Request
+
+---
+
+## 📄 许可证
+
+本项目采用 [MIT 许可证](LICENSE)。
+
+---
+
+## 🙏 致谢
+
+感谢所有开源贡献者！
+
+特别致谢：
+- [Alfred](https://www.alfredapp.com/) - 灵感来源
+- [uTools](https://u.tools/) - 灵感来源
+- [Electron](https://www.electronjs.org/) - 跨平台框架
+
+---
+
+**Lumina - 让应用启动更快、更简单！** ⚡️
