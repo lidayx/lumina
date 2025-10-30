@@ -41,21 +41,19 @@ class WindowManager {
       // macOS 特定设置
       ...(config.type === 'main' && process.platform === 'darwin' && {
         titleBarStyle: 'hidden',
-        trafficLightPosition: { x: -100, y: -100 }, // 隐藏红绿灯按钮
+        trafficLightPosition: { x: -100, y: -100 }, // 隐藏 macOS 窗口控制按钮
       }),
-      // Windows/Linux 隐藏标题栏按钮
       ...(config.type === 'main' && process.platform !== 'darwin' && {
         autoHideMenuBar: true,
       }),
-        webPreferences: {
-          preload: require('path').join(__dirname, 'preload.js'),
-          contextIsolation: true,
-          nodeIntegration: false,
-        },
-        show: false, // 先不显示，等加载完成后再显示
-        // 设置图标
-        icon: this.getAppIcon(),
-      };
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+      show: false,
+      icon: this.getAppIcon(),
+    };
 
     // 设置窗口位置
     const primaryDisplay = screen.getPrimaryDisplay();
@@ -184,9 +182,6 @@ class WindowManager {
     return windows;
   }
 
-  /**
-   * 获取活动窗口
-   */
   public getActiveWindow(): BrowserWindow | undefined {
     const windows = BrowserWindow.getAllWindows();
     return windows.find((w) => w.isFocused());

@@ -1,7 +1,5 @@
-import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
-import { getMainWindow, showMainWindow, toggleMainWindow } from './windows/mainWindow';
-import { openSettingsWindow } from './windows/settingsWindow';
-import { openPluginWindow } from './windows/pluginWindow';
+import { app, BrowserWindow, ipcMain, globalShortcut, screen } from 'electron';
+import { getMainWindow, showMainWindow } from './windows/mainWindow';
 import { windowManager } from './windows/windowManager';
 import { registerAppHandlers } from './handlers/appHandlers';
 import { registerFileHandlers } from './handlers/fileHandlers';
@@ -13,7 +11,6 @@ import { registerCalculatorHandlers } from './handlers/calculatorHandlers';
 import { registerBookmarkHandlers } from './handlers/bookmarkHandlers';
 import { registerSettingsHandlers } from './handlers/settingsHandlers';
 import { indexService } from './services/indexService';
-import { browserService } from './services/browserService';
 import { appService } from './services/appService';
 import { fileService } from './services/fileService';
 import { trayService } from './services/trayService';
@@ -28,11 +25,10 @@ if (!gotTheLock) {
   console.log('⚠️ 应用已经运行，退出当前实例');
   app.quit();
 } else {
-  // 处理第二实例启动（用户试图打开第二个实例时）
-  app.on('second-instance', (_event, _commandLine, _workingDirectory) => {
+  // 处理第二实例启动
+  app.on('second-instance', () => {
     console.log('⚠️ 检测到试图启动第二个实例，激活现有实例');
     
-    // 如果有主窗口，显示并聚焦它
     const mainWindow = getMainWindow();
     if (mainWindow) {
       if (mainWindow.isMinimized()) {
@@ -122,7 +118,7 @@ if (!gotTheLock) {
       }
     });
 
-    // macOS: 当所有窗口都关闭后，点击 Dock 图标时重新创建窗口
+    // macOS: 点击 Dock 图标时重新创建窗口
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         getMainWindow();
@@ -133,8 +129,7 @@ if (!gotTheLock) {
 
 // 所有窗口关闭时不退出应用（保持在托盘运行）
 app.on('window-all-closed', () => {
-  // 注意：不要退出应用，让它保持在系统托盘运行
-  // 用户可以通过托盘菜单退出
+  // 保持应用运行，用户可通过托盘菜单退出
 });
 
 // 应用准备退出
@@ -223,19 +218,13 @@ ipcMain.handle('window-close', (_event, windowType: string) => {
 ipcMain.handle('window-resize', (_event, width: number, height: number) => {
   const mainWindow = windowManager.getWindow('main');
   if (mainWindow) {
-    // 获取当前窗口位置
-    const [currentX, currentY] = mainWindow.getPosition();
-    
-    // 设置新大小
+    const [, currentY] = mainWindow.getPosition();
     mainWindow.setSize(width, height);
     
-    // 保持窗口顶部位置不变（只在垂直方向调整，水平居中）
-    const display = require('electron').screen.getPrimaryDisplay();
+    const display = screen.getPrimaryDisplay();
     const { width: screenWidth } = display.workAreaSize;
-    
-    // 水平居中
     const x = Math.floor((screenWidth - width) / 2);
-    // 保持原有的 y 位置（顶部位置不变）
+    
     mainWindow.setPosition(x, currentY);
   }
 });
@@ -251,12 +240,10 @@ registerCalculatorHandlers();
 registerBookmarkHandlers();
 registerSettingsHandlers();
 
-// 注册快捷键
+// 注册全局快捷键
 app.on('ready', () => {
-  // 注册全局快捷键 Shift+Space
   const shortcut = 'Shift+Space';
   const ret = globalShortcut.register(shortcut, () => {
-    // 按快捷键时只显示窗口，不关闭
     showMainWindow();
   });
 

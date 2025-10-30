@@ -3,9 +3,10 @@ import { webService } from '../services/webService';
 
 /**
  * 注册网页搜索相关的 IPC 处理器
+ * 提供搜索引擎管理、网页搜索、历史记录和常用网站功能
  */
 export function registerWebHandlers() {
-  // 获取所有搜索引擎
+  // 获取所有配置的搜索引擎
   ipcMain.handle('web-get-engines', async () => {
     try {
       return webService.getAllEngines();
@@ -15,7 +16,7 @@ export function registerWebHandlers() {
     }
   });
 
-  // 搜索网页
+  // 使用指定搜索引擎搜索（默认使用配置的默认引擎）
   ipcMain.handle('web-search', async (_event, query: string, engineName?: string) => {
     try {
       return await webService.searchWeb(query, engineName);
@@ -25,7 +26,7 @@ export function registerWebHandlers() {
     }
   });
 
-  // 打开搜索 URL
+  // 在浏览器中打开搜索URL
   ipcMain.handle('web-open', async (_event, url: string) => {
     try {
       await webService.openSearchUrl(url);
@@ -36,7 +37,7 @@ export function registerWebHandlers() {
     }
   });
 
-  // 获取搜索历史
+  // 获取网页搜索历史记录
   ipcMain.handle('web-get-history', async (_event, limit?: number) => {
     try {
       return webService.getSearchHistory(limit);
@@ -46,7 +47,7 @@ export function registerWebHandlers() {
     }
   });
 
-  // 清除搜索历史
+  // 清除网页搜索历史记录
   ipcMain.handle('web-clear-history', async () => {
     try {
       webService.clearSearchHistory();
@@ -57,7 +58,7 @@ export function registerWebHandlers() {
     }
   });
 
-  // 获取常用网站
+  // 获取常用网站列表（快速访问）
   ipcMain.handle('web-get-common-sites', async () => {
     try {
       return webService.getCommonSites();
@@ -78,7 +79,7 @@ export function registerWebHandlers() {
     }
   });
 
-  // 更新搜索引擎
+  // 更新指定搜索引擎的配置
   ipcMain.handle('web-update-engine', async (_event, name: string, updates: any) => {
     try {
       webService.updateSearchEngine(name, updates);
@@ -89,7 +90,7 @@ export function registerWebHandlers() {
     }
   });
 
-  // 删除搜索引擎
+  // 删除指定的搜索引擎
   ipcMain.handle('web-delete-engine', async (_event, name: string) => {
     try {
       webService.deleteSearchEngine(name);

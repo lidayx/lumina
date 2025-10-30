@@ -4,9 +4,10 @@ import { BrowserConfig } from '../../shared/types/browser';
 
 /**
  * 注册浏览器相关的 IPC 处理器
+ * 管理浏览器的增删改查、默认设置和URL打开
  */
 export function registerBrowserHandlers() {
-  // 获取所有浏览器
+  // 获取所有已配置的浏览器
   ipcMain.handle('browser-get-all', async () => {
     try {
       return browserService.getAllBrowsers();
@@ -16,7 +17,7 @@ export function registerBrowserHandlers() {
     }
   });
 
-  // 添加浏览器
+  // 添加新的浏览器配置
   ipcMain.handle('browser-add', async (_event, browser: BrowserConfig) => {
     try {
       browserService.addBrowser(browser);
@@ -27,7 +28,7 @@ export function registerBrowserHandlers() {
     }
   });
 
-  // 更新浏览器
+  // 更新指定浏览器的配置
   ipcMain.handle('browser-update', async (_event, id: string, updates: Partial<BrowserConfig>) => {
     try {
       browserService.updateBrowser(id, updates);
@@ -38,7 +39,7 @@ export function registerBrowserHandlers() {
     }
   });
 
-  // 删除浏览器
+  // 删除指定的浏览器配置
   ipcMain.handle('browser-delete', async (_event, id: string) => {
     try {
       browserService.deleteBrowser(id);
@@ -60,7 +61,7 @@ export function registerBrowserHandlers() {
     }
   });
 
-  // 获取默认浏览器
+  // 获取当前默认浏览器
   ipcMain.handle('browser-get-default', async () => {
     try {
       return browserService.getDefaultBrowser();
@@ -70,7 +71,7 @@ export function registerBrowserHandlers() {
     }
   });
 
-  // 打开 URL
+  // 使用默认浏览器打开URL
   ipcMain.handle('browser-open-url', async (_event, url: string) => {
     try {
       await browserService.openUrl(url);

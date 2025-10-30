@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
 
-// 动态导入 sql.js（支持开发和生产环境）
+// 动态导入 sql.js（兼容开发/生产环境）
 let initSqlJsSync: any;
 
 const loadSqlJs = async () => {
@@ -33,7 +33,24 @@ interface DatabaseItem {
   lastUsed: string | null;
   score: number;
   indexedAt: string;
-  searchKeywords?: string | null; // 拼音搜索关键词
+  searchKeywords?: string | null;
+}
+
+interface DatabaseItemInput {
+  id: string;
+  type: string;
+  name: string;
+  nameEn?: string;
+  nameCn?: string;
+  path: string;
+  icon?: string;
+  description?: string;
+  category?: string;
+  launchCount?: number;
+  lastUsed?: Date;
+  score?: number;
+  indexedAt: Date;
+  searchKeywords?: string;
 }
 
 class SimpleDatabase {
@@ -48,16 +65,13 @@ class SimpleDatabase {
   }
 
   private async ensureInit() {
-    // 如果已初始化，直接返回
     if (this.initialized || this.db) return;
     
-    // 如果正在初始化，等待正在进行的初始化完成
     if (this.initPromise) {
       await this.initPromise;
       return;
     }
     
-    // 开始新的初始化
     this.initPromise = this.doInit();
     await this.initPromise;
   }
@@ -69,25 +83,21 @@ class SimpleDatabase {
     console.log('📁 [数据库] 路径:', this.dataPath);
     
     try {
-      // 动态加载 sql.js
       const sqlJsModule = await loadSqlJs();
       const SQL = await sqlJsModule();
       console.log('✅ [数据库] sql.js 模块加载成功');
       
-      // 尝试加载现有数据库
       const dbExists = fs.existsSync(this.dataPath);
       if (dbExists) {
         const fileBuffer = fs.readFileSync(this.dataPath);
         this.db = new SQL.Database(fileBuffer);
         console.log('📂 [数据库] 加载现有数据库');
         
-        // 输出数据库统计信息
         const stats = this.getStats();
         console.log('📊 [数据库] 统计数据:');
         console.log(`   - 总项目数: ${stats.totalItems}`);
         console.log(`   - 类型分布:`, stats.typeStats);
       } else {
-        // 创建新数据库
         this.db = new SQL.Database();
         this.initSchema();
         this.save();
@@ -107,7 +117,7 @@ class SimpleDatabase {
   private initSchema() {
     if (!this.db) return;
 
-    // 创建 items 表
+    // items 表
     this.db.run(`
       CREATE TABLE IF NOT EXISTS items (
         id TEXT PRIMARY KEY,
@@ -127,7 +137,7 @@ class SimpleDatabase {
       )
     `);
 
-    // 创建 item_types 表
+    // item_types 表
     this.db.run(`
       CREATE TABLE IF NOT EXISTS item_types (
         type TEXT PRIMARY KEY,
@@ -137,7 +147,7 @@ class SimpleDatabase {
       )
     `);
 
-    // 创建索引
+    // 索引
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_type ON items(type)`);
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_score ON items(score DESC)`);
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_launchCount ON items(launchCount DESC)`);
@@ -146,7 +156,7 @@ class SimpleDatabase {
     try {
       this.db.run(`ALTER TABLE items ADD COLUMN searchKeywords TEXT`);
     } catch (e) {
-      // 列已存在，忽略错误
+      // 列已存在
     }
   }
 
@@ -192,24 +202,7 @@ class SimpleDatabase {
     }
   }
 
-  // ========== Items ==========
-
-  public async upsertItem(item: {
-    id: string;
-    type: string;
-    name: string;
-    nameEn?: string;
-    nameCn?: string;
-    path: string;
-    icon?: string;
-    description?: string;
-    category?: string;
-    launchCount?: number;
-    lastUsed?: Date;
-    score?: number;
-    indexedAt: Date;
-    searchKeywords?: string;
-  }) {
+  public async upsertItem(item: DatabaseItemInput) {
     await this.ensureInit();
     if (!this.db) return;
 
@@ -260,26 +253,11 @@ class SimpleDatabase {
     }
   }
 
-  public async batchUpsertItems(items: Array<{
-    id: string;
-    type: string;
-    name: string;
-    nameEn?: string;
-    nameCn?: string;
-    path: string;
-    icon?: string;
-    description?: string;
-    category?: string;
-    launchCount?: number;
-    lastUsed?: Date;
-    score?: number;
-    indexedAt: Date;
-    searchKeywords?: string;
-  }>) {
+  public async batchUpsertItems(items: DatabaseItemInput[]) {
     await this.ensureInit();
     if (!this.db || items.length === 0) return;
 
-    // 使用事务和批量操作，大幅提升性能
+    // 事务 + 批量执行，提高性能
     const stmt = this.db.prepare(`
       INSERT INTO items (
         id, type, name, nameEn, nameCn, path, icon, description, category,
@@ -322,7 +300,7 @@ class SimpleDatabase {
     }
 
     stmt.free();
-    // 只在最后保存一次，而不是每次 upsertItem 都保存
+    // 仅最后保存一次
     this.save();
   }
 
@@ -396,7 +374,6 @@ class SimpleDatabase {
       launchCount DESC 
       LIMIT 50`;
     
-    // 添加开头匹配和关键词匹配参数
     params.push(`${query}%`, `%,${query},%`);
 
     const stmt = this.db.prepare(sql);
@@ -441,15 +418,13 @@ class SimpleDatabase {
 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - maxAgeDays);
-    const cutoffDateStr = cutoffDate.toISOString();
-
-    // 删除超过指定天数且不在当前列表中的项目
+    
     const stmt = this.db.prepare(`
       DELETE FROM items 
       WHERE indexedAt < ? AND id NOT IN (${currentItemIds.map(() => '?').join(',')})
     `);
     
-    stmt.run([cutoffDateStr, ...currentItemIds]);
+    stmt.run([cutoffDate.toISOString(), ...currentItemIds]);
     stmt.free();
     this.save();
   }
@@ -469,8 +444,6 @@ class SimpleDatabase {
     console.log(`✅ [数据库] 已清除类型 "${type}" 的所有项目`);
   }
 
-  // ========== Stats ==========
-
   public getStats() {
     if (!this.db) {
       return { totalItems: 0, lastIndexed: '', typeStats: [] };
@@ -478,7 +451,6 @@ class SimpleDatabase {
 
     const stmt = this.db.prepare(`
       SELECT 
-        COUNT(*) as total,
         type,
         COUNT(*) as count
       FROM items
@@ -496,12 +468,10 @@ class SimpleDatabase {
 
     return {
       totalItems: total,
-      lastIndexed: '', // TODO: 添加此字段
+      lastIndexed: '',
       typeStats,
     };
   }
-
-  // ========== Types ==========
 
   public getTypes() {
     if (!this.db) return [];
