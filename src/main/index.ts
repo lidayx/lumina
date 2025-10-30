@@ -1,0 +1,231 @@
+import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
+import { getMainWindow, showMainWindow, toggleMainWindow } from './windows/mainWindow';
+import { openSettingsWindow } from './windows/settingsWindow';
+import { openPluginWindow } from './windows/pluginWindow';
+import { windowManager } from './windows/windowManager';
+import { registerAppHandlers } from './handlers/appHandlers';
+import { registerFileHandlers } from './handlers/fileHandlers';
+import { registerWebHandlers } from './handlers/webHandlers';
+import { registerBrowserHandlers } from './handlers/browserHandlers';
+import { registerWindowHandlers } from './handlers/windowHandlers';
+import { registerCommandHandlers } from './handlers/commandHandlers';
+import { registerCalculatorHandlers } from './handlers/calculatorHandlers';
+import { registerBookmarkHandlers } from './handlers/bookmarkHandlers';
+import { registerSettingsHandlers } from './handlers/settingsHandlers';
+import { indexService } from './services/indexService';
+import { browserService } from './services/browserService';
+import { appService } from './services/appService';
+import { fileService } from './services/fileService';
+import { trayService } from './services/trayService';
+import bookmarkService from './services/bookmarkService';
+
+// 单实例限制：防止同时运行多个应用实例
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  // 如果已经有实例在运行，退出当前实例
+  console.log('⚠️ 应用已经运行，退出当前实例');
+  app.quit();
+} else {
+  // 处理第二实例启动（用户试图打开第二个实例时）
+  app.on('second-instance', (_event, _commandLine, _workingDirectory) => {
+    console.log('⚠️ 检测到试图启动第二个实例，激活现有实例');
+    
+    // 如果有主窗口，显示并聚焦它
+    const mainWindow = getMainWindow();
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.focus();
+      mainWindow.show();
+    }
+  });
+
+  // 设置应用名称和版本
+  app.setName('Lumina');
+  
+  // 自定义 About 对话框（仅 macOS）
+  if (process.platform === 'darwin') {
+    // 从 app 对象读取版本号（会自动从 package.json 读取）
+    app.setAboutPanelOptions({
+      applicationName: 'Lumina',
+      applicationVersion: app.getVersion(),
+      credits: '快如闪电的跨平台搜索启动器',
+      copyright: 'Copyright © 2024 Lumina',
+      iconPath: '', // 不显示图标
+    });
+  }
+
+  app.whenReady().then(async () => {
+    // 创建主窗口
+    const mainWindow = getMainWindow();
+    
+    // 根据设置决定是否显示窗口（minimizeToTray）
+    const { default: settingsService } = await import('./services/settingsService');
+    const minimizeToTray = settingsService.getSetting('minimizeToTray');
+    
+    if (!minimizeToTray) {
+      // 显示窗口
+      mainWindow.show();
+      mainWindow.focus();
+      console.log('✓ Lumina 窗口已显示');
+    } else {
+      // 启动时最小化到托盘，不显示窗口
+      mainWindow.hide();
+      console.log('✓ Lumina 已启动（最小化到托盘）');
+    }
+    
+    // 启动定期索引服务（每10分钟重新索引一次）
+    indexService.startPeriodicIndexing(10);
+    
+    // 异步创建系统托盘（不阻塞）
+    setImmediate(() => {
+      trayService.initialize().catch(err => {
+        console.error('托盘初始化失败:', err);
+      });
+    });
+
+    // 首次启动时触发索引（根据 fastStart 设置决定是否使用缓存）
+    setImmediate(async () => {
+      const { dbManager } = await import('./database/db');
+      const apps = await dbManager.getAllItems('app');
+      const fastStart = settingsService.getSetting('fastStart');
+      
+      // fastStart = false 或首次启动（无缓存），执行全量索引
+      if (!fastStart || !apps || apps.length === 0) {
+        if (!fastStart) {
+          console.log('📝 快速启动已禁用，执行全量索引...');
+        } else {
+          console.log('📝 首次启动，等待窗口加载完成后触发索引...');
+        }
+        
+        // 等待HTML加载完成后再触发索引（避免阻塞UI）
+        mainWindow.webContents.once('did-finish-load', async () => {
+          console.log('🚀 触发完整索引...');
+          // fastStart=false 时，所有服务都重新扫描（忽略缓存）
+          await Promise.all([
+            appService.indexApps(true).catch(err => console.error('应用索引失败:', err)),
+            fileService.indexFiles().catch(err => console.error('文件索引失败:', err)),
+            bookmarkService.loadBookmarks(true).catch(err => console.error('书签加载失败:', err)),
+          ]);
+        });
+      } else {
+        // fastStart = true 且有缓存，快速加载（仅从缓存加载，不重新索引）
+        console.log('✅ 快速启动模式：从缓存加载...');
+        await Promise.all([
+          appService.indexApps(false).catch(err => console.error('应用索引失败:', err)),
+          fileService.indexFiles().catch(err => console.error('文件索引失败:', err)),
+          bookmarkService.loadBookmarks().catch(err => console.error('书签加载失败:', err)),
+        ]);
+      }
+    });
+
+    // macOS: 当所有窗口都关闭后，点击 Dock 图标时重新创建窗口
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        getMainWindow();
+      }
+    });
+  });
+}
+
+// 所有窗口关闭时不退出应用（保持在托盘运行）
+app.on('window-all-closed', () => {
+  // 注意：不要退出应用，让它保持在系统托盘运行
+  // 用户可以通过托盘菜单退出
+});
+
+// 应用准备退出
+app.on('will-quit', () => {
+  // 注销所有快捷键
+  globalShortcut.unregisterAll();
+  
+  // 停止索引服务
+  try {
+    indexService.stopPeriodicIndexing();
+  } catch (error) {
+    console.error('停止索引服务失败:', error);
+  }
+  
+  // 销毁托盘
+  try {
+    trayService.destroy();
+  } catch (error) {
+    console.error('销毁托盘失败:', error);
+  }
+});
+
+// IPC 处理器
+ipcMain.handle('get-windows', () => {
+  return windowManager.getAllWindows().map((w) => ({
+    id: w.id,
+    type: w.title,
+  }));
+});
+
+ipcMain.handle('window-show', (_event, windowType: string) => {
+  windowManager.showWindow(windowType as any);
+});
+
+ipcMain.handle('window-hide', (_event, windowType: string) => {
+  windowManager.hideWindow(windowType as any);
+});
+
+ipcMain.handle('window-toggle', (_event, windowType: string) => {
+  windowManager.toggleWindow(windowType as any);
+});
+
+ipcMain.handle('window-close', (_event, windowType: string) => {
+  windowManager.closeWindow(windowType as any);
+});
+
+// 调整窗口大小
+ipcMain.handle('window-resize', (_event, width: number, height: number) => {
+  const mainWindow = windowManager.getWindow('main');
+  if (mainWindow) {
+    // 获取当前窗口位置
+    const [currentX, currentY] = mainWindow.getPosition();
+    
+    // 设置新大小
+    mainWindow.setSize(width, height);
+    
+    // 保持窗口顶部位置不变（只在垂直方向调整，水平居中）
+    const display = require('electron').screen.getPrimaryDisplay();
+    const { width: screenWidth } = display.workAreaSize;
+    
+    // 水平居中
+    const x = Math.floor((screenWidth - width) / 2);
+    // 保持原有的 y 位置（顶部位置不变）
+    mainWindow.setPosition(x, currentY);
+  }
+});
+
+// 注册 IPC 处理器
+registerAppHandlers();
+registerFileHandlers();
+registerWebHandlers();
+registerBrowserHandlers();
+registerWindowHandlers();
+registerCommandHandlers();
+registerCalculatorHandlers();
+registerBookmarkHandlers();
+registerSettingsHandlers();
+
+// 注册快捷键
+app.on('ready', () => {
+  // 注册全局快捷键 Shift+Space
+  const shortcut = 'Shift+Space';
+  const ret = globalShortcut.register(shortcut, () => {
+    // 按快捷键时只显示窗口，不关闭
+    showMainWindow();
+  });
+
+  if (!ret) {
+    console.log('全局快捷键注册失败');
+  } else {
+    console.log(`✅ 已注册全局快捷键: ${shortcut}`);
+  }
+
+  console.log('Lumina is ready!');
+});

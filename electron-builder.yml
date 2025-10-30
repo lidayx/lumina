@@ -1,0 +1,61 @@
+appId: com.lumina.app
+productName: Lumina
+copyright: Copyright © 2024
+
+directories:
+  buildResources: build
+  output: dist
+
+files:
+  - dist
+  - dist-electron
+  - package.json
+  - 'node_modules/sql.js/dist/sql-wasm.wasm'
+  - build/icon.png
+  - build/icon.icns
+  - build/icon.ico
+  - '!src'
+  - '!docs'
+  - '!*.md'
+  - '!*.sh'
+  - '!scripts'
+  - '!node_modules/*'
+
+mac:
+  category: public.app-category.utilities
+  target:
+    - dmg
+    - zip
+  icon: build/icon.icns
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  gatekeeperAssess: false
+
+win:
+  target:
+    - nsis
+    - portable
+  # 临时禁用图标以在 macOS 上构建（需要 Wine 才能使用图标）
+  # icon: build/icon.ico
+  publisherName: Your Name
+  # 在 macOS 上交叉构建 Windows 时跳过签名
+  sign: null
+  signingHashAlgorithms:
+    - sha256
+  artifactName: ${name}-Setup-${version}.${ext}
+
+linux:
+  target:
+    - AppImage
+    - deb
+  icon: build/icon.png
+  category: Utility
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+appImage:
+  artifactName: ${name}-${version}-${arch}.${ext}
