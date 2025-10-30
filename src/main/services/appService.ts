@@ -8,21 +8,26 @@ import pinyin from 'pinyin';
 /**
  * 应用服务
  * 负责应用索引、搜索和启动
+ * - macOS: 使用 Spotlight 索引或目录扫描，支持 .app 格式
+ * - Windows: 从 Start Menu 读取快捷方式，支持 .exe 格式
+ * - Linux: 扫描 .desktop 文件
  */
 class AppService {
   // ========== 常量 ==========
-  // MAX_SCAN_DEPTH 已移除：不再使用递归扫描，改用系统索引
 
   // ========== 私有属性 ==========
+  /** 应用数据映射表（ID -> 应用信息） */
   private apps: Map<string, AppInfo> = new Map();
+  /** 是否已完成索引 */
   private indexed: boolean = false;
-  // 性能优化：缓存搜索关键词，避免重复计算拼音
+  /** 搜索关键词缓存（性能优化：避免重复计算拼音） */
   private searchKeywordsCache: Map<string, string[]> = new Map();
 
   // ========== 公共 API ==========
 
   /**
    * 获取所有已安装的应用
+   * @returns 应用信息数组
    */
   public async getAllApps(): Promise<AppInfo[]> {
     if (!this.indexed) {
@@ -33,7 +38,9 @@ class AppService {
 
   /**
    * 索引所有应用
+   * 优先从数据库缓存加载，无缓存则执行完整扫描
    * @param ignoreCache 是否忽略缓存，强制重新扫描
+   * @returns Promise<void>
    */
   public async indexApps(ignoreCache: boolean = false): Promise<void> {
     console.log('📱 [应用服务] 开始索引应用...');
@@ -62,6 +69,8 @@ class AppService {
 
   /**
    * 强制重新扫描应用（忽略缓存）
+   * 清空缓存后执行完整扫描
+   * @returns Promise<void>
    */
   public async reindexApps(): Promise<void> {
     console.log('📱 [应用服务] 强制重新扫描应用...');
@@ -70,7 +79,13 @@ class AppService {
   }
 
   /**
-   * 启动应用（使用系统命令，更可靠）
+   * 启动应用（使用系统命令）
+   * - macOS: 使用 `open -a` 或 `open <path>`
+   * - Windows: 使用 Windows Shell API 打开
+   * - Linux: 使用 `gtk-launch` 或 `xdg-open`
+   * @param appId 应用ID
+   * @returns Promise<void>
+   * @throws 应用不存在或启动失败时抛出错误
    */
   public async launchApp(appId: string): Promise<void> {
     const appInfo = this.apps.get(appId);
@@ -142,6 +157,9 @@ class AppService {
 
   /**
    * 搜索应用（支持拼音、中文、英文）
+   * 使用评分算法对结果进行排序，优先显示完全匹配和前缀匹配
+   * @param query 搜索关键词
+   * @returns 排序后的应用信息数组（最多50个）
    */
   public async searchApps(query: string): Promise<AppInfo[]> {
     if (!query) {
@@ -177,6 +195,8 @@ class AppService {
 
   /**
    * 从缓存加载应用
+   * 恢复应用数据和搜索关键词缓存
+   * @param cachedApps 缓存的应用数据
    */
   private loadAppsFromCache(cachedApps: any[]): void {
     for (const app of cachedApps) {
@@ -204,6 +224,8 @@ class AppService {
 
   /**
    * 扫描并更新应用数据库
+   * 根据平台调用相应的索引方法，验证文件存在后保存到数据库
+   * @returns Promise<void>
    */
   private async scanAndUpdateApps(): Promise<void> {
     const platform = process.platform;
@@ -253,6 +275,9 @@ class AppService {
 
   /**
    * 保存应用到数据库
+   * 批量写入应用数据，清理过期条目
+   * @param apps 应用数据映射表
+   * @returns Promise<void>
    */
   private async saveAppsToDatabase(apps: Map<string, AppInfo>): Promise<void> {
     const { dbManager } = await import('../database/db');
@@ -331,7 +356,7 @@ class AppService {
         timeout: 30000 // 30秒超时
       });
       
-      const appPaths = output.trim().split('\n').filter(p => p && p.trim());
+      const appPaths = output.trim().split('\n').filter((p: string) => p && p.trim());
       console.log(`🔍 [应用服务] Spotlight 找到 ${appPaths.length} 个应用路径`);
       
       // 只处理标准应用目录中的应用（排除系统应用和用户特定应用）
@@ -1009,6 +1034,7 @@ $shortcuts | ConvertTo-Json
     
     try {
       // 使用 Node.js 递归扫描目录查找 .lnk 文件
+      const { execSync } = require('child_process');
       await this.scanDirectoryRecursive(startMenuPath, async (filePath) => {
         if (filePath.toLowerCase().endsWith('.lnk')) {
           try {
@@ -1170,8 +1196,6 @@ $shortcuts | ConvertTo-Json
       const parseDesktopFile = (content: string): Record<string, string> => {
         const lines = content.split('\n');
         const result: Record<string, string> = {};
-        let currentKey = '';
-        let currentValue = '';
         
         for (const line of lines) {
           // 跳过注释和空行

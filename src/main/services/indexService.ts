@@ -14,18 +14,13 @@ class IndexService {
 
   /**
    * 启动定期索引
+   * @param intervalMinutes 索引间隔（分钟），默认30分钟
    */
   public startPeriodicIndexing(intervalMinutes: number = 30): void {
-    this.stopPeriodicIndexing(); // 先清除现有定时器
-
-    // setTimeout(async () => {
-    //   await this.executeIndexing();
-    // }, 2000);
-
+    this.stopPeriodicIndexing();
     this.intervalId = setInterval(async () => {
       await this.executeIndexing();
     }, intervalMinutes * 60 * 1000);
-
     console.log(`✅ [索引服务] 已启动定期索引（每 ${intervalMinutes} 分钟）`);
   }
 
