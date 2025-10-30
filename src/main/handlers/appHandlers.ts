@@ -18,7 +18,15 @@ export function registerAppHandlers() {
   // 搜索应用
   ipcMain.handle('app-search', async (_event, query: string) => {
     try {
-      return await appService.searchApps(query);
+      const results = await appService.searchApps(query);
+      console.log(`🔍 [应用处理器] 搜索 "${query}" 返回 ${results.length} 个结果`);
+      if (results.length > 0) {
+        console.log(`🔍 [应用处理器] 第一个结果: ${results[0].name}, 有图标: ${!!results[0].icon}, 图标长度: ${results[0].icon?.length || 0}`);
+        if (results[0].icon) {
+          console.log(`🔍 [应用处理器] 图标前100字符: ${results[0].icon.substring(0, 100)}`);
+        }
+      }
+      return results;
     } catch (error) {
       console.error('Error searching apps:', error);
       return [];

@@ -148,6 +148,8 @@ class AppService {
       return this.getAllApps();
     }
 
+    console.log(`🔍 [应用服务] 搜索应用: "${query}", 共有 ${this.apps.size} 个应用`);
+    
     const searchTerm = query.toLowerCase().trim();
     const results: Array<{ app: AppInfo; score: number }> = [];
     const MAX_RESULTS = 50; // 限制搜索结果数量，提升性能
@@ -157,11 +159,14 @@ class AppService {
       
       if (score > 0) {
         results.push({ app, score });
+        console.log(`✅ [应用服务] 匹配: ${app.name} (分数: ${score})`);
         // 如果已经收集到足够的高分结果（完全匹配），可以提前返回
         // 但为了保持准确性，还是收集所有结果再排序
       }
     }
 
+    console.log(`🔍 [应用服务] 搜索到 ${results.length} 个结果`);
+    
     // 排序后限制返回数量
     return this.sortAppResults(results, searchTerm)
       .slice(0, MAX_RESULTS)
@@ -204,6 +209,9 @@ class AppService {
     const platform = process.platform;
     const scannedApps = new Map<string, AppInfo>();
     
+    console.log(`🔍 [应用服务] 开始扫描应用，平台: ${platform}`);
+    console.log(`🔍 [应用服务] 扫描前应用数量: ${scannedApps.size}`);
+    
     // 扫描应用
     if (platform === 'darwin') {
       await this.indexMacApps(scannedApps);
@@ -213,17 +221,27 @@ class AppService {
       await this.indexLinuxApps(scannedApps);
     }
 
+    console.log(`🔍 [应用服务] 扫描后应用数量: ${scannedApps.size}`);
+
     // 验证并更新应用列表
     const verifiedApps = new Map<string, AppInfo>();
     
+    let validCount = 0;
+    let invalidCount = 0;
     for (const [id, app] of scannedApps) {
       if (fs.existsSync(app.path)) {
         verifiedApps.set(id, app);
+        validCount++;
         // 性能优化：预计算并缓存搜索关键词
         const keywords = this.getAppSearchKeys(app.name);
         this.searchKeywordsCache.set(id, keywords);
+      } else {
+        invalidCount++;
+        console.log(`⚠️ [应用服务] 应用路径不存在: ${app.name} - ${app.path}`);
       }
     }
+    
+    console.log(`🔍 [应用服务] 验证结果 - 有效: ${validCount}, 无效: ${invalidCount}`);
     
     this.apps = verifiedApps;
     await this.saveAppsToDatabase(verifiedApps);
@@ -476,6 +494,166 @@ class AppService {
   }
 
   /**
+   * 压缩图标
+   */
+  private async compressIcon(iconPath: string, iconBuffer: Buffer): Promise<Buffer | undefined> {
+    if (process.platform !== 'win32') {
+      return undefined;
+    }
+    
+    try {
+      const tempCompressedPath = path.join(require('os').tmpdir(), `lumina_compressed_${Date.now()}.png`);
+      
+      const psScript = `Add-Type -AssemblyName System.Drawing
+$inputPath = "${iconPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"
+$outputPath = "${tempCompressedPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"
+try {
+  $image = [System.Drawing.Image]::FromFile($inputPath)
+  # 限制最大尺寸为 128x128
+  $maxSize = 128
+  $newWidth = [Math]::Min($image.Width, $maxSize)
+  $newHeight = [Math]::Min($image.Height, $maxSize)
+  
+  $resized = New-Object System.Drawing.Bitmap($newWidth, $newHeight)
+  $graphics = [System.Drawing.Graphics]::FromImage($resized)
+  $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+  $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+  $graphics.DrawImage($image, 0, 0, $newWidth, $newHeight)
+  
+  $resized.Save($outputPath, [System.Drawing.Imaging.ImageFormat]::Png)
+  $graphics.Dispose()
+  $resized.Dispose()
+  $image.Dispose()
+  
+  Write-Output "Success"
+} catch {
+  Write-Output "Failed"
+}`;
+      
+      const tempScriptPath = path.join(require('os').tmpdir(), `lumina_compress_${Date.now()}.ps1`);
+      fs.writeFileSync(tempScriptPath, psScript, 'utf-8');
+      
+      // 先写入原始图标到临时路径，因为 PowerShell 脚本需要文件路径
+      const tempOriginalPath = path.join(require('os').tmpdir(), `lumina_original_${Date.now()}.png`);
+      fs.writeFileSync(tempOriginalPath, iconBuffer);
+      
+      // 更新脚本中的输入路径
+      const updatedScript = psScript.replace(
+        `$inputPath = "${iconPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`,
+        `$inputPath = "${tempOriginalPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+      );
+      fs.writeFileSync(tempScriptPath, updatedScript, 'utf-8');
+      
+      const { execSync } = require('child_process');
+      const output = execSync(
+        `powershell -NoProfile -ExecutionPolicy Bypass -File "${tempScriptPath}"`,
+        { encoding: 'utf-8', timeout: 10000 }
+      );
+      
+      // 清理临时文件
+      try {
+        fs.unlinkSync(tempScriptPath);
+        fs.unlinkSync(tempOriginalPath);
+      } catch {}
+      
+      if (output.trim() === 'Success' && fs.existsSync(tempCompressedPath)) {
+        const compressedBuffer = fs.readFileSync(tempCompressedPath);
+        fs.unlinkSync(tempCompressedPath);
+        return compressedBuffer;
+      }
+    } catch (error) {
+      console.error(`❌ [应用服务] 压缩图标失败:`, error);
+    }
+    
+    return undefined;
+  }
+
+  /**
+   * 从 Windows EXE 文件提取图标
+   */
+  private async extractExeIcon(exePath: string): Promise<string | undefined> {
+    if (process.platform !== 'win32') {
+      return undefined;
+    }
+    
+    try {
+      const { execSync } = require('child_process');
+      const tempIconPath = path.join(require('os').tmpdir(), `lumina_icon_${Date.now()}.png`);
+      
+      console.log(`🔍 [应用服务] 从 EXE 提取图标: ${exePath}`);
+      
+      // 创建临时 PowerShell 脚本文件
+      const escapedExePath = exePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const escapedTempPath = tempIconPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      
+      const psScript = `Add-Type -AssemblyName System.Drawing
+$exePath = "${escapedExePath}"
+$outputPath = "${escapedTempPath}"
+try {
+  $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($exePath)
+  if ($icon) {
+    $bitmap = $icon.ToBitmap()
+    $bitmap.Save($outputPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    Write-Output "Success"
+  } else {
+    Write-Output "NoIcon"
+  }
+} catch {
+  Write-Output "Failed"
+}`;
+      
+      const tempScriptPath = path.join(require('os').tmpdir(), `lumina_extract_icon_${Date.now()}.ps1`);
+      fs.writeFileSync(tempScriptPath, psScript, 'utf-8');
+      
+      const output = execSync(
+        `powershell -NoProfile -ExecutionPolicy Bypass -File "${tempScriptPath}"`,
+        { encoding: 'utf-8', timeout: 10000 }
+      );
+      
+      // 清理临时脚本
+      try {
+        fs.unlinkSync(tempScriptPath);
+      } catch {}
+      
+      console.log(`🔍 [应用服务] PowerShell 输出: ${output.trim()}`);
+      
+      if (fs.existsSync(tempIconPath)) {
+        const iconBuffer = fs.readFileSync(tempIconPath);
+        const sizeKB = iconBuffer.length / 1024;
+        
+        // 如果图标大于 50KB，进行压缩处理
+        if (sizeKB > 50) {
+          console.log(`⚠️ [应用服务] 图标过大 (${sizeKB.toFixed(2)} KB)，尝试压缩`);
+          try {
+            const compressedIcon = await this.compressIcon(tempIconPath, iconBuffer);
+            // 清理原始图标文件
+            fs.unlinkSync(tempIconPath);
+            if (compressedIcon) {
+              const base64 = compressedIcon.toString('base64');
+              console.log(`✅ [应用服务] 图标提取并压缩成功: ${exePath} (${(compressedIcon.length / 1024).toFixed(2)} KB)`);
+              return `data:image/png;base64,${base64}`;
+            }
+          } catch (compressError) {
+            console.error(`❌ [应用服务] 压缩失败，使用原图标:`, compressError);
+          }
+        }
+        
+        // 清理临时文件
+        fs.unlinkSync(tempIconPath);
+        const base64 = iconBuffer.toString('base64');
+        console.log(`✅ [应用服务] 图标提取成功: ${exePath} (${sizeKB.toFixed(2)} KB)`);
+        return `data:image/png;base64,${base64}`;
+      } else {
+        console.log(`⚠️ [应用服务] 图标文件未创建: ${tempIconPath}`);
+      }
+    } catch (error) {
+      console.error(`❌ [应用服务] 提取 EXE 图标失败:`, error);
+    }
+    
+    return undefined;
+  }
+
+  /**
    * 查找应用图标路径
    */
   private async findAppIconPath(appPath: string): Promise<string | undefined> {
@@ -580,18 +758,40 @@ class AppService {
    * 优先使用 Start Menu（用户可见应用），失败时回退到目录扫描
    */
   private async indexWindowsApps(targetMap?: Map<string, AppInfo>): Promise<void> {
+    console.log(`🔍 [应用服务] 开始 Windows 应用索引`);
+    const startTime = Date.now();
+    
     // 优先尝试使用 Start Menu（快速，只包含用户可见应用）
     try {
+      console.log(`🔍 [应用服务] 尝试从 Start Menu 索引应用`);
       await this.indexWindowsAppsFromStartMenu(targetMap);
+      console.log(`✅ [应用服务] Start Menu 索引成功，耗时: ${Date.now() - startTime}ms`);
       
       // Start Menu 成功后，还可以补充扫描用户安装目录（可选）
       const userProgramsPath = path.join(electronApp.getPath('home'), 'AppData', 'Local', 'Programs');
+      console.log(`🔍 [应用服务] 检查用户安装目录: ${userProgramsPath}`);
       if (fs.existsSync(userProgramsPath)) {
+        console.log(`✅ [应用服务] 用户安装目录存在，开始扫描`);
         await this.scanWindowsAppDirectory(userProgramsPath, targetMap, 2); // 只扫描2层深度
+        console.log(`✅ [应用服务] 用户安装目录扫描完成`);
+      } else {
+        console.log(`⚠️ [应用服务] 用户安装目录不存在: ${userProgramsPath}`);
       }
+      
+      // 补充扫描重要系统应用
+      console.log(`🔍 [应用服务] 补充扫描系统应用目录`);
+      const systemAppsPath = 'C:\\Windows\\System32';
+      if (fs.existsSync(systemAppsPath)) {
+        console.log(`✅ [应用服务] 系统目录存在，扫描系统应用`);
+        await this.scanWindowsSystemApps(systemAppsPath, targetMap);
+        console.log(`✅ [应用服务] 系统应用扫描完成`);
+      }
+      
+      console.log(`✅ [应用服务] Windows 应用索引完成，总耗时: ${Date.now() - startTime}ms`);
       return;
     } catch (error) {
-      console.log('⚠️ [应用服务] Start Menu 索引失败，回退到目录扫描:', error);
+      console.error('❌ [应用服务] Start Menu 索引失败:', error);
+      console.log('⚠️ [应用服务] 回退到目录扫描方案');
       // 回退到目录扫描方案
       await this.indexWindowsAppsFallback(targetMap);
     }
@@ -605,37 +805,58 @@ class AppService {
     const appsMap = targetMap || this.apps;
     const homeDir = electronApp.getPath('home');
     
+    console.log(`🔍 [应用服务] 用户目录: ${homeDir}`);
+    
     const startMenuPaths = [
       path.join(homeDir, 'AppData', 'Roaming', 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
       path.join(process.env.PROGRAMDATA || 'C:\\ProgramData', 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
     ];
     
+    console.log(`🔍 [应用服务] Start Menu 路径列表:`, startMenuPaths);
+    
     for (const startMenuPath of startMenuPaths) {
-      if (!fs.existsSync(startMenuPath)) continue;
+      console.log(`🔍 [应用服务] 检查路径: ${startMenuPath}`);
+      
+      if (!fs.existsSync(startMenuPath)) {
+        console.log(`⚠️ [应用服务] 路径不存在: ${startMenuPath}`);
+        continue;
+      }
+      
+      console.log(`✅ [应用服务] 路径存在，开始扫描快捷方式`);
       
       try {
-        // 使用 PowerShell 递归查找 .lnk 文件并解析快捷方式
-        const psCommand = `
-          $shortcuts = @()
-          Get-ChildItem -Path "${startMenuPath.replace(/\\/g, '/')}" -Filter *.lnk -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-            try {
-              $shell = New-Object -ComObject WScript.Shell
-              $shortcut = $shell.CreateShortcut($_.FullName)
-              if ($shortcut.TargetPath -and (Test-Path $shortcut.TargetPath)) {
-                $shortcuts += @{
-                  Name = $_.BaseName
-                  Path = $shortcut.TargetPath
-                  Icon = $shortcut.IconLocation
-                  WorkingDir = $shortcut.WorkingDirectory
-                }
-              }
-            } catch {}
-          }
-          $shortcuts | ConvertTo-Json -Compress
-        `;
+        // 创建临时 PowerShell 脚本文件
+        const psScript = `
+$shortcuts = @()
+$startMenuPath = "${startMenuPath.replace(/\\/g, '/')}"
+Get-ChildItem -Path $startMenuPath -Filter *.lnk -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+  try {
+    $shell = New-Object -ComObject WScript.Shell
+    $shortcut = $shell.CreateShortcut($_.FullName)
+    if ($shortcut.TargetPath -and (Test-Path $shortcut.TargetPath)) {
+      $shortcuts += @{
+        Name = $_.BaseName
+        Path = $shortcut.TargetPath
+        Icon = $shortcut.IconLocation
+        WorkingDir = $shortcut.WorkingDirectory
+      }
+    }
+  } catch {
+    # 忽略错误继续处理
+  }
+}
+$shortcuts | ConvertTo-Json
+        `.trim();
+
+        // 写入临时文件
+        const tempScriptPath = path.join(require('os').tmpdir(), `lumina_scan_${Date.now()}.ps1`);
+        fs.writeFileSync(tempScriptPath, psScript, 'utf-8');
+        
+        console.log(`🔍 [应用服务] 临时脚本路径: ${tempScriptPath}`);
+        console.log(`🔍 [应用服务] 执行的路径: ${startMenuPath}`);
         
         const output = execSync(
-          `powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommand}"`,
+          `powershell -NoProfile -ExecutionPolicy Bypass -File "${tempScriptPath}"`,
           { 
             encoding: 'utf-8', 
             maxBuffer: 10 * 1024 * 1024,
@@ -643,28 +864,79 @@ class AppService {
           }
         );
         
+        // 清理临时文件
+        try {
+          fs.unlinkSync(tempScriptPath);
+        } catch {}
+        
+        console.log(`✅ [应用服务] PowerShell 命令执行成功，输出长度: ${output.length} 字符`);
+        
         if (output && output.trim()) {
           const shortcuts = JSON.parse(output);
           const shortcutArray = Array.isArray(shortcuts) ? shortcuts : [shortcuts];
           
+          console.log(`🔍 [应用服务] 解析到 ${shortcutArray.length} 个快捷方式`);
+          
+          let validCount = 0;
+          let invalidCount = 0;
+          
           for (const shortcut of shortcutArray) {
             if (shortcut.Path && fs.existsSync(shortcut.Path)) {
               const appName = shortcut.Name || path.basename(shortcut.Path, path.extname(shortcut.Path));
+              
+              // 获取图标
+              let icon: string | undefined;
+              try {
+                if (shortcut.Icon) {
+                  // PowerShell 返回的 Icon 可能包含逗号分割的路径和索引，如 "C:\\path\\to\\file.exe,0"
+                  const iconParts = shortcut.Icon.split(',');
+                  const iconPath = iconParts[0].trim();
+                  
+                  if (fs.existsSync(iconPath)) {
+                    icon = await this.convertIconToBase64(iconPath);
+                  } else if (shortcut.Path && shortcut.Path.toLowerCase().endsWith('.exe')) {
+                    // 如果快捷方式的图标路径不存在，尝试从 exe 文件提取图标
+                    icon = await this.extractExeIcon(shortcut.Path);
+                  }
+                } else if (shortcut.Path && shortcut.Path.toLowerCase().endsWith('.exe')) {
+                  // 如果快捷方式没有图标信息，尝试从 exe 文件提取
+                  icon = await this.extractExeIcon(shortcut.Path);
+                }
+              } catch (iconError) {
+                console.error(`⚠️ [应用服务] 获取图标失败 ${appName}:`, iconError);
+              }
+              
               const appInfo: AppInfo = {
                 id: `win-${appName}`,
                 name: appName,
                 path: shortcut.Path, // 存储实际可执行文件路径，不是 .lnk 路径
-                icon: shortcut.Icon || undefined,
+                icon: icon,
                 launchCount: 0,
                 lastUsed: new Date(),
               };
               
               appsMap.set(appInfo.id, appInfo);
+              validCount++;
+              console.log(`✅ [应用服务] 添加应用: ${appName} - ${shortcut.Path} ${icon ? '(已加载图标)' : '(无图标)'}`);
+            } else {
+              invalidCount++;
+              console.log(`⚠️ [应用服务] 跳过无效路径: ${shortcut.Name} - ${shortcut.Path}`);
             }
           }
+          
+          console.log(`🔍 [应用服务] 路径 ${startMenuPath} 结果: 有效 ${validCount}, 无效 ${invalidCount}`);
+        } else {
+          console.log(`⚠️ [应用服务] PowerShell 输出为空`);
+          console.log(`🔍 [应用服务] 尝试直接扫描 .lnk 文件...`);
+          
+          // 如果 PowerShell 失败，尝试直接扫描 .lnk 文件
+          await this.scanStartMenuLnkFiles(startMenuPath, appsMap);
         }
       } catch (error) {
-        console.error(`⚠️ [应用服务] Start Menu 扫描失败 ${startMenuPath}:`, error);
+        console.error(`❌ [应用服务] Start Menu 扫描失败 ${startMenuPath}:`, error);
+        // 回退到直接扫描 .lnk 文件
+        console.log(`🔍 [应用服务] 回退到直接扫描 .lnk 文件...`);
+        await this.scanStartMenuLnkFiles(startMenuPath, appsMap);
       }
     }
     
@@ -672,30 +944,163 @@ class AppService {
   }
 
   /**
+   * 扫描 Windows 系统应用（只扫描常用应用）
+   */
+  private async scanWindowsSystemApps(systemPath: string, appsMap?: Map<string, AppInfo>): Promise<void> {
+    console.log(`🔍 [应用服务] 扫描系统应用目录: ${systemPath}`);
+    
+    // 只扫描常用系统应用，避免扫描整个 System32（文件太多）
+    const systemApps = [
+      'notepad.exe',
+      'calc.exe',
+      'paint.exe',
+      'mspaint.exe',
+      'cmd.exe',
+      'powershell.exe',
+      'charmap.exe',
+      'osk.exe',
+      'magnify.exe',
+      'narrator.exe',
+      'regedit.exe',
+      'mstsc.exe',
+      'taskmgr.exe',
+      'explorer.exe',
+      'control.exe',
+    ];
+    
+    const foundApps: string[] = [];
+    
+    for (const appName of systemApps) {
+      const appPath = path.join(systemPath, appName);
+      if (fs.existsSync(appPath)) {
+        foundApps.push(appName);
+        const appInfo: AppInfo = {
+          id: `win-${appName}`,
+          name: appName.replace('.exe', ''),
+          path: appPath,
+          launchCount: 0,
+          lastUsed: new Date(),
+        };
+        
+        // 尝试提取图标
+        try {
+          const icon = await this.extractExeIcon(appPath);
+          if (icon) {
+            appInfo.icon = icon;
+          }
+        } catch (err) {
+          console.error(`⚠️ [应用服务] 获取图标失败: ${appName}`);
+        }
+        
+        const apps = appsMap || this.apps;
+        apps.set(appInfo.id, appInfo);
+        console.log(`✅ [应用服务] 添加系统应用: ${appName}`);
+      }
+    }
+    
+    console.log(`🔍 [应用服务] 系统应用扫描完成，找到 ${foundApps.length} 个应用`);
+  }
+
+  /**
+   * 扫描 Start Menu 中的 .lnk 文件（回退方案）
+   */
+  private async scanStartMenuLnkFiles(startMenuPath: string, appsMap?: Map<string, AppInfo>): Promise<void> {
+    console.log(`🔍 [应用服务] 直接扫描 .lnk 文件: ${startMenuPath}`);
+    
+    try {
+      // 使用 Node.js 递归扫描目录查找 .lnk 文件
+      await this.scanDirectoryRecursive(startMenuPath, async (filePath) => {
+        if (filePath.toLowerCase().endsWith('.lnk')) {
+          try {
+            // 使用 PowerShell 解析单个 .lnk 文件
+            const psCommand = `$shell = New-Object -ComObject WScript.Shell; $shortcut = $shell.CreateShortcut("${filePath.replace(/\\/g, '/')}"); if ($shortcut.TargetPath -and (Test-Path $shortcut.TargetPath)) { @{Name='${path.basename(filePath, '.lnk')}';Path=$shortcut.TargetPath} | ConvertTo-Json }`;
+            
+            const output = execSync(
+              `powershell -NoProfile -ExecutionPolicy Bypass -Command "${psCommand}"`,
+              { encoding: 'utf-8', timeout: 5000 }
+            );
+            
+            if (output && output.trim()) {
+              const shortcut = JSON.parse(output);
+              if (shortcut.Path && fs.existsSync(shortcut.Path)) {
+                // 尝试提取图标
+                let icon: string | undefined;
+                try {
+                  if (shortcut.Path.toLowerCase().endsWith('.exe')) {
+                    icon = await this.extractExeIcon(shortcut.Path);
+                  }
+                } catch (err) {
+                  console.error(`⚠️ [应用服务] 获取图标失败: ${shortcut.Name}`);
+                }
+                
+                const apps = appsMap || this.apps;
+                const appInfo: AppInfo = {
+                  id: `win-${shortcut.Name}`,
+                  name: shortcut.Name,
+                  path: shortcut.Path,
+                  icon: icon,
+                  launchCount: 0,
+                  lastUsed: new Date(),
+                };
+                apps.set(appInfo.id, appInfo);
+                console.log(`✅ [应用服务] 添加应用 (回退方案): ${shortcut.Name} ${icon ? '(已加载图标)' : '(无图标)'}`);
+              }
+            }
+          } catch (err) {
+            // 忽略单个文件解析失败
+          }
+        }
+      }, 5, 0);
+    } catch (error) {
+      console.error(`❌ [应用服务] 扫描 .lnk 文件失败:`, error);
+    }
+  }
+
+  /**
    * 回退方案：目录扫描（当 Start Menu 不可用时）
    */
   private async indexWindowsAppsFallback(targetMap?: Map<string, AppInfo>): Promise<void> {
+    console.log(`🔍 [应用服务] 开始回退方案：目录扫描`);
+    
     const searchPaths = [
       'C:\\Program Files',
       'C:\\Program Files (x86)',
       path.join(electronApp.getPath('home'), 'AppData', 'Local', 'Programs'),
     ];
 
+    console.log(`🔍 [应用服务] 搜索路径列表:`, searchPaths);
+
     for (const searchPath of searchPaths) {
+      console.log(`🔍 [应用服务] 检查路径: ${searchPath}`);
+      
       if (fs.existsSync(searchPath)) {
+        console.log(`✅ [应用服务] 路径存在，开始扫描 (深度 3)`);
         await this.scanWindowsAppDirectory(searchPath, targetMap, 3); // 最大深度3
+        console.log(`✅ [应用服务] 路径扫描完成: ${searchPath}`);
+      } else {
+        console.log(`⚠️ [应用服务] 路径不存在: ${searchPath}`);
       }
     }
+    
+    console.log(`✅ [应用服务] 回退方案扫描完成，找到 ${targetMap?.size || this.apps.size} 个应用`);
   }
 
   /**
    * 扫描 Windows 应用目录（回退方案使用）
    */
   private async scanWindowsAppDirectory(dir: string, targetMap?: Map<string, AppInfo>, maxDepth: number = 3): Promise<void> {
+    console.log(`🔍 [应用服务] 扫描目录: ${dir}, 最大深度: ${maxDepth}`);
+    
+    let scanCount = 0;
+    let exeCount = 0;
+    const appsToProcess: string[] = [];
+    
     try {
       await this.scanDirectoryRecursive(dir, (filePath) => {
+        scanCount++;
         const ext = path.extname(filePath).toLowerCase();
         if (ext === '.exe') {
+          exeCount++;
           const appName = path.basename(filePath, '.exe');
           const appInfo: AppInfo = {
             id: `win-${appName}`,
@@ -704,9 +1109,16 @@ class AppService {
             launchCount: 0,
             lastUsed: new Date(),
           };
+          
+          if (scanCount % 100 === 0) {
+            console.log(`🔍 [应用服务] 已扫描 ${scanCount} 个文件，发现 ${exeCount} 个 .exe`);
+          }
 
           const appsMap = targetMap || this.apps;
           appsMap.set(appInfo.id, appInfo);
+          
+          // 收集需要提取图标的应用（延迟提取以提高性能）
+          appsToProcess.push(appInfo.id);
         }
       }, maxDepth, 0);
     } catch (error) {

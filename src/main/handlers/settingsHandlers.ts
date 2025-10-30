@@ -39,6 +39,17 @@ export function registerSettingsHandlers() {
     }
   });
 
+  // 获取日志文件路径
+  ipcMain.handle('settings-get-log-file', async () => {
+    try {
+      const { debugLog } = await import('../utils/debugLog');
+      return debugLog.getLogFile();
+    } catch (error: any) {
+      console.error('获取日志文件路径失败:', error);
+      throw error;
+    }
+  });
+
   console.log('✅ 设置 IPC 处理器已注册');
 }
 

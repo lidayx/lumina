@@ -1,6 +1,6 @@
 {
   "name": "lumina",
-  "version": "1.0.0",
+  "version": "1.0.8",
   "description": "Lumina（快搜）- 免费的 Alfred/uTools 替代品，快如闪电的跨平台应用搜索启动器",
   "main": "dist-electron/main.js",
   "scripts": {

@@ -21,6 +21,9 @@ export interface AppSettings {
   
   // 界面设置
   theme: 'light' | 'dark' | 'auto';
+  
+  // 开发者模式
+  developerMode: boolean; // 开发者模式，开启后记录 debug 日志
 }
 
 /**
@@ -31,13 +34,14 @@ class SettingsService {
   private readonly SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
   private readonly DEFAULT_SETTINGS: AppSettings = {
     autoStart: false,
-    minimizeToTray: true,
+    minimizeToTray: false,
     fastStart: true,
     fileSearchEnabled: true, // 默认开启文件搜索
     fileSearchPaths: [], // 空数组表示使用默认路径
     searchDebounce: 300,
     indexingInterval: 30,
     theme: 'auto',
+    developerMode: false, // 默认关闭开发者模式
   };
 
   // ========== 私有属性 ==========
@@ -148,6 +152,18 @@ class SettingsService {
   private applySettings(updates: Partial<AppSettings>): void {
     if ('autoStart' in updates || 'minimizeToTray' in updates) {
       this.applyStartupSettings();
+    }
+    
+    if ('developerMode' in updates) {
+      // 开发者模式变更时，使用动态 import 以避免循环依赖
+      setImmediate(async () => {
+        try {
+          const { debugLog } = await import('../utils/debugLog');
+          debugLog.setEnabled(updates.developerMode);
+        } catch (error) {
+          console.error('更新开发者模式失败:', error);
+        }
+      });
     }
   }
 }

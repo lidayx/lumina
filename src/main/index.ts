@@ -18,6 +18,7 @@ import { appService } from './services/appService';
 import { fileService } from './services/fileService';
 import { trayService } from './services/trayService';
 import bookmarkService from './services/bookmarkService';
+import { debugLog } from './utils/debugLog';
 
 // 单实例限制：防止同时运行多个应用实例
 const gotTheLock = app.requestSingleInstanceLock();
@@ -154,6 +155,44 @@ app.on('will-quit', () => {
   } catch (error) {
     console.error('销毁托盘失败:', error);
   }
+  
+  // 清理 debug 日志
+  try {
+    debugLog.cleanup();
+  } catch (error) {
+    console.error('清理 debug 日志失败:', error);
+  }
+});
+
+// 重写 console 方法以支持 debug 日志
+const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+const originalConsoleInfo = console.info;
+
+console.log = (...args: any[]) => {
+  originalConsoleLog.apply(console, args);
+  debugLog.log(...args);
+};
+
+console.error = (...args: any[]) => {
+  originalConsoleError.apply(console, args);
+  debugLog.error(...args);
+};
+
+console.warn = (...args: any[]) => {
+  originalConsoleWarn.apply(console, args);
+  debugLog.warn(...args);
+};
+
+console.info = (...args: any[]) => {
+  originalConsoleInfo.apply(console, args);
+  debugLog.info(...args);
+};
+
+// 初始化 debug 日志工具（在设置服务加载后）
+setImmediate(async () => {
+  await debugLog.init();
 });
 
 // IPC 处理器

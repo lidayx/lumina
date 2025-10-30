@@ -268,9 +268,18 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             const isFileSearch = fileSearchMatch !== null;
             const fileSearchQuery = fileSearchMatch ? fileSearchMatch[1] : '';
             
+            console.log('🔍 [文件搜索] 检测:', { 
+              query, 
+              isFileSearch, 
+              fileSearchQuery,
+              match: fileSearchMatch 
+            });
+            
             // 获取设置以决定是否搜索文件
             const settings = await window.electron.settings.getAll().catch(() => ({}));
             const fileSearchEnabled = settings?.fileSearchEnabled !== false; // 默认启用
+            
+            console.log('🔍 [文件搜索] 设置:', { fileSearchEnabled });
 
             // 并行搜索所有类型（统一防抖，确保结果同时返回以便正确排序）
             const [appsFromIPC, files, webResults, bookmarks, commands, calcResult, defaultBrowser] = await Promise.all([
@@ -302,6 +311,18 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
 
             // 调试日志
             console.log('搜索结果:', { apps: apps.length, files: files.length, webResultsCount: webResults?.length || 0, webResults });
+            console.log('🔍 [文件搜索] 返回结果:', { 
+              fileCount: files.length, 
+              files: files.slice(0, 3).map((f: any) => ({ name: f.name, path: f.path }))
+            });
+            if (apps.length > 0) {
+              console.log('第一个应用:', { 
+                name: apps[0].title, 
+                hasIcon: !!apps[0].icon, 
+                iconLength: apps[0].icon?.length,
+                iconPreview: apps[0].icon?.substring(0, 50) 
+              });
+            }
 
             // 检查是否有应用或文件结果
             const hasAppOrFileResults = apps.length > 0 || files.length > 0;

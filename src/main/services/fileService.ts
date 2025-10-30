@@ -52,24 +52,34 @@ class FileService {
    * 搜索文件（完全使用系统 API）
    */
   public async searchFiles(query: string, fileType?: string, maxResults: number = 50): Promise<FileInfo[]> {
+    console.log(`🔍 [文件服务] 搜索文件: "${query}"`);
+    
     // 检查是否启用了文件搜索
     const { default: settingsService } = await import('./settingsService');
     const fileSearchEnabled = settingsService.getSetting('fileSearchEnabled');
+    console.log(`🔍 [文件服务] 文件搜索是否启用: ${fileSearchEnabled}`);
+    
     if (!fileSearchEnabled) {
+      console.log(`⚠️ [文件服务] 文件搜索已禁用`);
       return [];
     }
 
     if (!query) {
+      console.log(`⚠️ [文件服务] 查询为空`);
       return [];
     }
 
     // 使用系统 API 搜索所有目录
     const allPaths = await this.getIndexPaths();
+    console.log(`🔍 [文件服务] 搜索路径: ${JSON.stringify(allPaths)}`);
     const results = await this.searchWithSystemAPI(query, allPaths, maxResults, fileType);
+    console.log(`🔍 [文件服务] 找到 ${results.length} 个文件`);
     
     // 对结果进行评分和排序
     const searchTerm = query.toLowerCase().trim();
-    return this.sortAndLimitResults(results, searchTerm, maxResults);
+    const sortedResults = this.sortAndLimitResults(results, searchTerm, maxResults);
+    console.log(`🔍 [文件服务] 排序后返回 ${sortedResults.length} 个结果`);
+    return sortedResults;
   }
 
   /**

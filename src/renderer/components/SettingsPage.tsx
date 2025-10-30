@@ -43,6 +43,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
   const [appSettings, setAppSettings] = useState<any>({});
   const [fileSearchPaths, setFileSearchPaths] = useState<string[]>([]);
   const [newFilePath, setNewFilePath] = useState('');
+  const [logFilePath, setLogFilePath] = useState<string>('');
   
   useEffect(() => {
     loadBrowsers();
@@ -57,6 +58,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       // 加载文件搜索路径
       if (settings.fileSearchPaths && Array.isArray(settings.fileSearchPaths)) {
         setFileSearchPaths(settings.fileSearchPaths);
+      }
+      
+      // 加载日志文件路径
+      try {
+        const logFile = await window.electron.settings.getLogFile();
+        setLogFilePath(logFile);
+      } catch (error) {
+        console.error('获取日志文件路径失败:', error);
       }
     } catch (error) {
       console.error('加载设置失败:', error);
@@ -875,6 +884,36 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                           type="checkbox"
                           checked={appSettings.fastStart !== false}
                           onChange={(e) => updateSetting('fastStart', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 开发者设置 */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                <div className="p-6">
+                  <h3 className="text-lg font-medium mb-4">开发者设置</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between py-2">
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">开发者模式</div>
+                        <div className="text-sm text-gray-500">开启后将记录所有 debug 日志到 run_debug.log 文件</div>
+                        {appSettings.developerMode && logFilePath && (
+                          <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                            <div className="text-xs text-gray-600 mb-1">日志文件路径：</div>
+                            <div className="text-xs font-mono text-blue-600 break-all">{logFilePath}</div>
+                          </div>
+                        )}
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer ml-4">
+                        <input
+                          type="checkbox"
+                          checked={appSettings.developerMode || false}
+                          onChange={(e) => updateSetting('developerMode', e.target.checked)}
                           className="sr-only peer"
                         />
                         <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>

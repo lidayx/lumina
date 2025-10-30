@@ -85,6 +85,7 @@ contextBridge.exposeInMainWorld('electron', {
         getAll: () => ipcRenderer.invoke('settings-get-all'),
         update: (updates: any) => ipcRenderer.invoke('settings-update', updates),
         reset: () => ipcRenderer.invoke('settings-reset'),
+        getLogFile: () => ipcRenderer.invoke('settings-get-log-file'),
       },
       
       // 窗口相关
@@ -152,6 +153,7 @@ contextBridge.exposeInMainWorld('electron', {
       getAll: () => Promise<any>;
       update: (updates: any) => Promise<any>;
       reset: () => Promise<any>;
+      getLogFile: () => Promise<string>;
     };
     windowResize: (width: number, height: number) => Promise<void>;
     windowHide: (windowType: string) => Promise<void>;

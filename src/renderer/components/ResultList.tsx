@@ -90,6 +90,18 @@ const ResultItem = React.memo<{
   onSelect: () => void;
   itemRef: (el: HTMLDivElement | null) => void;
 }>(({ result, index, isSelected, onSelect, itemRef }) => {
+  // 调试图标渲染
+  if (index === 0 && result.icon) {
+    console.log('🔍 [前端渲染] 第一个结果图标:', {
+      title: result.title,
+      hasIcon: !!result.icon,
+      iconLength: result.icon.length,
+      iconType: result.icon.substring(0, 30),
+      iconStartsWithData: result.icon.startsWith('data:'),
+      iconStartsWithFile: result.icon.startsWith('file://')
+    });
+  }
+  
   return (
     <div
       key={result.id}
@@ -117,7 +129,13 @@ const ResultItem = React.memo<{
                 loading="lazy" // 性能优化：懒加载图标
                 onError={(e) => {
                   // 图标加载失败时显示默认图标
+                  console.error(`❌ [前端渲染] 图标加载失败: ${result.title}`, e);
                   e.currentTarget.style.display = 'none';
+                }}
+                onLoad={() => {
+                  if (index === 0) {
+                    console.log('✅ [前端渲染] 图标加载成功:', result.title);
+                  }
                 }}
               />
             ) : (

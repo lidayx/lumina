@@ -46,6 +46,9 @@ echo "🧹 清理旧构建..."
 rm -rf dist
 rm -rf dist-electron
 
+# 升级版本号
+npm run version:patch
+
 # 构建应用
 echo ""
 echo "🔨 构建应用..."
