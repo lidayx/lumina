@@ -42,12 +42,7 @@ win:
   sign: null
   signingHashAlgorithms:
     - sha256
-  # 安装包文件名
   artifactName: ${name}-Setup-${version}.${ext}
-
-# 便携版配置（portable）
-portable:
-  artifactName: ${name}-Portable-${version}.${ext}
 
 linux:
   target:
@@ -55,20 +50,12 @@ linux:
     - deb
   icon: build/icon.png
   category: Utility
-  # Linux maintainer (required for .deb package)
-  maintainer: Lumina Team <support@lumina.dev>
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  # 安装包显示名称
-  displayLanguageSelector: false
-  # 安装完成后运行选项
-  runAfterFinish: true
-  # 卸载程序配置
-  deleteAppDataOnUninstall: false
 
 appImage:
   artifactName: ${name}-${version}-${arch}.${ext}

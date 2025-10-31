@@ -1,6 +1,6 @@
 {
   "name": "lumina",
-  "version": "1.0.11",
+  "version": "1.0.10",
   "description": "Lumina（快搜）- 免费的 Alfred/uTools 替代品，快如闪电的跨平台应用搜索启动器",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -8,8 +8,6 @@
     "build": "vite build && electron-builder --dir",
     "build:mac": "vite build && electron-builder --mac",
     "build:win": "vite build && electron-builder --win",
-    "build:win:installer": "vite build && electron-builder --win --config.win.target=nsis",
-    "build:win:portable": "vite build && electron-builder --win --config.win.target=portable",
     "build:linux": "vite build && electron-builder --linux",
     "build:all": "vite build && electron-builder --mac --win --linux",
     "generate:icon": "./scripts/generate-icon.sh",

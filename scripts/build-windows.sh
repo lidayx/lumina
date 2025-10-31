@@ -46,9 +46,6 @@ echo "🧹 清理旧构建..."
 rm -rf dist
 rm -rf dist-electron
 
-# 升级版本号
-npm run version:patch
-
 # 构建应用
 echo ""
 echo "🔨 构建应用..."
@@ -67,15 +64,6 @@ echo ""
 echo "📦 输出文件在：dist/"
 echo ""
 echo "生成的文件："
-echo ""
-echo "📦 安装包（需要安装，推荐）："
-ls -lh dist/*Setup*.exe 2>/dev/null || echo "  - 未找到安装包"
-echo ""
-echo "💻 便携版（可直接运行）："
-ls -lh dist/*Portable*.exe 2>/dev/null || echo "  - 未找到便携版"
-echo ""
-echo "💡 提示："
-echo "  - 安装包（*-Setup-*.exe）：运行后会引导安装，创建快捷方式"
-echo "  - 便携版（*-Portable-*.exe）：解压后直接双击运行，无需安装"
+ls -lh dist/*.exe 2>/dev/null || ls -lh dist/*.exe 2>/dev/null
 echo ""
 
