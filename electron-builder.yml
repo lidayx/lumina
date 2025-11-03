@@ -33,8 +33,8 @@ mac:
 
 win:
   target:
-    - nsis
-    - portable
+    - nsis      # 安装包（推荐）：Lumina-Setup-*.exe，需要安装
+    - portable  # 便携版（可选）：Lumina-*.exe，可直接运行
   # 临时禁用图标以在 macOS 上构建（需要 Wine 才能使用图标）
   # icon: build/icon.ico
   publisherName: Your Name
@@ -42,7 +42,7 @@ win:
   sign: null
   signingHashAlgorithms:
     - sha256
-  artifactName: ${name}-Setup-${version}.${ext}
+  artifactName: ${name}-Setup-${version}.${ext}  # 仅影响 nsis 安装包的文件名
 
 linux:
   target:
@@ -52,10 +52,10 @@ linux:
   category: Utility
 
 nsis:
-  oneClick: false
-  allowToChangeInstallationDirectory: true
-  createDesktopShortcut: true
-  createStartMenuShortcut: true
+  oneClick: false                    # 非一键安装，显示安装向导
+  allowToChangeInstallationDirectory: true  # 允许用户选择安装目录
+  createDesktopShortcut: true        # 创建桌面快捷方式
+  createStartMenuShortcut: true     # 创建开始菜单快捷方式
 
 appImage:
   artifactName: ${name}-${version}-${arch}.${ext}

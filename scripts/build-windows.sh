@@ -63,7 +63,36 @@ echo "====================================="
 echo ""
 echo "📦 输出文件在：dist/"
 echo ""
+
+# 查找并显示生成的文件
 echo "生成的文件："
-ls -lh dist/*.exe 2>/dev/null || ls -lh dist/*.exe 2>/dev/null
+echo ""
+
+# 查找安装包（Setup.exe）
+INSTALLER=$(ls dist/*Setup*.exe 2>/dev/null | head -1)
+if [ -n "$INSTALLER" ]; then
+    echo "📦 安装包（推荐使用）："
+    ls -lh "$INSTALLER"
+    echo "   └─ 这是安装程序，双击后需要安装到系统"
+    echo ""
+fi
+
+# 查找便携版（portable.exe）
+PORTABLE=$(ls dist/*.exe 2>/dev/null | grep -v Setup | head -1)
+if [ -n "$PORTABLE" ]; then
+    echo "📁 便携版（可选）："
+    ls -lh "$PORTABLE"
+    echo "   └─ 这是便携版，可以直接双击运行（无需安装）"
+    echo ""
+fi
+
+# 如果没有找到文件，列出所有 exe
+if [ -z "$INSTALLER" ] && [ -z "$PORTABLE" ]; then
+    echo "⚠️  未找到生成的文件，显示所有 exe 文件："
+    ls -lh dist/*.exe 2>/dev/null || echo "   未找到任何 .exe 文件"
+    echo ""
+fi
+
+echo "💡 提示：安装包文件名通常为 Lumina-Setup-*.exe"
 echo ""
 
