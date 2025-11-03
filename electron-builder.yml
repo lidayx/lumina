@@ -50,6 +50,7 @@ linux:
     - deb
   icon: build/icon.png
   category: Utility
+  maintainer: Lumina Team <support@lumina.app>
 
 nsis:
   oneClick: false                    # 非一键安装，显示安装向导
