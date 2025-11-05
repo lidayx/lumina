@@ -7,6 +7,8 @@ import { timeService } from './timeService';
 import { encodeService } from './encodeService';
 import { stringService } from './stringService';
 import { randomService } from './randomService';
+import { translateService } from './translateService';
+import { variableNameService } from './variableNameService';
 
 // ========== 类型定义 ==========
 

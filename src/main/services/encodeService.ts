@@ -106,14 +106,14 @@ class EncodeService {
         const encoded = encodeURIComponent(text);
         return {
           input: query,
-          output: `${text} → ${encoded}`,
+          output: encoded,
           success: true,
         };
       } else {
         const decoded = decodeURIComponent(text);
         return {
           input: query,
-          output: `${text} → ${decoded}`,
+          output: decoded,
           success: true,
         };
       }
@@ -169,14 +169,14 @@ class EncodeService {
         const encoded = this.htmlEncode(text);
         return {
           input: query,
-          output: `${text} → ${encoded}`,
+          output: encoded,
           success: true,
         };
       } else {
         const decoded = this.htmlDecode(text);
         return {
           input: query,
-          output: `${text} → ${decoded}`,
+          output: decoded,
           success: true,
         };
       }
@@ -260,14 +260,14 @@ class EncodeService {
         const encoded = Buffer.from(text, 'utf-8').toString('base64');
         return {
           input: query,
-          output: `${text} → ${encoded}`,
+          output: encoded,
           success: true,
         };
       } else {
         const decoded = Buffer.from(text, 'base64').toString('utf-8');
         return {
           input: query,
-          output: `${text} → ${decoded}`,
+          output: decoded,
           success: true,
         };
       }
@@ -307,7 +307,7 @@ class EncodeService {
       const hash = createHash('md5').update(text).digest('hex');
       return {
         input: query,
-        output: `${text} → ${hash}`,
+        output: hash,
         success: true,
       };
     } catch (error: any) {

@@ -42,13 +42,14 @@ class TimeService {
     try {
       const trimmedQuery = query.trim();
       
-      // 0. 先排除明显的非时间查询（包含字符串工具、编码解码关键字）
+      // 0. 先排除明显的非时间查询（包含字符串工具、编码解码关键字、变量名生成关键字）
       const hasStringKeywords = /\b(uppercase|lowercase|title\s+case|大写|小写|标题|camel\s+case|snake\s+case|reverse|反转|trim|count|统计|word\s+count|replace|extract)\b/i.test(trimmedQuery);
       const hasEncodeKeywords = /\b(html|url|base64|encode|decode|编码|解码|md5)\b/i.test(trimmedQuery);
+      const hasVariableNameKeywords = /^(?:varname|变量名|camel|snake|pascal)\s+/i.test(trimmedQuery) || /\s+(?:varname|变量名)$/i.test(trimmedQuery);
       const hasDatePattern = /\d{4}[-\/]\d{2}[-\/]\d{2}/.test(trimmedQuery);
       
-      // 如果包含字符串工具或编码关键字，且没有日期模式，直接返回 null
-      if ((hasStringKeywords || hasEncodeKeywords) && !hasDatePattern) {
+      // 如果包含字符串工具、编码关键字或变量名生成关键字，且没有日期模式，直接返回 null
+      if ((hasStringKeywords || hasEncodeKeywords || hasVariableNameKeywords) && !hasDatePattern) {
         return null;
       }
       
@@ -185,11 +186,13 @@ class TimeService {
     const hasHtmlTags = /<[^>]+>/.test(trimmedQuery);
     // 排除包含字符串工具关键字的字符串
     const hasStringKeywords = /\b(uppercase|lowercase|title\s+case|大写|小写|标题|camel\s+case|snake\s+case|reverse|反转|trim|count|统计|word\s+count|replace|extract)\b/i.test(trimmedQuery);
+    // 排除包含变量名生成关键字的字符串
+    const hasVariableNameKeywords = /^(?:varname|变量名|camel|snake|pascal)\s+/i.test(trimmedQuery) || /\s+(?:varname|变量名)$/i.test(trimmedQuery);
     // 排除包含其他明显非日期字符的情况（但有日期模式时允许）
     const hasDatePattern = /\d{4}[-\/]\d{2}[-\/]\d{2}/.test(trimmedQuery);
     
-    // 如果包含编码关键字、HTML标签或字符串工具关键字，且没有日期模式，则不识别为日期
-    if ((hasEncodeKeywords || hasHtmlTags || hasStringKeywords) && !hasDatePattern) {
+    // 如果包含编码关键字、HTML标签、字符串工具关键字或变量名生成关键字，且没有日期模式，则不识别为日期
+    if ((hasEncodeKeywords || hasHtmlTags || hasStringKeywords || hasVariableNameKeywords) && !hasDatePattern) {
       return null;
     }
     

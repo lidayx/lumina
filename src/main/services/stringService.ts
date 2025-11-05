@@ -149,7 +149,7 @@ class StringService {
 
       return {
         input: query,
-        output: `${text} → ${result}`,
+        output: result,
         success: true,
       };
     } catch (error: any) {
@@ -223,7 +223,7 @@ class StringService {
 
       return {
         input: query,
-        output: `${text} → ${result}`,
+        output: result,
         success: true,
       };
     } catch (error: any) {
@@ -288,7 +288,7 @@ class StringService {
       const reversed = text.split('').reverse().join('');
       return {
         input: query,
-        output: `${text} → ${reversed}`,
+        output: reversed,
         success: true,
       };
     } catch (error: any) {
@@ -350,7 +350,7 @@ class StringService {
 
       return {
         input: query,
-        output: `${text} → ${result}`,
+        output: result,
         success: true,
       };
     } catch (error: any) {
@@ -451,7 +451,7 @@ class StringService {
       const result = text.replace(new RegExp(this.escapeRegex(search), 'g'), replace);
       return {
         input: query,
-        output: `${text} → ${result}`,
+        output: result,
         success: true,
       };
     } catch (error: any) {
@@ -518,13 +518,13 @@ class StringService {
         const result = matches.join(', ');
         return {
           input: query,
-          output: `${text} → [${result}]`,
+          output: `[${result}]`,
           success: true,
         };
       } else {
         return {
           input: query,
-          output: `${text} → (未找到匹配)`,
+          output: '(未找到匹配)',
           success: true,
         };
       }

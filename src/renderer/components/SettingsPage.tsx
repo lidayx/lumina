@@ -1276,6 +1276,75 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 </div>
               </div>
 
+              {/* 翻译功能 */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                <div className="p-6">
+                  <h3 className="text-lg font-medium mb-4">翻译功能</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">基础翻译</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">translate hello</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">翻译 你好</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">hello 翻译</code>
+                      </div>
+                      <p className="text-xs text-gray-600">自动检测语言并翻译，默认中英文互译</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">快捷翻译</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">en 你好</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">zh hello</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">cn hello world</code>
+                      </div>
+                      <p className="text-xs text-gray-600">快速翻译为英文或中文</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">指定目标语言</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">translate hello to 中文</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">你好 to English</code>
+                      </div>
+                      <p className="text-xs text-gray-600">指定翻译的目标语言</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 变量名生成 */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                <div className="p-6">
+                  <h3 className="text-lg font-medium mb-4">变量名生成</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">基础生成</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">varname 用户名称</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">变量名 订单列表</code>
+                      </div>
+                      <p className="text-xs text-gray-600">生成所有命名风格的变量名（camelCase、snake_case、PascalCase、CONSTANT_CASE、kebab-case）</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">指定风格</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">camel 用户名称</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">snake 订单ID</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">pascal 商品价格</code>
+                      </div>
+                      <p className="text-xs text-gray-600">直接生成指定命名风格的变量名</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">混合输入</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">varname user name</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">varname 用户User名称</code>
+                      </div>
+                      <p className="text-xs text-gray-600">支持中英文混合输入，自动识别并转换</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* 随机数生成 */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                 <div className="p-6">

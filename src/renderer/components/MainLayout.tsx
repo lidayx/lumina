@@ -273,6 +273,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               /^\d{10,13}\s+(?:to|转)\s+date$/i.test(queryTrimmed) ||
               // 日期转时间戳：日期 + to timestamp
               /^.+?\s+(?:to|转)\s+timestamp$/i.test(queryTrimmed) ||
+              // 翻译关键词检测
+              /^(?:translate|翻译|fanyi|fy|en|zh|cn)\s+/i.test(queryTrimmed) ||
+              /\s+(?:translate|翻译|fanyi|fy|to|到)$/i.test(queryTrimmed) ||
+              /(?:translate|翻译|fanyi|fy)\s+.+\s+(?:to|到)\s+/i.test(queryTrimmed) ||
+              // 变量名生成关键词检测
+              /^(?:varname|变量名|camel|snake|pascal)\s+/i.test(queryTrimmed) ||
+              /\s+(?:varname|变量名)$/i.test(queryTrimmed) ||
               // 时间计算：包含 - 或 + 且看起来像日期格式
               /^\d{4}[-\/]\d{2}[-\/]\d{2}/.test(queryTrimmed) && /[\+\-]/.test(queryTrimmed) ||
               // 日期格式化：format 或格式化关键字
@@ -331,13 +338,23 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               (isFileSearch && fileSearchEnabled && fileSearchQuery) 
                 ? window.electron.file.search(fileSearchQuery).catch(() => []) 
                 : Promise.resolve([]),
-              window.electron.web.search(query).catch(() => []),
+              // 如果是计算/翻译查询，不搜索网页（避免显示网页搜索结果）
+              isCalculation ? Promise.resolve([]) : window.electron.web.search(query).catch(() => []),
               window.electron.bookmark.search(query).catch(() => []),
               window.electron.command.search(query).catch(() => []),
-              isCalculation ? window.electron.calculator.calculate(query).catch(() => null) : Promise.resolve(null),
+              isCalculation ? window.electron.calculator.calculate(query).catch((err) => {
+                console.error('计算器计算失败:', err);
+                return null;
+              }) : Promise.resolve(null),
               // 获取默认浏览器（用于为书签/网页结果显示默认浏览器图标）
               window.electron.browser.getDefault().catch(() => null),
             ]);
+            
+            console.log('🔍 [搜索结果]', {
+              isCalculation,
+              calcResult,
+              webResultsCount: webResults?.length || 0,
+            });
 
             // 将应用搜索结果转换为统一的格式
             const apps = appsFromIPC.map((app: any) => ({
@@ -386,7 +403,21 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             }
             
             // 计算器结果（如果有，包括时间查询结果）
-            if (calcResult && calcResult.success) {
+            // 处理错误结果
+            if (calcResult && !calcResult.success && calcResult.error) {
+              combinedResults.push({
+                id: 'calc-error',
+                type: 'command' as const,
+                title: `错误: ${calcResult.error}`,
+                description: calcResult.input || query,
+                action: 'calc:copy',
+                score: 1000,
+                priorityScore: 1000,
+                calcData: calcResult,
+              });
+            }
+            // 处理成功结果
+            else if (calcResult && calcResult.success) {
               // 判断是否为时间差计算结果（优先判断，避免误判）
               // 时间差结果格式：包含"天"、"小时"、"分钟"、"秒"等关键词，并且包含"总计:"
               const isTimeDifference = calcResult.output.includes('总计:') && 
@@ -408,8 +439,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                                  calcResult.output.includes('段落数') ||
                                  /^字符数:/m.test(calcResult.output);
               
+              // 判断是否为变量名生成结果（优先判断）
+              const isVariableNameResult = /原始描述:|camelCase:|snake_case:|PascalCase:|CONSTANT:|kebab-case:/i.test(calcResult.output);
+              
               // 判断是否为时间查询结果（通过输出内容判断）
-              const isTimeResult = !isTimeDifference && !isTimeCalculation && !isTextStats && (
+              const isTimeResult = !isTimeDifference && !isTimeCalculation && !isTextStats && !isVariableNameResult && (
                 calcResult.output.includes('\n') || 
                 /^\d{4}[-\/]\d{2}/.test(calcResult.output) ||
                 /时间戳|timestamp|ISO|UTC|CST|EST|PST|JST|格式/i.test(calcResult.output)
@@ -662,7 +696,39 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                     calcData: calcResult,
                   });
                 }
-              } else {
+              } 
+              // 变量名生成结果：显示多行结果
+              else if (isVariableNameResult) {
+                // 将多行结果拆分成多个选项
+                const lines = calcResult.output.split('\n');
+                lines.forEach((line: string, index: number) => {
+                  if (line.trim()) {
+                    const colonIndex = line.indexOf(':');
+                    // 只处理包含变量名格式的行
+                    if (colonIndex > 0 && /^(camelCase|snake_case|PascalCase|CONSTANT|kebab-case):/i.test(line.trim())) {
+                      const variableName = line.substring(colonIndex + 1).trim();
+                      const styleName = line.substring(0, colonIndex).trim();
+                      
+                      // 标题只显示变量名
+                      combinedResults.push({
+                        id: `varname-result-${index}`,
+                        type: 'command' as const,
+                        title: variableName,
+                        description: styleName,
+                        action: 'calc:copy',
+                        score: 1900 - index,
+                        priorityScore: 1900 - index,
+                        calcData: {
+                          input: calcResult.input,
+                          output: variableName, // 只复制变量名，不包含其他内容
+                          success: true,
+                        },
+                      });
+                    }
+                  }
+                });
+              }
+              else {
                 // 文本统计结果：直接显示多行结果
                 if (isTextStats) {
                   combinedResults.push({
