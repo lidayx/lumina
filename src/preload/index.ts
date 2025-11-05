@@ -151,6 +151,10 @@ contextBridge.exposeInMainWorld('electron', {
     calculator: {
       calculate: (expression: string) => Promise<any>;
     };
+    time: {
+      getAllFormats: (dateISOString?: string) => Promise<any[]>;
+      handleQuery: (query: string) => Promise<any>;
+    };
     bookmark: {
       getAll: () => Promise<any[]>;
       search: (query: string) => Promise<any[]>;

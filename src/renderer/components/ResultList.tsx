@@ -9,6 +9,12 @@ export interface SearchResult {
   action: string;
   score: number;
   priorityScore?: number; // 类型优先级评分
+  calcData?: {
+    input: string;
+    output: string;
+    success: boolean;
+    error?: string;
+  }; // 计算器结果数据
 }
 
 interface ResultListProps {

@@ -12,7 +12,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
   const [results, setResults] = React.useState<SearchResultType[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [showNoResult, setShowNoResult] = React.useState(false);
-  const [browsers, setBrowsers] = React.useState<any[]>([]);
   const [isFirstLaunch, setIsFirstLaunch] = React.useState(true);
 
   // 监听主窗口显示事件，清空输入并获取焦点
@@ -63,10 +62,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
 
           window.electron.on('indexing-complete', handleIndexingComplete);
         }
-        
-        // 加载浏览器列表
-        const browsersResult = await window.electron.invoke('browser-get-all');
-        setBrowsers(browsersResult);
       } catch (error) {
         console.error('加载数据失败:', error);
       }
@@ -100,7 +95,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
   const generateBrowserOptions = async (url: string): Promise<SearchResultType[]> => {
     try {
       const allBrowsers = await window.electron.invoke('browser-get-all');
-      const defaultBrowser = await window.electron.invoke('browser-get-default');
       
       const options: SearchResultType[] = allBrowsers.map((browser: any, index: number) => {
         console.log('浏览器图标:', browser.name, 'icon:', browser.icon ? '有' : '无');
@@ -331,7 +325,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             console.log('🔍 [文件搜索] 设置:', { fileSearchEnabled });
 
             // 并行搜索所有类型（统一防抖，确保结果同时返回以便正确排序）
-            const [appsFromIPC, files, webResults, bookmarks, commands, calcResult, defaultBrowser] = await Promise.all([
+            const [appsFromIPC, files, webResults, bookmarks, commands, calcResult] = await Promise.all([
               // 直接调用 IPC 搜索应用，而不是使用 useAppSearch hook 的结果（避免防抖延迟）
               window.electron.app.search(query).catch(() => []),
               // 只在输入 "file + 空格 + 关键字" 时才搜索文件
@@ -346,9 +340,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                 console.error('计算器计算失败:', err);
                 return null;
               }) : Promise.resolve(null),
-              // 获取默认浏览器（用于为书签/网页结果显示默认浏览器图标）
-              window.electron.browser.getDefault().catch(() => null),
             ]);
+            
+            // 获取默认浏览器（用于为书签/网页结果显示默认浏览器图标）
+            const defaultBrowser = await window.electron.browser.getDefault().catch(() => null);
             
             console.log('🔍 [搜索结果]', {
               isCalculation,
@@ -933,7 +928,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
         // action 格式：browser:browserId:url
         const match = result.action.match(/^browser:([^:]+):(.+)$/);
         if (match) {
-          const browserId = match[1];
           const url = match[2];
           try {
             await window.electron.invoke('browser-open-url', url);

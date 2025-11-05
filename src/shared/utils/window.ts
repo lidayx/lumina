@@ -57,7 +57,7 @@ export const WINDOW_CONFIGS = {
     minHeight: 80, // 最小高度保持输入框可见
     maximizable: false, // 不允许最大化
     minimizable: true,
-    resizable: true, // 允许动态调整大小
+    resizable: false, // 禁止调整大小
   }),
   settings: () => ({
     type: 'settings' as WindowType,
