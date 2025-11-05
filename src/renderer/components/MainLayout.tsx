@@ -353,7 +353,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                 : Promise.resolve([]),
             ]);
             
-            // 获取默认浏览器（用于为书签/网页结果显示默认浏览器图标）
+              // 获取默认浏览器（用于为书签/网页结果显示默认浏览器图标）
             const defaultBrowser = await window.electron.browser.getDefault().catch(() => null);
             
             console.log('🔍 [搜索结果]', {
@@ -777,16 +777,16 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   });
                 } else {
                   // 普通计算器结果
-                  combinedResults.push({
-                    id: 'calc-result',
-                    type: 'command' as const,
+              combinedResults.push({
+                id: 'calc-result',
+                type: 'command' as const,
                     title: `= ${calcResult.output.split('\n')[0]}`,
-                    description: `计算：${calcResult.input}`,
-                    action: 'calc:copy',
-                    score: 1800,
-                    priorityScore: 1800,
-                    calcData: calcResult,
-                  });
+                description: `计算：${calcResult.input}`,
+                action: 'calc:copy',
+                score: 1800,
+                priorityScore: 1800,
+                calcData: calcResult,
+              });
                 }
               }
             }

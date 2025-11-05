@@ -74,6 +74,8 @@
     "@types/sql.js": "^1.4.9",
     "@vitalets/google-translate-api": "^9.2.1",
     "chokidar": "^4.0.3",
+    "drizzle-kit": "^0.31.6",
+    "drizzle-orm": "^0.44.7",
     "electron-store": "^11.0.2",
     "fuse.js": "^7.0.0",
     "pinyin": "^4.0.0",

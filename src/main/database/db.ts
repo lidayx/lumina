@@ -164,6 +164,15 @@ class SimpleDatabase {
       )
     `);
 
+    // settings 表
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `);
+
     // 索引
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_type ON items(type)`);
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_score ON items(score DESC)`);

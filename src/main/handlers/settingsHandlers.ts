@@ -20,7 +20,7 @@ export function registerSettingsHandlers() {
   ipcMain.handle('settings-update', async (_event, updates: any) => {
     try {
       const { default: settingsService } = await import('../services/settingsService');
-      settingsService.updateSettings(updates);
+      await settingsService.updateSettings(updates);
       return { success: true };
     } catch (error) {
       console.error('更新设置失败:', error);
@@ -32,7 +32,7 @@ export function registerSettingsHandlers() {
   ipcMain.handle('settings-reset', async () => {
     try {
       const { default: settingsService } = await import('../services/settingsService');
-      settingsService.resetSettings();
+      await settingsService.resetSettings();
       return { success: true };
     } catch (error) {
       console.error('重置设置失败:', error);

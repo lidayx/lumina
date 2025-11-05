@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
+import { dbManager } from '../database/db';
 
 /**
  * 应用设置接口
@@ -61,11 +62,15 @@ class SettingsService {
   // ========== 私有属性 ==========
   private settings: AppSettings = this.DEFAULT_SETTINGS;
   private loaded: boolean = false;
+  private useDatabase: boolean = true; // 是否使用数据库存储
 
   // ========== 公共 API ==========
 
   constructor() {
-    this.loadSettings();
+    // 异步加载设置
+    this.loadSettings().catch(err => {
+      console.error('❌ [设置服务] 初始化加载失败:', err);
+    });
   }
 
   /**
@@ -85,9 +90,9 @@ class SettingsService {
   /**
    * 更新设置
    */
-  public updateSettings(updates: Partial<AppSettings>): void {
+  public async updateSettings(updates: Partial<AppSettings>): Promise<void> {
     this.settings = { ...this.settings, ...updates };
-    this.saveSettings();
+    await this.saveSettings();
     
     // 应用设置
     this.applySettings(updates);
@@ -96,9 +101,9 @@ class SettingsService {
   /**
    * 重置设置
    */
-  public resetSettings(): void {
+  public async resetSettings(): Promise<void> {
     this.settings = { ...this.DEFAULT_SETTINGS };
-    this.saveSettings();
+    await this.saveSettings();
     this.applySettings(this.settings);
   }
 
@@ -107,22 +112,51 @@ class SettingsService {
   /**
    * 加载设置
    */
-  private loadSettings(): void {
+  private async loadSettings(): Promise<void> {
     try {
+      // 尝试从数据库加载
+      try {
+        const db = await dbManager.getDb();
+        if (db) {
+          const dbSettings = await this.loadSettingsFromDatabase();
+          if (dbSettings && Object.keys(dbSettings).length > 0) {
+            this.settings = { ...this.DEFAULT_SETTINGS, ...dbSettings };
+            console.log('✅ [设置服务] 已从数据库加载用户设置');
+            this.useDatabase = true;
+            this.loaded = true;
+            this.applyStartupSettings();
+            return;
+          }
+        }
+      } catch (dbError) {
+        console.warn('⚠️ [设置服务] 从数据库加载失败，尝试从文件加载:', dbError);
+        this.useDatabase = false;
+      }
+
+      // 如果数据库没有设置，尝试从 JSON 文件加载（向后兼容）
       if (fs.existsSync(this.SETTINGS_FILE)) {
         const content = fs.readFileSync(this.SETTINGS_FILE, 'utf-8');
-        this.settings = { ...this.DEFAULT_SETTINGS, ...JSON.parse(content) };
+        const fileSettings = JSON.parse(content);
+        this.settings = { ...this.DEFAULT_SETTINGS, ...fileSettings };
         
-        console.log('✅ [设置服务] 已加载用户设置');
+        console.log('✅ [设置服务] 已从文件加载用户设置');
+        
+        // 迁移到数据库
+        await this.migrateSettingsToDatabase(fileSettings);
+        
+        this.loaded = true;
       } else {
         this.settings = { ...this.DEFAULT_SETTINGS };
         console.log('✅ [设置服务] 使用默认设置');
+        
+        // 保存默认设置到数据库
+        await this.saveSettingsToDatabase(this.settings);
+        
+        this.loaded = true;
       }
       
       // 应用启动设置
       this.applyStartupSettings();
-      
-      this.loaded = true;
     } catch (error) {
       console.error('❌ [设置服务] 加载设置失败:', error);
       this.settings = { ...this.DEFAULT_SETTINGS };
@@ -133,12 +167,104 @@ class SettingsService {
   /**
    * 保存设置
    */
-  private saveSettings(): void {
+  private async saveSettings(): Promise<void> {
     try {
-      fs.writeFileSync(this.SETTINGS_FILE, JSON.stringify(this.settings, null, 2));
-      console.log('✅ [设置服务] 已保存设置');
+      if (this.useDatabase) {
+        await this.saveSettingsToDatabase(this.settings);
+      } else {
+        // 如果数据库不可用，回退到文件
+        fs.writeFileSync(this.SETTINGS_FILE, JSON.stringify(this.settings, null, 2));
+        console.log('✅ [设置服务] 已保存设置到文件');
+      }
     } catch (error) {
       console.error('❌ [设置服务] 保存设置失败:', error);
+      // 如果数据库保存失败，尝试保存到文件作为备份
+      try {
+        fs.writeFileSync(this.SETTINGS_FILE, JSON.stringify(this.settings, null, 2));
+      } catch (fileError) {
+        console.error('❌ [设置服务] 保存到文件也失败:', fileError);
+      }
+    }
+  }
+
+  /**
+   * 从数据库加载设置
+   */
+  private async loadSettingsFromDatabase(): Promise<Partial<AppSettings>> {
+    try {
+      const db = await dbManager.getDb();
+      if (!db) {
+        return {};
+      }
+
+      const stmt = db.prepare('SELECT key, value FROM settings');
+      const settings: Record<string, any> = {};
+      
+      while (stmt.step()) {
+        const row = stmt.getAsObject() as any;
+        try {
+          settings[row.key] = JSON.parse(row.value);
+        } catch (e) {
+          // 如果解析失败，尝试直接使用值
+          settings[row.key] = row.value;
+        }
+      }
+      
+      stmt.free();
+      return settings as Partial<AppSettings>;
+    } catch (error) {
+      console.error('❌ [设置服务] 从数据库加载设置失败:', error);
+      return {};
+    }
+  }
+
+  /**
+   * 保存设置到数据库
+   */
+  private async saveSettingsToDatabase(settings: AppSettings): Promise<void> {
+    try {
+      const db = await dbManager.getDb();
+      if (!db) {
+        throw new Error('数据库未初始化');
+      }
+
+      const now = new Date().toISOString();
+      const stmt = db.prepare(`
+        INSERT INTO settings (key, value, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(key) DO UPDATE SET
+          value = excluded.value,
+          updated_at = excluded.updated_at
+      `);
+
+      // 保存所有设置项
+      for (const [key, value] of Object.entries(settings)) {
+        const valueStr = JSON.stringify(value);
+        stmt.run([key, valueStr, now]);
+      }
+
+      stmt.free();
+      dbManager.saveDatabase();
+      console.log('✅ [设置服务] 已保存设置到数据库');
+    } catch (error) {
+      console.error('❌ [设置服务] 保存设置到数据库失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 迁移设置从文件到数据库
+   */
+  private async migrateSettingsToDatabase(fileSettings: Partial<AppSettings>): Promise<void> {
+    try {
+      await this.saveSettingsToDatabase({ ...this.DEFAULT_SETTINGS, ...fileSettings });
+      console.log('✅ [设置服务] 已迁移设置到数据库');
+      
+      // 迁移成功后，可以删除旧文件（可选）
+      // fs.unlinkSync(this.SETTINGS_FILE);
+      // console.log('✅ [设置服务] 已删除旧设置文件');
+    } catch (error) {
+      console.error('❌ [设置服务] 迁移设置到数据库失败:', error);
     }
   }
 
