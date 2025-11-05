@@ -1,7 +1,7 @@
 import { app, Tray, Menu, nativeImage, BrowserWindow } from 'electron';
 import * as path from 'path';
 import { getMainWindow, showMainWindow } from '../windows/mainWindow';
-import { openSettingsWindow } from '../windows/settingsWindow';
+import { openSettingsWindow, openSettingsWindowToHelp } from '../windows/settingsWindow';
 import * as fs from 'fs';
 
 /**
@@ -262,6 +262,7 @@ class TrayService {
       { label: '显示主窗口', click: () => this.showMainWindow() },
       { type: 'separator' },
       { label: '设置', click: () => this.openSettings() },
+      { label: '帮助中心', click: () => this.openHelpCenter() },
       { type: 'separator' },
     ];
 
@@ -324,6 +325,17 @@ class TrayService {
       openSettingsWindow();
     } catch (error) {
       console.error('❌ [托盘服务] 打开设置窗口失败:', error);
+    }
+  }
+
+  /**
+   * 打开帮助中心
+   */
+  private openHelpCenter(): void {
+    try {
+      openSettingsWindowToHelp();
+    } catch (error) {
+      console.error('❌ [托盘服务] 打开帮助中心失败:', error);
     }
   }
 

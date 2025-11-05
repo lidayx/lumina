@@ -23,7 +23,7 @@ const CommandItem: React.FC<CommandItemProps> = ({ name, shortcut, description }
   </div>
 );
 
-type TabType = 'browser' | 'search-engines' | 'file' | 'general' | 'help';
+type TabType = 'browser' | 'search-engines' | 'file' | 'general' | 'help' | 'shortcuts';
 
 export const SettingsPage: React.FC<SettingsPageProps> = () => {
   const [activeTab, setActiveTab] = useState<TabType>('browser');
@@ -49,6 +49,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     loadBrowsers();
     loadSearchEngines();
     loadSettings();
+    
+    // 监听来自主进程的标签切换消息
+    const handleTabSwitch = (tab: TabType) => {
+      setActiveTab(tab);
+    };
+    
+    window.electron.on('settings-switch-tab', handleTabSwitch);
+    
+    return () => {
+      window.electron.removeListener('settings-switch-tab', handleTabSwitch);
+    };
   }, []);
   
   const loadSettings = async () => {
@@ -1003,6 +1014,55 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 </div>
               </div>
 
+              {/* 搜索功能 */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                <div className="p-6">
+                  <h3 className="text-lg font-medium mb-4">搜索功能</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">应用搜索</div>
+                      <p className="text-xs text-gray-600 mb-2">快速搜索已安装的应用，支持：</p>
+                      <ul className="text-xs text-gray-600 space-y-1 ml-4 list-disc">
+                        <li>应用名称模糊匹配（支持中文、英文、拼音）</li>
+                        <li>智能排序（精确匹配优先，使用频率排序）</li>
+                        <li>自动提取应用图标</li>
+                        <li>跨平台支持（macOS Spotlight、Windows Start Menu、Linux .desktop）</li>
+                      </ul>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">文件搜索</div>
+                      <p className="text-xs text-gray-600 mb-2">搜索本地文件和文件夹，支持：</p>
+                      <ul className="text-xs text-gray-600 space-y-1 ml-4 list-disc">
+                        <li>输入 <code className="px-1 py-0.5 bg-white rounded text-xs">file 文件名</code> 进行搜索</li>
+                        <li>使用系统原生搜索 API（Spotlight、Everything、locate）</li>
+                        <li>自定义搜索路径和范围</li>
+                        <li>实时搜索，无需预索引</li>
+                      </ul>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">书签搜索</div>
+                      <p className="text-xs text-gray-600 mb-2">搜索浏览器收藏的书签，支持：</p>
+                      <ul className="text-xs text-gray-600 space-y-1 ml-4 list-disc">
+                        <li>自动检测多浏览器（Chrome、Safari、Firefox、Edge、Brave 等）</li>
+                        <li>多用户配置文件自动加载</li>
+                        <li>支持标题和 URL 搜索</li>
+                        <li>实时同步，自动检测书签变化</li>
+                      </ul>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">网页搜索</div>
+                      <p className="text-xs text-gray-600 mb-2">快速访问搜索引擎，支持：</p>
+                      <ul className="text-xs text-gray-600 space-y-1 ml-4 list-disc">
+                        <li>多个搜索引擎（百度、谷歌、必应、DuckDuckGo 等）</li>
+                        <li>自定义搜索引擎</li>
+                        <li>历史记录追踪常用网站</li>
+                        <li>快捷键快速切换引擎</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* 命令列表 */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
                 <div className="p-6">
@@ -1043,7 +1103,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
               </div>
 
               {/* 计算器 */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
                 <div className="p-6">
                   <h3 className="text-lg font-medium mb-4">计算器功能</h3>
                   <div className="space-y-3 text-sm">
@@ -1069,6 +1129,191 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                         <code className="px-2 py-1 bg-white rounded text-xs">100km to m</code>
                         <code className="px-2 py-1 bg-white rounded text-xs">32f to c</code>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 时间转换 */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                <div className="p-6">
+                  <h3 className="text-lg font-medium mb-4">时间转换</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">当前时间查询</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">time</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">时间</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">date</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">now</code>
+                      </div>
+                      <p className="text-xs text-gray-600">显示当前时间的多种格式（标准格式、中文格式、ISO、时间戳等）</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">时间戳转换</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">timestamp 1705312245</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">1705312245 to date</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">2024-01-15 to timestamp</code>
+                      </div>
+                      <p className="text-xs text-gray-600">时间戳与日期互转，支持秒级和毫秒级时间戳</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">时间计算</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">2024-01-15 - 2024-01-10</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">2024-01-15 + 2 days</code>
+                      </div>
+                      <p className="text-xs text-gray-600">计算时间差或时间加减（支持天、小时、分钟、秒）</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">时区转换</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">2024-01-15 to UTC</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">2024-01-15 CST to EST</code>
+                      </div>
+                      <p className="text-xs text-gray-600">支持 UTC、CST、EST、PST、JST 等时区转换</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 编码解码 */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                <div className="p-6">
+                  <h3 className="text-lg font-medium mb-4">编码解码</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">URL 编码/解码</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">url encode hello world</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">url decode hello%20world</code>
+                      </div>
+                      <p className="text-xs text-gray-600">URL 编码和解码，支持中文和特殊字符</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">HTML 编码/解码</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">html encode &lt;div&gt;</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">html decode &amp;lt;div&amp;gt;</code>
+                      </div>
+                      <p className="text-xs text-gray-600">HTML 实体编码和解码，防止 XSS 攻击</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">Base64 编码/解码</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">base64 encode hello</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">base64 decode aGVsbG8=</code>
+                      </div>
+                      <p className="text-xs text-gray-600">Base64 编码和解码，支持中文</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">MD5 加密</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">md5 hello</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">hello md5</code>
+                      </div>
+                      <p className="text-xs text-gray-600">计算字符串的 MD5 哈希值（32位十六进制）</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 字符串工具 */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                <div className="p-6">
+                  <h3 className="text-lg font-medium mb-4">字符串工具</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">大小写转换</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">uppercase hello</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">lowercase HELLO</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">title case hello world</code>
+                      </div>
+                      <p className="text-xs text-gray-600">转换为大写、小写或标题格式（首字母大写）</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">命名格式转换</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">camel case hello world</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">snake case hello world</code>
+                      </div>
+                      <p className="text-xs text-gray-600">转换为驼峰命名（helloWorld）或蛇形命名（hello_world）</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">字符串操作</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">reverse abc</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">trim " hello "</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">trim all "hello world"</code>
+                      </div>
+                      <p className="text-xs text-gray-600">字符串反转、去除首尾空格或所有空格</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">文本统计</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">count hello world</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">word count text</code>
+                      </div>
+                      <p className="text-xs text-gray-600">统计字符数、单词数、行数、段落数等</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">字符串替换</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">replace hello world hello hi</code>
+                      </div>
+                      <p className="text-xs text-gray-600">替换字符串中的指定文本</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">正则提取</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">extract hello123 \d+</code>
+                      </div>
+                      <p className="text-xs text-gray-600">使用正则表达式提取匹配的内容</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 随机数生成 */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                <div className="p-6">
+                  <h3 className="text-lg font-medium mb-4">随机数生成</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">UUID 生成</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">uuid</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">generate uuid</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">uuid v1</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">uuid v4</code>
+                      </div>
+                      <p className="text-xs text-gray-600">生成 UUID v4（随机）或 v1（基于时间）</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">随机字符串</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">random string 16</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">16 random string</code>
+                      </div>
+                      <p className="text-xs text-gray-600">生成指定长度的随机字符串（字母+数字）</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">随机密码</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">random password 20</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">20 random password</code>
+                      </div>
+                      <p className="text-xs text-gray-600">生成指定长度的随机密码（包含大小写字母、数字、特殊字符）</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">随机数字</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">random number 1 100</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">random number 100</code>
+                      </div>
+                      <p className="text-xs text-gray-600">生成指定范围内的随机整数（如：1-100 或 0-100）</p>
                     </div>
                   </div>
                 </div>

@@ -9,7 +9,8 @@ contextBridge.exposeInMainWorld('electron', {
 
   // 监听主进程事件
   on: (channel: string, callback: (...args: any[]) => void) => {
-    ipcRenderer.on(channel, (_, ...args) => callback(...args));
+    const wrappedCallback = (_event: any, ...args: any[]) => callback(...args);
+    ipcRenderer.on(channel, wrappedCallback);
   },
 
   // 移除事件监听器
