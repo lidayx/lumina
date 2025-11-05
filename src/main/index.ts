@@ -11,11 +11,13 @@ import { registerCalculatorHandlers } from './handlers/calculatorHandlers';
 import { registerTimeHandlers } from './handlers/timeHandlers';
 import { registerBookmarkHandlers } from './handlers/bookmarkHandlers';
 import { registerSettingsHandlers } from './handlers/settingsHandlers';
+import { registerClipboardHandlers } from './handlers/clipboardHandlers';
 import { indexService } from './services/indexService';
 import { appService } from './services/appService';
 import { fileService } from './services/fileService';
 import { trayService } from './services/trayService';
 import bookmarkService from './services/bookmarkService';
+import { clipboardService } from './services/clipboardService';
 import { debugLog } from './utils/debugLog';
 
 // 单实例限制：防止同时运行多个应用实例
@@ -58,6 +60,11 @@ if (!gotTheLock) {
   app.whenReady().then(async () => {
     // 创建主窗口
     const mainWindow = getMainWindow();
+    
+    // 初始化剪贴板服务
+    clipboardService.initialize().catch(err => {
+      console.error('剪贴板服务初始化失败:', err);
+    });
     
     // 根据设置决定是否显示窗口（minimizeToTray）
     const { default: settingsService } = await import('./services/settingsService');
@@ -241,6 +248,7 @@ registerCalculatorHandlers();
 registerTimeHandlers();
 registerBookmarkHandlers();
 registerSettingsHandlers();
+registerClipboardHandlers();
 
 // 注册全局快捷键
 app.on('ready', () => {

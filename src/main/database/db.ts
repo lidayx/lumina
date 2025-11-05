@@ -93,6 +93,10 @@ class SimpleDatabase {
         this.db = new SQL.Database(fileBuffer);
         console.log('📂 [数据库] 加载现有数据库');
         
+        // 确保表结构是最新的（包括新添加的表）
+        this.initSchema();
+        this.save(); // 保存表结构更新
+        
         const stats = this.getStats();
         console.log('📊 [数据库] 统计数据:');
         console.log(`   - 总项目数: ${stats.totalItems}`);
@@ -147,10 +151,25 @@ class SimpleDatabase {
       )
     `);
 
+    // clipboard_history 表
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS clipboard_history (
+        id TEXT PRIMARY KEY,
+        content TEXT NOT NULL,
+        content_preview TEXT,
+        content_type TEXT DEFAULT 'text',
+        copy_count INTEGER DEFAULT 1,
+        created_at TEXT NOT NULL,
+        last_used_at TEXT
+      )
+    `);
+
     // 索引
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_type ON items(type)`);
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_score ON items(score DESC)`);
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_launchCount ON items(launchCount DESC)`);
+    this.db.run(`CREATE INDEX IF NOT EXISTS idx_clipboard_created_at ON clipboard_history(created_at DESC)`);
+    this.db.run(`CREATE INDEX IF NOT EXISTS idx_clipboard_preview ON clipboard_history(content_preview)`);
     
     // 如果旧表存在但没有 searchKeywords 列，添加该列
     try {
@@ -200,6 +219,21 @@ class SimpleDatabase {
     } catch (error) {
       console.error('保存数据库失败:', error);
     }
+  }
+
+  /**
+   * 公共保存方法（用于外部手动保存）
+   */
+  public saveDatabase(): void {
+    this.save();
+  }
+
+  /**
+   * 获取数据库实例（用于执行自定义 SQL）
+   */
+  public async getDb(): Promise<any> {
+    await this.ensureInit();
+    return this.db;
   }
 
   public async upsertItem(item: DatabaseItemInput) {

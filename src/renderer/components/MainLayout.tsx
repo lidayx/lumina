@@ -244,6 +244,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             // 检测是否为设置关键词
             const isSettingsQuery = ['设置', 'settings', 'setting', '配置', 'preferences'].includes(query.trim().toLowerCase());
             
+            // 检测是否为剪贴板搜索（优先检测，避免被其他查询拦截）
+            const clipboardMatch = query.trim().match(/^(?:clip|clipboard|剪贴板|cb)(?:\s+(.+))?$/i);
+            const isClipboardSearch = clipboardMatch !== null;
+            const clipboardQuery = clipboardMatch ? (clipboardMatch[1] || '') : '';
+            
             // 检测是否为计算表达式或时间查询（需要包含运算符、函数、单位转换符号或时间关键词）
             const queryTrimmed = query.trim();
             const isCalculation = (
@@ -325,7 +330,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             console.log('🔍 [文件搜索] 设置:', { fileSearchEnabled });
 
             // 并行搜索所有类型（统一防抖，确保结果同时返回以便正确排序）
-            const [appsFromIPC, files, webResults, bookmarks, commands, calcResult] = await Promise.all([
+            const [appsFromIPC, files, webResults, bookmarks, commands, calcResult, clipboardResults] = await Promise.all([
               // 直接调用 IPC 搜索应用，而不是使用 useAppSearch hook 的结果（避免防抖延迟）
               window.electron.app.search(query).catch(() => []),
               // 只在输入 "file + 空格 + 关键字" 时才搜索文件
@@ -340,6 +345,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                 console.error('计算器计算失败:', err);
                 return null;
               }) : Promise.resolve(null),
+              // 剪贴板搜索
+              isClipboardSearch 
+                ? (clipboardQuery 
+                    ? window.electron.clipboard.search(clipboardQuery, 20).catch(() => [])
+                    : window.electron.clipboard.getHistory(20).catch(() => []))
+                : Promise.resolve([]),
             ]);
             
             // 获取默认浏览器（用于为书签/网页结果显示默认浏览器图标）
@@ -395,6 +406,34 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                 score: 2000,
                 priorityScore: 2000,
               });
+            }
+            
+            // 剪贴板历史结果（如果有）
+            if (clipboardResults && clipboardResults.length > 0) {
+              for (const item of clipboardResults) {
+                const date = new Date(item.createdAt);
+                const timeStr = date.toLocaleString('zh-CN', {
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
+                
+                combinedResults.push({
+                  id: `clipboard-${item.id}`,
+                  type: 'command' as const,
+                  title: item.contentPreview || item.content.substring(0, 50),
+                  description: `${timeStr}${item.copyCount > 1 ? ` · 复制 ${item.copyCount} 次` : ''}`,
+                  action: `clipboard:paste:${item.id}`,
+                  score: 1900,
+                  priorityScore: 1900,
+                  calcData: {
+                    input: item.content,
+                    output: item.content,
+                    success: true,
+                  },
+                });
+              }
             }
             
             // 计算器结果（如果有，包括时间查询结果）
@@ -971,6 +1010,17 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
           } catch (error) {
             console.error('Failed to copy time result:', error);
           }
+        }
+      }
+      // 处理剪贴板粘贴
+      else if (result.action.startsWith('clipboard:paste:')) {
+        const itemId = result.action.replace('clipboard:paste:', '');
+        try {
+          await window.electron.clipboard.paste(itemId);
+          console.log('Clipboard item pasted:', itemId);
+          hideMainWindow();
+        } catch (error) {
+          console.error('Failed to paste clipboard item:', error);
         }
       }
       // 处理计算器结果

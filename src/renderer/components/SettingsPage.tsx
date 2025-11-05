@@ -23,7 +23,7 @@ const CommandItem: React.FC<CommandItemProps> = ({ name, shortcut, description }
   </div>
 );
 
-type TabType = 'browser' | 'search-engines' | 'file' | 'general' | 'translate' | 'help' | 'shortcuts';
+type TabType = 'browser' | 'search-engines' | 'file' | 'general' | 'translate' | 'clipboard' | 'help' | 'shortcuts';
 
 export const SettingsPage: React.FC<SettingsPageProps> = () => {
   const [activeTab, setActiveTab] = useState<TabType>('browser');
@@ -404,6 +404,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
                 </svg>
                 翻译设置
+              </div>
+            </button>
+            
+            <button
+              onClick={() => setActiveTab('clipboard')}
+              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                activeTab === 'clipboard'
+                  ? 'bg-blue-50 text-blue-700 font-medium'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center">
+                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                剪贴板设置
               </div>
             </button>
             
@@ -1051,6 +1067,83 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                         <li>如果未配置，触发翻译时将提示"请在设置中配置翻译参数"</li>
                         <li>修改配置后，新的翻译请求将立即生效</li>
                         <li>请确保您的 AppID 和 Secret Key 有效且有足够的调用额度</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'clipboard' && (
+            <div>
+              <h2 className="text-2xl font-bold mb-2">剪贴板设置</h2>
+              <p className="text-gray-600 mb-6">配置剪贴板历史记录功能</p>
+              
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="space-y-6">
+                  {/* 启用剪贴板历史 */}
+                  <div className="flex items-center justify-between py-2">
+                    <div>
+                      <div className="font-medium text-gray-900">启用剪贴板历史</div>
+                      <div className="text-sm text-gray-500">开启后自动记录复制的内容</div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={appSettings.clipboardEnabled !== false}
+                        onChange={(e) => updateSetting('clipboardEnabled', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+                  
+                  {/* 最大记录数 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      最大记录数
+                    </label>
+                    <input
+                      type="number"
+                      min="10"
+                      max="200"
+                      value={appSettings.clipboardMaxItems || 50}
+                      onChange={(e) => updateSetting('clipboardMaxItems', parseInt(e.target.value) || 50)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <p className="mt-1 text-sm text-gray-500">
+                      建议值：20-100 条。超出此数量的旧记录将自动删除。
+                    </p>
+                  </div>
+                  
+                  {/* 保留天数 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      保留天数
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="30"
+                      value={appSettings.clipboardRetentionDays || 7}
+                      onChange={(e) => updateSetting('clipboardRetentionDays', parseInt(e.target.value) || 7)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <p className="mt-1 text-sm text-gray-500">
+                      建议值：3-30 天。超过此天数的记录将自动清理。
+                    </p>
+                  </div>
+                  
+                  {/* 使用说明 */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h3 className="text-sm font-medium text-blue-900 mb-2">使用说明</h3>
+                      <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                        <li>在搜索框中输入 <code className="px-1 py-0.5 bg-blue-100 rounded text-xs">clip</code> 或 <code className="px-1 py-0.5 bg-blue-100 rounded text-xs">剪贴板</code> 查看历史记录</li>
+                        <li>输入 <code className="px-1 py-0.5 bg-blue-100 rounded text-xs">clip 关键词</code> 可以搜索历史记录</li>
+                        <li>选择历史记录后按 Enter 键快速粘贴</li>
+                        <li>所有数据仅存储在本地，不会上传到任何服务器</li>
                       </ul>
                     </div>
                   </div>

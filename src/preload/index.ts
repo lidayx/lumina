@@ -95,6 +95,15 @@ contextBridge.exposeInMainWorld('electron', {
         getLogFile: () => ipcRenderer.invoke('settings-get-log-file'),
       },
       
+      // 剪贴板相关
+      clipboard: {
+        getHistory: (limit?: number) => ipcRenderer.invoke('clipboard-get-history', limit),
+        search: (query: string, limit?: number) => ipcRenderer.invoke('clipboard-search', query, limit),
+        delete: (id: string) => ipcRenderer.invoke('clipboard-delete', id),
+        clear: () => ipcRenderer.invoke('clipboard-clear'),
+        paste: (id: string) => ipcRenderer.invoke('clipboard-paste', id),
+      },
+      
       // 窗口相关
       windowResize: (width: number, height: number) => 
         ipcRenderer.invoke('window-resize', width, height),
@@ -165,6 +174,13 @@ contextBridge.exposeInMainWorld('electron', {
       update: (updates: any) => Promise<any>;
       reset: () => Promise<any>;
       getLogFile: () => Promise<string>;
+    };
+    clipboard: {
+      getHistory: (limit?: number) => Promise<any[]>;
+      search: (query: string, limit?: number) => Promise<any[]>;
+      delete: (id: string) => Promise<any>;
+      clear: () => Promise<any>;
+      paste: (id: string) => Promise<any>;
     };
     windowResize: (width: number, height: number) => Promise<void>;
     windowHide: (windowType: string) => Promise<void>;

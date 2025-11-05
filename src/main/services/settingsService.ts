@@ -28,6 +28,11 @@ export interface AppSettings {
   // 翻译设置
   baiduTranslateAppId: string; // 百度翻译 AppID
   baiduTranslateSecretKey: string; // 百度翻译 Secret Key
+  
+  // 剪贴板设置
+  clipboardEnabled: boolean; // 是否启用剪贴板历史
+  clipboardMaxItems: number; // 最大记录数（默认 50）
+  clipboardRetentionDays: number; // 保留天数（默认 7）
 }
 
 /**
@@ -48,6 +53,9 @@ class SettingsService {
     developerMode: false, // 默认关闭开发者模式
     baiduTranslateAppId: '', // 百度翻译 AppID（需要在设置中配置）
     baiduTranslateSecretKey: '', // 百度翻译 Secret Key（需要在设置中配置）
+    clipboardEnabled: true, // 默认启用剪贴板历史
+    clipboardMaxItems: 50, // 默认最大记录 50 条
+    clipboardRetentionDays: 7, // 默认保留 7 天
   };
 
   // ========== 私有属性 ==========
@@ -181,6 +189,19 @@ class SettingsService {
           console.log('✅ [设置服务] 已更新翻译服务配置');
         } catch (error) {
           console.error('❌ [设置服务] 更新翻译配置失败:', error);
+        }
+      });
+    }
+    
+    if ('clipboardEnabled' in updates || 'clipboardMaxItems' in updates || 'clipboardRetentionDays' in updates) {
+      // 剪贴板设置变更时，更新剪贴板服务（异步调用）
+      setImmediate(async () => {
+        try {
+          const { clipboardService } = await import('./clipboardService');
+          await clipboardService.updateSettings();
+          console.log('✅ [设置服务] 已更新剪贴板服务配置');
+        } catch (error) {
+          console.error('❌ [设置服务] 更新剪贴板配置失败:', error);
         }
       });
     }
