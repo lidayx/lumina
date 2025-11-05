@@ -73,6 +73,12 @@ contextBridge.exposeInMainWorld('electron', {
         calculate: (expression: string) => ipcRenderer.invoke('calculator-calculate', expression),
       },
       
+      // 时间相关
+      time: {
+        getAllFormats: (dateISOString?: string) => ipcRenderer.invoke('time-get-all-formats', dateISOString),
+        handleQuery: (query: string) => ipcRenderer.invoke('time-handle-query', query),
+      },
+      
       // 书签相关
       bookmark: {
         getAll: () => ipcRenderer.invoke('bookmark-get-all'),

@@ -3,6 +3,8 @@
  * 支持基本数学运算、科学计算、单位换算和表达式解析
  */
 
+import { timeService } from './timeService';
+
 // ========== 类型定义 ==========
 
 export interface CalculationResult {
@@ -77,6 +79,18 @@ class CalculatorService {
       // 检查是否为纯数字
       if (/^-?\d+\.?\d*$/.test(expression)) {
         return { input: expression, output: expression, success: true };
+      }
+
+      // 尝试识别时间查询（在单位换算之前）
+      const timeResult = timeService.handleTimeQuery(expression);
+      if (timeResult && timeResult.success) {
+        // 将 TimeResult 转换为 CalculationResult
+        return {
+          input: timeResult.input,
+          output: timeResult.output,
+          success: timeResult.success,
+          error: timeResult.error,
+        };
       }
 
       // 尝试识别单位换算

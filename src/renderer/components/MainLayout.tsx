@@ -250,7 +250,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             // 检测是否为设置关键词
             const isSettingsQuery = ['设置', 'settings', 'setting', '配置', 'preferences'].includes(query.trim().toLowerCase());
             
-            // 检测是否为计算表达式（需要包含运算符、函数或单位转换符号）
+            // 检测是否为计算表达式或时间查询（需要包含运算符、函数、单位转换符号或时间关键词）
             const queryTrimmed = query.trim();
             const isCalculation = (
               // 包含运算符或特殊字符，且不是纯数字
@@ -260,7 +260,26 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               // 包含单位转换关键字（单词边界）
               /\b(to|到)\b/i.test(queryTrimmed) ||
               // 包含单位转换箭头符号
-              /=>/.test(queryTrimmed)
+              /=>/.test(queryTrimmed) ||
+              // 时间查询关键词（精确匹配单个词，避免误匹配应用名）
+              /^(time|时间|date|日期|now|今天|今天日期|当前时间|现在几点)\s*$/i.test(queryTrimmed) ||
+              // 纯日期时间字符串（如：2024-01-15 14:30:45）
+              /^\d{4}[-\/]\d{2}[-\/]\d{2}(\s+\d{2}:\d{2}(:\d{2})?)?$/i.test(queryTrimmed) ||
+              // ISO 日期时间格式
+              /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/i.test(queryTrimmed) ||
+              // 时间戳模式：timestamp 或 ts 开头加数字
+              /^(timestamp|ts)\s+\d{10,13}$/i.test(queryTrimmed) ||
+              // 时间戳转日期：数字 + to date
+              /^\d{10,13}\s+(?:to|转)\s+date$/i.test(queryTrimmed) ||
+              // 日期转时间戳：日期 + to timestamp
+              /^.+?\s+(?:to|转)\s+timestamp$/i.test(queryTrimmed) ||
+              // 时间计算：包含 - 或 + 且看起来像日期格式
+              /^\d{4}[-\/]\d{2}[-\/]\d{2}/.test(queryTrimmed) && /[\+\-]/.test(queryTrimmed) ||
+              // 日期格式化：format 或格式化关键字
+              /^(?:format|格式化)\s+.+?\s+.+?$/i.test(queryTrimmed) ||
+              /^.+?\s+(?:format|格式化)\s+.+?$/i.test(queryTrimmed) ||
+              // 时区转换：包含 to/in/到 和时区关键词（更宽松的匹配）
+              /\s+(?:to|in|到)\s+(utc|gmt|cst|est|pst|jst|bst|cet|ist|kst|aest|china|中国|beijing|北京|japan|日本|tokyo|东京|eastern|pacific|london|europe|india|印度|korea|韩国|australia|悉尼|utc[+\-]\d+)/i.test(queryTrimmed)
             );
             
             // 检测是否为文件搜索（file + 空格 + 关键字）
@@ -343,18 +362,289 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               });
             }
             
-            // 计算器结果（如果有）
+            // 计算器结果（如果有，包括时间查询结果）
             if (calcResult && calcResult.success) {
-              combinedResults.push({
-                id: 'calc-result',
-                type: 'command' as const,
-                title: `= ${calcResult.output}`,
-                description: `计算：${calcResult.input}`,
-                action: 'calc:copy',
-                score: 1800,
-                priorityScore: 1800,
-                calcData: calcResult,
-              });
+              // 判断是否为时间差计算结果（优先判断，避免误判）
+              // 时间差结果格式：包含"天"、"小时"、"分钟"、"秒"等关键词，并且包含"总计:"
+              const isTimeDifference = calcResult.output.includes('总计:') && 
+                                       (/\d+\s*(天|小时|分钟|秒)/.test(calcResult.output) || 
+                                        calcResult.output.includes('毫秒'));
+              
+              // 判断是否为时间加减计算结果（包含日期时间格式，且是单个日期时间）
+              // 时间加减结果：格式为 YYYY-MM-DD HH:mm:ss，且输入包含 + 或 - 和时长关键词
+              const isTimeCalculation = !isTimeDifference && 
+                                       /^\d{4}[-\/]\d{2}[-\/]\d{2}\s+\d{2}:\d{2}:\d{2}$/.test(calcResult.output) &&
+                                       /[\+\-]/.test(query.trim()) &&
+                                       (/\b(days?|hours?|minutes?|minutes?|seconds?|天|小时|分钟|秒)\b/i.test(query.trim()) ||
+                                        /\d+\s*(d|h|m|s|天|小时|分钟|秒)/i.test(query.trim()));
+              
+              // 判断是否为时间查询结果（通过输出内容判断）
+              const isTimeResult = !isTimeDifference && !isTimeCalculation && (
+                calcResult.output.includes('\n') || 
+                /^\d{4}[-\/]\d{2}/.test(calcResult.output) ||
+                /时间戳|timestamp|ISO|UTC|CST|EST|PST|JST|格式/i.test(calcResult.output)
+              );
+              
+              // 时间差计算结果：直接显示，不拆分
+              if (isTimeDifference) {
+                combinedResults.push({
+                  id: 'time-difference-result',
+                  type: 'command' as const,
+                  title: calcResult.output.split('\n')[0] || '时间差',
+                  description: calcResult.output.includes('\n') ? calcResult.output.split('\n').slice(1).join(' ') : '点击复制',
+                  action: 'time:copy',
+                  score: 1900,
+                  priorityScore: 1900,
+                  calcData: calcResult,
+                });
+              }
+              // 时间加减计算结果：显示计算结果的所有格式
+              else if (isTimeCalculation) {
+                try {
+                  // 从输出中解析计算结果日期
+                  const resultDateStr = calcResult.output.trim();
+                  
+                  // 使用正则精确解析日期时间格式，避免时区问题
+                  let resultDate: Date | null = null;
+                  const dateTimePattern = /^(\d{4})[-\/](\d{2})[-\/](\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/;
+                  const match = resultDateStr.match(dateTimePattern);
+                  
+                  if (match) {
+                    const year = parseInt(match[1], 10);
+                    const month = parseInt(match[2], 10) - 1;
+                    const day = parseInt(match[3], 10);
+                    const hours = parseInt(match[4], 10);
+                    const minutes = parseInt(match[5], 10);
+                    const seconds = parseInt(match[6], 10);
+                    
+                    resultDate = new Date(year, month, day, hours, minutes, seconds);
+                  } else {
+                    // 如果正则解析失败，尝试使用 Date 构造函数
+                    resultDate = new Date(resultDateStr);
+                  }
+                  
+                  if (resultDate && !isNaN(resultDate.getTime())) {
+                    // 获取计算结果的所有格式
+                    const timeFormats = await window.electron.time.getAllFormats(resultDate.toISOString());
+                    
+                    // 为每个时间格式创建一个选项
+                    timeFormats.forEach((format: { label: string; value: string }, index: number) => {
+                      combinedResults.push({
+                        id: `time-calculation-${index}`,
+                        type: 'command' as const,
+                        title: format.value,
+                        description: format.label,
+                        action: 'time:copy',
+                        score: 1900 - index,
+                        priorityScore: 1900 - index,
+                        calcData: {
+                          input: calcResult.input,
+                          output: format.value,
+                          success: true,
+                        },
+                      });
+                    });
+                  } else {
+                    // 如果解析失败，直接显示结果
+                    combinedResults.push({
+                      id: 'time-calculation-result',
+                      type: 'command' as const,
+                      title: calcResult.output,
+                      description: '计算结果',
+                      action: 'time:copy',
+                      score: 1900,
+                      priorityScore: 1900,
+                      calcData: calcResult,
+                    });
+                  }
+                } catch (error) {
+                  console.error('Failed to process time calculation result:', error);
+                  // 如果处理失败，直接显示结果
+                  combinedResults.push({
+                    id: 'time-calculation-result',
+                    type: 'command' as const,
+                    title: calcResult.output,
+                    description: '计算结果',
+                    action: 'time:copy',
+                    score: 1900,
+                    priorityScore: 1900,
+                    calcData: calcResult,
+                  });
+                }
+              }
+              // 时间查询结果：需要获取所有时间格式并拆分成多个选项
+              else if (isTimeResult) {
+                // 时间查询结果：需要获取所有时间格式并拆分成多个选项
+                try {
+                  // 尝试从输入中提取时间信息
+                  let targetDate: Date | null = null;
+                  const queryTrimmed = query.trim();
+                  
+                  // 1. 检测时间戳转日期: timestamp 1705312245 或 ts 1705312245
+                  const timestampPattern = /^(?:timestamp|ts)\s+(\d{10,13})$/i;
+                  const timestampMatch = queryTrimmed.match(timestampPattern);
+                  
+                  if (timestampMatch) {
+                    const timestampStr = timestampMatch[1];
+                    const timestamp = parseInt(timestampStr, 10);
+                    const isSeconds = timestampStr.length === 10;
+                    targetDate = isSeconds ? new Date(timestamp * 1000) : new Date(timestamp);
+                  } else {
+                    // 2. 检测时间戳转日期: 1705312245 to date 或 1705312245 转日期
+                    const toDatePattern = /^(\d{10,13})\s+(?:to|转)\s+date$/i;
+                    const toDateMatch = queryTrimmed.match(toDatePattern);
+                    if (toDateMatch) {
+                      const timestampStr = toDateMatch[1];
+                      const timestamp = parseInt(timestampStr, 10);
+                      const isSeconds = timestampStr.length === 10;
+                      targetDate = isSeconds ? new Date(timestamp * 1000) : new Date(timestamp);
+                    } else {
+                      // 3. 检测日期转时间戳: 日期 + to timestamp 或 日期 + 转时间戳
+                      const dateToTimestampPattern = /^(.+?)\s+(?:to|转)\s+timestamp$/i;
+                      const dateToTimestampMatch = queryTrimmed.match(dateToTimestampPattern);
+                      if (dateToTimestampMatch) {
+                        const dateStr = dateToTimestampMatch[1].trim();
+                        // 尝试多种日期格式解析
+                        const dateFormats = [
+                          // YYYY-MM-DD HH:mm:ss
+                          /^(\d{4})[-\/](\d{2})[-\/](\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/,
+                          // YYYY-MM-DD HH:mm
+                          /^(\d{4})[-\/](\d{2})[-\/](\d{2})\s+(\d{2}):(\d{2})$/,
+                          // YYYY-MM-DD
+                          /^(\d{4})[-\/](\d{2})[-\/](\d{2})$/,
+                          // ISO 格式
+                          /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/,
+                        ];
+                        
+                        let parsed = false;
+                        for (const format of dateFormats) {
+                          const match = dateStr.match(format);
+                          if (match) {
+                            const year = parseInt(match[1], 10);
+                            const month = parseInt(match[2], 10) - 1; // 月份从 0 开始
+                            const day = parseInt(match[3], 10);
+                            const hours = match[4] ? parseInt(match[4], 10) : 0;
+                            const minutes = match[5] ? parseInt(match[5], 10) : 0;
+                            const seconds = match[6] ? parseInt(match[6], 10) : 0;
+                            
+                            targetDate = new Date(year, month, day, hours, minutes, seconds);
+                            if (!isNaN(targetDate.getTime())) {
+                              parsed = true;
+                              break;
+                            }
+                          }
+                        }
+                        
+                        // 如果正则解析失败，尝试使用 Date 构造函数
+                        if (!parsed) {
+                          const tryDate = new Date(dateStr);
+                          if (!isNaN(tryDate.getTime())) {
+                            targetDate = tryDate;
+                          }
+                        }
+                      }
+                    }
+                  }
+                  
+                  // 4. 如果还没有找到日期，尝试从输出中解析第一个日期格式
+                  if ((!targetDate || isNaN(targetDate.getTime())) && calcResult.output) {
+                    const dateMatch = calcResult.output.match(/^(\d{4}[-\/]\d{2}[-\/]\d{2}(?:\s+\d{2}:\d{2}:\d{2})?)/);
+                    if (dateMatch) {
+                      targetDate = new Date(dateMatch[1].replace(/\//g, '-'));
+                    }
+                  }
+                  
+                  // 5. 如果还没有找到，尝试直接解析查询字符串（纯日期时间格式）
+                  if ((!targetDate || isNaN(targetDate.getTime())) && queryTrimmed) {
+                    const pureDatePatterns = [
+                      // YYYY-MM-DD HH:mm:ss
+                      /^(\d{4})[-\/](\d{2})[-\/](\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/,
+                      // YYYY-MM-DD HH:mm
+                      /^(\d{4})[-\/](\d{2})[-\/](\d{2})\s+(\d{2}):(\d{2})$/,
+                      // YYYY-MM-DD
+                      /^(\d{4})[-\/](\d{2})[-\/](\d{2})$/,
+                      // ISO 格式
+                      /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/,
+                    ];
+                    
+                    for (const pattern of pureDatePatterns) {
+                      const match = queryTrimmed.match(pattern);
+                      if (match) {
+                        const year = parseInt(match[1], 10);
+                        const month = parseInt(match[2], 10) - 1;
+                        const day = parseInt(match[3], 10);
+                        const hours = match[4] ? parseInt(match[4], 10) : 0;
+                        const minutes = match[5] ? parseInt(match[5], 10) : 0;
+                        const seconds = match[6] ? parseInt(match[6], 10) : 0;
+                        
+                        targetDate = new Date(year, month, day, hours, minutes, seconds);
+                        if (!isNaN(targetDate.getTime())) {
+                          break;
+                        }
+                      }
+                    }
+                    
+                    // 如果正则解析失败，尝试使用 Date 构造函数
+                    if ((!targetDate || isNaN(targetDate.getTime())) && !/^\d+$/.test(queryTrimmed)) {
+                      const tryDate = new Date(queryTrimmed);
+                      if (!isNaN(tryDate.getTime())) {
+                        targetDate = tryDate;
+                      }
+                    }
+                  }
+                  
+                  // 6. 如果仍然没有找到，使用当前时间（用于 time/date 查询）
+                  if (!targetDate || isNaN(targetDate.getTime())) {
+                    targetDate = new Date();
+                  }
+                  
+                  // 获取该日期所有格式（传递日期参数）
+                  const timeFormats = await window.electron.time.getAllFormats(targetDate.toISOString());
+                  
+                  // 为每个时间格式创建一个选项
+                  timeFormats.forEach((format: { label: string; value: string }, index: number) => {
+                    combinedResults.push({
+                      id: `time-result-${index}`,
+                      type: 'command' as const,
+                      title: format.value,
+                      description: format.label,
+                      action: 'time:copy',
+                      score: 1900 - index, // 第一个选项优先级最高
+                      priorityScore: 1900 - index,
+                      calcData: {
+                        input: calcResult.input,
+                        output: format.value,
+                        success: true,
+                      },
+                    });
+                  });
+                } catch (error) {
+                  console.error('Failed to get time formats:', error);
+                  // 如果获取失败，回退到单个结果
+                  combinedResults.push({
+                    id: 'time-result',
+                    type: 'command' as const,
+                    title: calcResult.output.split('\n')[0] || '时间查询',
+                    description: '点击复制',
+                    action: 'time:copy',
+                    score: 1900,
+                    priorityScore: 1900,
+                    calcData: calcResult,
+                  });
+                }
+              } else {
+                // 普通计算器结果
+                combinedResults.push({
+                  id: 'calc-result',
+                  type: 'command' as const,
+                  title: `= ${calcResult.output.split('\n')[0]}`,
+                  description: `计算：${calcResult.input}`,
+                  action: 'calc:copy',
+                  score: 1800,
+                  priorityScore: 1800,
+                  calcData: calcResult,
+                });
+              }
             }
             
             // 命令结果（系统命令优先级高于应用）
@@ -564,6 +854,19 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
           hideMainWindow();
         } catch (error) {
           console.error('Failed to open bookmark:', error);
+        }
+      }
+      // 处理时间查询结果
+      else if (result.action === 'time:copy') {
+        if (result.calcData) {
+          try {
+            // 复制时间结果到剪贴板
+            await navigator.clipboard.writeText(result.calcData.output);
+            console.log('Time result copied:', result.calcData.output);
+            hideMainWindow();
+          } catch (error) {
+            console.error('Failed to copy time result:', error);
+          }
         }
       }
       // 处理计算器结果

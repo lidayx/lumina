@@ -8,6 +8,7 @@ import { registerBrowserHandlers } from './handlers/browserHandlers';
 import { registerWindowHandlers } from './handlers/windowHandlers';
 import { registerCommandHandlers } from './handlers/commandHandlers';
 import { registerCalculatorHandlers } from './handlers/calculatorHandlers';
+import { registerTimeHandlers } from './handlers/timeHandlers';
 import { registerBookmarkHandlers } from './handlers/bookmarkHandlers';
 import { registerSettingsHandlers } from './handlers/settingsHandlers';
 import { indexService } from './services/indexService';
@@ -237,6 +238,7 @@ registerBrowserHandlers();
 registerWindowHandlers();
 registerCommandHandlers();
 registerCalculatorHandlers();
+registerTimeHandlers();
 registerBookmarkHandlers();
 registerSettingsHandlers();
 
