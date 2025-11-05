@@ -20,6 +20,8 @@ export function getWindowUrl(type: WindowType): string {
         return `${baseUrl}#settings`;
       case 'plugin':
         return `${baseUrl}#plugins`;
+      case 'preview':
+        return `${baseUrl}#preview`;
       default:
         return baseUrl;
     }
@@ -38,6 +40,8 @@ export function getWindowUrl(type: WindowType): string {
         return `file://${indexPath}#settings`;
       case 'plugin':
         return `file://${indexPath}#plugins`;
+      case 'preview':
+        return `file://${indexPath}#preview`;
       default:
         return `file://${indexPath}`;
     }
@@ -81,5 +85,21 @@ export const WINDOW_CONFIGS = {
     minimizable: true,
     resizable: true,
   }),
+  preview: () => {
+    // 主窗口最大高度计算：80 (输入框) + 8 * 56 (最大8项结果，每项56px) + 20 (padding) = 548px
+    const mainWindowMaxHeight = 80 + 8 * 56 + 20; // 548px
+    
+    return {
+      type: 'preview' as WindowType,
+      url: getWindowUrl('preview'),
+      width: 400,
+      height: mainWindowMaxHeight, // 固定为主窗口最大高度
+      minWidth: 300,
+      minHeight: 200,
+      maximizable: false,
+      minimizable: true,
+      resizable: false, // 禁止调整大小，保持固定尺寸
+    };
+  },
 };
 

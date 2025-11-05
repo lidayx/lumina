@@ -1,5 +1,6 @@
 import { windowManager } from './windowManager';
 import { WINDOW_CONFIGS } from '../../shared/utils/window';
+import { hidePreviewWindow } from './previewWindow';
 
 /**
  * 创建或获取主窗口
@@ -20,6 +21,8 @@ export function showMainWindow() {
  */
 export function hideMainWindow() {
   windowManager.hideWindow('main');
+  // 隐藏主窗口时，同时隐藏预览窗口
+  hidePreviewWindow();
 }
 
 /**

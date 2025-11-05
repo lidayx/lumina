@@ -52,5 +52,73 @@ export function registerAppHandlers() {
       return { success: false, error: String(error) };
     }
   });
+
+  // 打开应用安装文件夹
+  ipcMain.handle('app-reveal-folder', async (_event, appId: string) => {
+    try {
+      const { shell } = require('electron');
+      const apps = await appService.getAllApps();
+      const app = apps.find((a: any) => a.id === appId);
+      if (app && app.path) {
+        // 对于 macOS .app 文件，显示包含 .app 的文件夹
+        // 对于其他平台，显示文件所在的文件夹
+        const path = require('path');
+        let folderPath = app.path;
+        
+        // macOS: 如果是 .app 文件，获取父目录
+        if (process.platform === 'darwin' && app.path.endsWith('.app')) {
+          folderPath = path.dirname(app.path);
+        } else {
+          // 其他平台：获取文件所在目录
+          folderPath = path.dirname(app.path);
+        }
+        
+        await shell.showItemInFolder(folderPath);
+        return { success: true };
+      } else {
+        return { success: false, error: '应用未找到' };
+      }
+    } catch (error) {
+      console.error('Error revealing folder:', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  // 获取应用文件信息（包括安装时间等）
+  ipcMain.handle('app-get-info', async (_event, appId: string) => {
+    try {
+      const fs = require('fs');
+      // 直接从应用服务获取最新数据（内存中的数据已经是最新的，因为 launchApp 会更新内存）
+      const apps = await appService.getAllApps();
+      const app = apps.find((a: any) => a.id === appId);
+      if (app && app.path) {
+        // 如果文件存在，获取文件统计信息
+        let stats = null;
+        try {
+          stats = fs.statSync(app.path);
+        } catch (err) {
+          // 文件可能不存在，忽略错误
+        }
+        
+        return {
+          success: true,
+          info: {
+            ...app,
+            // 如果文件存在，添加文件信息
+            ...(stats && {
+              installDate: stats.birthtime || stats.ctime, // 创建时间作为安装时间
+              size: stats.size,
+              modifiedDate: stats.mtime,
+            }),
+          },
+        };
+      } else {
+        return { success: false, error: '应用未找到' };
+      }
+    } catch (error) {
+      console.error('Error getting app info:', error);
+      return { success: false, error: String(error) };
+    }
+  });
 }
 

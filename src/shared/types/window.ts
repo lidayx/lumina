@@ -8,7 +8,7 @@ export interface WindowState {
   isMaximized: boolean;
 }
 
-export type WindowType = 'main' | 'settings' | 'plugin';
+export type WindowType = 'main' | 'settings' | 'plugin' | 'preview';
 
 export interface WindowConfig {
   type: WindowType;

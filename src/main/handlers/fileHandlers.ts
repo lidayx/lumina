@@ -37,6 +37,45 @@ export function registerFileHandlers() {
     }
   });
 
+  // 在文件管理器中显示文件所在文件夹
+  ipcMain.handle('file-reveal-folder', async (_event, filePath: string) => {
+    try {
+      const { shell } = require('electron');
+      const path = require('path');
+      // 获取文件所在目录
+      const folderPath = path.dirname(filePath);
+      await shell.showItemInFolder(folderPath);
+      return { success: true };
+    } catch (error) {
+      console.error('Error revealing folder:', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  // 获取文件信息（包括文件大小等）
+  ipcMain.handle('file-get-info', async (_event, filePath: string) => {
+    try {
+      const fs = require('fs');
+      if (!fs.existsSync(filePath)) {
+        return { success: false, error: '文件不存在' };
+      }
+      
+      const stats = fs.statSync(filePath);
+      return {
+        success: true,
+        info: {
+          size: stats.size,
+          createdDate: stats.birthtime || stats.ctime,
+          modifiedDate: stats.mtime,
+          isDirectory: stats.isDirectory(),
+        },
+      };
+    } catch (error) {
+      console.error('Error getting file info:', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
   // 扫描并索引指定目录的文件
   ipcMain.handle('file-index', async (_event, paths?: string[]) => {
     try {

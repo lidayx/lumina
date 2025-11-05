@@ -140,6 +140,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
   // 动态调整窗口大小（优化：立即执行+防抖后续更新）
   const resizeTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const lastHeightRef = React.useRef<number>(80);
+  const lastWidthRef = React.useRef<number>(700);
   
   React.useEffect(() => {
     if (!window.electron) return;
@@ -173,19 +174,31 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
       clearTimeout(resizeTimerRef.current);
     }
 
+    // 主窗口宽度固定（不再受预览影响）
+    const baseWidth = 700;
+    const targetWidth = baseWidth;
+
     // 如果高度变化较大（超过5px）或者首次设置，立即更新
     const heightDiff = Math.abs(height - lastHeightRef.current);
-    if (heightDiff > 5 || lastHeightRef.current === 80) {
+    const widthDiff = Math.abs(targetWidth - (lastWidthRef.current || baseWidth));
+    const shouldUpdateImmediately = heightDiff > 5 || widthDiff > 5 || lastHeightRef.current === 80;
+    
+    if (shouldUpdateImmediately) {
       // 立即执行
       lastHeightRef.current = height;
-      window.electron.invoke('window-resize', 700, height).catch(err => {
+      lastWidthRef.current = targetWidth;
+      window.electron.windowResize(targetWidth, height).catch(err => {
         console.error('调整窗口大小失败:', err);
       });
     } else {
       // 小幅变化时使用短防抖（16ms，接近一帧时间）
+      if (resizeTimerRef.current) {
+        clearTimeout(resizeTimerRef.current);
+      }
       resizeTimerRef.current = setTimeout(() => {
         lastHeightRef.current = height;
-        window.electron.invoke('window-resize', 700, height).catch(err => {
+        lastWidthRef.current = targetWidth;
+        window.electron.windowResize(targetWidth, height).catch(err => {
           console.error('调整窗口大小失败:', err);
         });
       }, 16); // 16ms 防抖（约一帧时间）
@@ -323,6 +336,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               match: fileSearchMatch 
             });
             
+            // 如果检测到文件搜索，禁用计算器（文件搜索优先）
+            const finalIsCalculation = isFileSearch ? false : isCalculation;
+            
             // 获取设置以决定是否搜索文件
             const settings = await window.electron.settings.getAll().catch(() => ({}));
             const fileSearchEnabled = settings?.fileSearchEnabled !== false; // 默认启用
@@ -337,11 +353,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               (isFileSearch && fileSearchEnabled && fileSearchQuery) 
                 ? window.electron.file.search(fileSearchQuery).catch(() => []) 
                 : Promise.resolve([]),
-              // 如果是计算/翻译查询，不搜索网页（避免显示网页搜索结果）
-              isCalculation ? Promise.resolve([]) : window.electron.web.search(query).catch(() => []),
+              // 如果是计算/翻译查询或文件搜索，不搜索网页（避免显示网页搜索结果）
+              (finalIsCalculation || isFileSearch) ? Promise.resolve([]) : window.electron.web.search(query).catch(() => []),
               window.electron.bookmark.search(query).catch(() => []),
               window.electron.command.search(query).catch(() => []),
-              isCalculation ? window.electron.calculator.calculate(query).catch((err) => {
+              finalIsCalculation ? window.electron.calculator.calculate(query).catch((err) => {
                 console.error('计算器计算失败:', err);
                 return null;
               }) : Promise.resolve(null),
@@ -358,6 +374,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             
             console.log('🔍 [搜索结果]', {
               isCalculation,
+              isFileSearch,
+              finalIsCalculation,
               calcResult,
               webResultsCount: webResults?.length || 0,
             });
@@ -935,6 +953,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
         try {
           await window.electron.invoke('app-launch', appId);
           console.log('App launched:', appId);
+          // 应用启动后，触发预览窗口刷新（启动次数会更新）
+          // 通过重新选择当前结果来触发预览更新
+          if (selectedIndex === index) {
+            // 延迟一下确保数据库已更新
+            setTimeout(() => {
+              setSelectedIndex(index); // 触发预览更新
+            }, 300);
+          }
           hideMainWindow();
         } catch (error) {
           console.error('Failed to launch app:', error);
@@ -1053,6 +1079,42 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
     }
   };
 
+  // 按类型分组结果
+  const groupResultsByType = React.useMemo(() => {
+    const grouped: Record<string, typeof results> = {};
+    results.forEach((result) => {
+      const type = result.type;
+      if (!grouped[type]) {
+        grouped[type] = [];
+      }
+      grouped[type].push(result);
+    });
+    return grouped;
+  }, [results]);
+
+  // 获取下一个类型
+  const getNextType = React.useCallback((currentType: string) => {
+    const types = Object.keys(groupResultsByType).sort();
+    if (types.length <= 1) return null;
+    
+    const currentIndex = types.indexOf(currentType);
+    if (currentIndex === -1) return types[0];
+    
+    return types[(currentIndex + 1) % types.length];
+  }, [groupResultsByType]);
+
+  // 切换到指定类型的第一个结果
+  const switchToType = React.useCallback((type: string) => {
+    const typeResults = groupResultsByType[type];
+    if (typeResults && typeResults.length > 0) {
+      const firstResult = typeResults[0];
+      const index = results.findIndex(r => r.id === firstResult.id);
+      if (index !== -1) {
+        setSelectedIndex(index);
+      }
+    }
+  }, [groupResultsByType, results]);
+
   // 键盘导航
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1062,6 +1124,16 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setSelectedIndex((prev) => Math.max(prev - 1, 0));
+      } else if (e.key === 'Tab' && !e.shiftKey && results.length > 0) {
+        // Tab 键：在结果类型间切换
+        e.preventDefault();
+        const currentResult = results[selectedIndex];
+        if (currentResult) {
+          const nextType = getNextType(currentResult.type);
+          if (nextType) {
+            switchToType(nextType);
+          }
+        }
       } else if (e.key === 'Enter' && results[selectedIndex]) {
         e.preventDefault();
         handleSelect(selectedIndex);
@@ -1086,7 +1158,40 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keydown', handleKeyRepeat);
     };
+  }, [results, selectedIndex, getNextType, switchToType]);
+
+  // 获取当前选中的结果，用于预览
+  const selectedResult = React.useMemo(() => {
+    return results[selectedIndex] || null;
   }, [results, selectedIndex]);
+
+  // 管理预览窗口
+  React.useEffect(() => {
+    // 只有在有选中结果且查询不为空时才显示预览窗口
+    if (selectedResult && query) {
+      // 先更新内容，再显示窗口（确保内容准备好后再显示）
+      console.log('[MainLayout] 更新预览内容，选中结果:', selectedResult);
+      
+      // 先更新内容，确保窗口显示时就有内容
+      window.electron.preview.update(selectedResult, query).then(() => {
+        // 内容更新后再显示窗口
+        console.log('[MainLayout] 内容已更新，显示预览窗口');
+        return window.electron.preview.show();
+      }).catch(err => {
+        console.error('[MainLayout] 显示预览窗口失败:', err);
+      });
+    } else {
+      // 隐藏预览窗口
+      window.electron.preview.hide();
+    }
+
+    return () => {
+      // 清理时隐藏预览窗口
+      if (!selectedResult || !query) {
+        window.electron.preview.hide();
+      }
+    };
+  }, [selectedResult, query]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
@@ -1103,14 +1208,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             />
           </div>
 
-
           {/* 搜索结果区域 */}
           {query && (
             <div className="w-full mt-2 max-h-[450px] overflow-y-auto">
               {results.length > 0 ? (
-                <ResultList results={results} selectedIndex={selectedIndex} onSelect={handleSelect} />
+                <ResultList results={results} selectedIndex={selectedIndex} query={query} onSelect={handleSelect} />
               ) : showNoResult ? (
-                <ResultList results={[]} selectedIndex={selectedIndex} onSelect={handleSelect} />
+                <ResultList results={[]} selectedIndex={selectedIndex} query={query} onSelect={handleSelect} />
               ) : null}
             </div>
           )}

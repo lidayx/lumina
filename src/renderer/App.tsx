@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MainLayout } from './components/MainLayout';
 import { SettingsPage } from './components/SettingsPage';
+import { PreviewPage } from './components/PreviewPage';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(() => {
@@ -33,6 +34,12 @@ const App: React.FC = () => {
   if (currentPage === '#settings') {
     console.log('显示设置页面');
     return <SettingsPage />;
+  }
+
+  // 检查是否是预览页面
+  if (currentPage === '#preview') {
+    console.log('显示预览页面');
+    return <PreviewPage />;
   }
 
   console.log('显示主界面，hash:', currentPage);

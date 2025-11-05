@@ -17,6 +17,11 @@ contextBridge.exposeInMainWorld('electron', {
   removeListener: (channel: string, callback: (...args: any[]) => void) => {
     ipcRenderer.removeListener(channel, callback);
   },
+  
+  // 移除事件监听器（别名）
+  off: (channel: string, callback: (...args: any[]) => void) => {
+    ipcRenderer.removeListener(channel, callback);
+  },
 
   // 应用相关
   app: {
@@ -24,6 +29,8 @@ contextBridge.exposeInMainWorld('electron', {
     search: (query: string) => ipcRenderer.invoke('app-search', query),
     launch: (appId: string) => ipcRenderer.invoke('app-launch', appId),
     index: () => ipcRenderer.invoke('app-index'),
+    revealFolder: (appId: string) => ipcRenderer.invoke('app-reveal-folder', appId),
+    getInfo: (appId: string) => ipcRenderer.invoke('app-get-info', appId),
   },
   
       // 文件相关
@@ -31,6 +38,8 @@ contextBridge.exposeInMainWorld('electron', {
         getAll: () => ipcRenderer.invoke('file-get-all'),
         search: (query: string) => ipcRenderer.invoke('file-search', query),
         open: (filePath: string) => ipcRenderer.invoke('file-open', filePath),
+        revealFolder: (filePath: string) => ipcRenderer.invoke('file-reveal-folder', filePath),
+        getInfo: (filePath: string) => ipcRenderer.invoke('file-get-info', filePath),
         index: (paths?: string[]) => ipcRenderer.invoke('file-index', paths),
       },
       
@@ -109,6 +118,14 @@ contextBridge.exposeInMainWorld('electron', {
         ipcRenderer.invoke('window-resize', width, height),
       windowHide: (windowType: string) =>
         ipcRenderer.invoke('window-hide', windowType),
+      
+      // 预览窗口相关
+      preview: {
+        show: () => ipcRenderer.invoke('preview-show'),
+        hide: () => ipcRenderer.invoke('preview-hide'),
+        update: (result: any, query: string) => ipcRenderer.invoke('preview-update', result, query).then(() => undefined),
+        close: () => ipcRenderer.invoke('preview-close'),
+      },
 });
 
   // 类型定义
@@ -121,11 +138,15 @@ contextBridge.exposeInMainWorld('electron', {
       search: (query: string) => Promise<any[]>;
       launch: (appId: string) => Promise<any>;
       index: () => Promise<any>;
+      revealFolder: (appId: string) => Promise<any>;
+      getInfo: (appId: string) => Promise<any>;
     };
     file: {
       getAll: () => Promise<any[]>;
       search: (query: string) => Promise<any[]>;
       open: (filePath: string) => Promise<any>;
+      revealFolder: (filePath: string) => Promise<any>;
+      getInfo: (filePath: string) => Promise<any>;
       index: (paths?: string[]) => Promise<any>;
     };
     web: {
@@ -184,6 +205,13 @@ contextBridge.exposeInMainWorld('electron', {
     };
     windowResize: (width: number, height: number) => Promise<void>;
     windowHide: (windowType: string) => Promise<void>;
+    off: (channel: string, callback: (...args: any[]) => void) => void;
+    preview: {
+      show: () => Promise<void>;
+      hide: () => Promise<void>;
+      update: (result: any, query: string) => Promise<void>;
+      close: () => Promise<void>;
+    };
   }
 
 declare global {

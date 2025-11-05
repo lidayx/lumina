@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { highlightText } from '../utils/highlightText';
 
 export interface SearchResult {
   id: string;
@@ -20,6 +21,7 @@ export interface SearchResult {
 interface ResultListProps {
   results: SearchResult[];
   selectedIndex: number;
+  query: string; // 查询关键词，用于高亮
   onSelect: (index: number) => void;
 }
 
@@ -93,9 +95,10 @@ const ResultItem = React.memo<{
   result: SearchResult;
   index: number;
   isSelected: boolean;
+  query: string; // 查询关键词，用于高亮
   onSelect: () => void;
   itemRef: (el: HTMLDivElement | null) => void;
-}>(({ result, index, isSelected, onSelect, itemRef }) => {
+}>(({ result, index, isSelected, query, onSelect, itemRef }) => {
   // 调试图标渲染
   if (index === 0 && result.icon) {
     console.log('🔍 [前端渲染] 第一个结果图标:', {
@@ -160,11 +163,11 @@ const ResultItem = React.memo<{
       {/* Content */}
       <div className="ml-3 flex-1 min-w-0 overflow-hidden">
         <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
-          {result.title}
+          {highlightText(result.title, query)}
         </div>
         {result.description && (
           <div className="text-xs text-gray-500 dark:text-gray-500 truncate mt-0.5">
-            {result.description}
+            {highlightText(result.description, query)}
           </div>
         )}
       </div>
@@ -177,7 +180,8 @@ const ResultItem = React.memo<{
     prevProps.isSelected === nextProps.isSelected &&
     prevProps.result.title === nextProps.result.title &&
     prevProps.result.description === nextProps.result.description &&
-    prevProps.result.icon === nextProps.result.icon
+    prevProps.result.icon === nextProps.result.icon &&
+    prevProps.query === nextProps.query
   );
 });
 
@@ -186,6 +190,7 @@ ResultItem.displayName = 'ResultItem';
 export const ResultList: React.FC<ResultListProps> = ({
   results,
   selectedIndex,
+  query,
   onSelect,
 }) => {
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -226,6 +231,7 @@ export const ResultList: React.FC<ResultListProps> = ({
           result={result}
           index={index}
           isSelected={index === selectedIndex}
+          query={query}
           onSelect={() => onSelect(index)}
           itemRef={(el) => {
             itemRefs.current[index] = el;

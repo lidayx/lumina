@@ -14,7 +14,10 @@ class WindowManager {
     const existingWindow = this.windows.get(config.type);
 
     if (existingWindow && !existingWindow.isDestroyed()) {
-      existingWindow.focus();
+      // 预览窗口不获取焦点
+      if (config.type !== 'preview') {
+        existingWindow.focus();
+      }
       return existingWindow;
     }
 
@@ -34,10 +37,21 @@ class WindowManager {
       maximizable: config.maximizable !== false,
       minimizable: config.minimizable !== false,
       resizable: config.resizable !== false,
-      // 无边框窗口（仅主窗口）
-      frame: config.type !== 'main',
-      transparent: config.type === 'main', // 透明背景
-      titleBarStyle: config.type === 'main' ? 'hidden' : 'default',
+      // 无边框窗口（仅主窗口和预览窗口）
+      frame: config.type !== 'main' && config.type !== 'preview',
+      transparent: config.type === 'main', // 透明背景（仅主窗口）
+      titleBarStyle: config.type === 'main' ? 'hidden' : (config.type === 'preview' ? 'hidden' : 'default'),
+      // 预览窗口：无边框，不可聚焦
+      ...(config.type === 'preview' && {
+        autoHideMenuBar: true,
+        focusable: false, // 预览窗口不可聚焦，保持主窗口焦点
+        skipTaskbar: true, // 不在任务栏显示
+        alwaysOnTop: false, // 不总是置顶，跟随主窗口
+        // macOS 特定设置：隐藏窗口控制按钮
+        ...(process.platform === 'darwin' && {
+          trafficLightPosition: { x: -100, y: -100 }, // 隐藏 macOS 窗口控制按钮
+        }),
+      }),
       // macOS 特定设置
       ...(config.type === 'main' && process.platform === 'darwin' && {
         titleBarStyle: 'hidden',
@@ -51,7 +65,7 @@ class WindowManager {
         contextIsolation: true,
         nodeIntegration: false,
       },
-      show: false,
+      show: config.type !== 'preview', // 预览窗口初始不显示
       icon: this.getAppIcon(),
     };
 
@@ -65,6 +79,10 @@ class WindowManager {
       const y = Math.floor(screenHeight / 4) - Math.floor(config.height / 2);
       windowOptions.x = x;
       windowOptions.y = Math.max(20, y); // 至少距顶部 20px
+    } else if (config.type === 'preview') {
+      // 预览窗口：默认位置在主窗口右侧（位置会在 showPreviewWindow 中设置）
+      windowOptions.x = Math.floor((screenWidth - config.width) / 2);
+      windowOptions.y = Math.floor((screenHeight - config.height) / 2);
     } else {
       // 其他窗口：屏幕居中
       windowOptions.x = Math.floor((screenWidth - config.width) / 2);
@@ -76,13 +94,26 @@ class WindowManager {
     // 加载窗口内容
     window.loadURL(getWindowUrl(config.type)).then(() => {
       // 内容加载完成后显示窗口
-      window.show();
-      window.focus();
+      if (config.type === 'preview') {
+        // 预览窗口不自动显示，等待内容准备好后再显示
+        // window.showInactive(); // 移除自动显示
+      } else {
+        window.show();
+        window.focus();
+      }
     });
 
     // 监听窗口关闭事件
     window.on('closed', () => {
       this.windows.delete(config.type);
+      
+      // 主窗口关闭时，关闭预览窗口
+      if (config.type === 'main') {
+        const previewWindow = this.windows.get('preview');
+        if (previewWindow && !previewWindow.isDestroyed()) {
+          previewWindow.close();
+        }
+      }
     });
 
     // 阻止新窗口在应用内打开，改为在默认浏览器中打开
@@ -90,6 +121,17 @@ class WindowManager {
       shell.openExternal(url);
       return { action: 'deny' };
     });
+
+    // 预览窗口：监听焦点事件，确保不会获取焦点
+    if (config.type === 'preview') {
+      window.on('focus', () => {
+        // 如果预览窗口意外获取焦点，立即将焦点还给主窗口
+        const mainWindow = this.windows.get('main');
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.focus();
+        }
+      });
+    }
 
     this.windows.set(config.type, window);
     return window;
@@ -113,8 +155,13 @@ class WindowManager {
   public showWindow(type: WindowType): void {
     const window = this.getWindow(type);
     if (window) {
-      window.show();
-      window.focus();
+      if (type === 'preview') {
+        // 预览窗口显示但不获取焦点
+        window.showInactive();
+      } else {
+        window.show();
+        window.focus();
+      }
       
       // 主窗口显示时，发送事件让渲染进程清空输入并获取焦点
       if (type === 'main') {

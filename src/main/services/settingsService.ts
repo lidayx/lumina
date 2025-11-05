@@ -173,7 +173,7 @@ class SettingsService {
         await this.saveSettingsToDatabase(this.settings);
       } else {
         // 如果数据库不可用，回退到文件
-        fs.writeFileSync(this.SETTINGS_FILE, JSON.stringify(this.settings, null, 2));
+      fs.writeFileSync(this.SETTINGS_FILE, JSON.stringify(this.settings, null, 2));
         console.log('✅ [设置服务] 已保存设置到文件');
       }
     } catch (error) {
