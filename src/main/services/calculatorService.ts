@@ -4,6 +4,9 @@
  */
 
 import { timeService } from './timeService';
+import { encodeService } from './encodeService';
+import { stringService } from './stringService';
+import { randomService } from './randomService';
 
 // ========== 类型定义 ==========
 
@@ -79,6 +82,42 @@ class CalculatorService {
       // 检查是否为纯数字
       if (/^-?\d+\.?\d*$/.test(expression)) {
         return { input: expression, output: expression, success: true };
+      }
+
+      // 尝试识别编码解码查询（在时间查询之前，因为编码解码匹配更精确）
+      const encodeResult = encodeService.handleEncodeQuery(expression);
+      if (encodeResult && encodeResult.success) {
+        // 将 EncodeResult 转换为 CalculationResult
+        return {
+          input: encodeResult.input,
+          output: encodeResult.output,
+          success: encodeResult.success,
+          error: encodeResult.error,
+        };
+      }
+
+      // 尝试识别字符串工具查询
+      const stringResult = stringService.handleStringQuery(expression);
+      if (stringResult && stringResult.success) {
+        // 将 StringResult 转换为 CalculationResult
+        return {
+          input: stringResult.input,
+          output: stringResult.output,
+          success: stringResult.success,
+          error: stringResult.error,
+        };
+      }
+
+      // 尝试识别随机数生成查询
+      const randomResult = randomService.handleRandomQuery(expression);
+      if (randomResult && randomResult.success) {
+        // 将 RandomResult 转换为 CalculationResult
+        return {
+          input: randomResult.input,
+          output: randomResult.output,
+          success: randomResult.success,
+          error: randomResult.error,
+        };
       }
 
       // 尝试识别时间查询（在单位换算之前）

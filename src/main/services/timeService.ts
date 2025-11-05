@@ -42,6 +42,16 @@ class TimeService {
     try {
       const trimmedQuery = query.trim();
       
+      // 0. 先排除明显的非时间查询（包含字符串工具、编码解码关键字）
+      const hasStringKeywords = /\b(uppercase|lowercase|title\s+case|大写|小写|标题|camel\s+case|snake\s+case|reverse|反转|trim|count|统计|word\s+count|replace|extract)\b/i.test(trimmedQuery);
+      const hasEncodeKeywords = /\b(html|url|base64|encode|decode|编码|解码|md5)\b/i.test(trimmedQuery);
+      const hasDatePattern = /\d{4}[-\/]\d{2}[-\/]\d{2}/.test(trimmedQuery);
+      
+      // 如果包含字符串工具或编码关键字，且没有日期模式，直接返回 null
+      if ((hasStringKeywords || hasEncodeKeywords) && !hasDatePattern) {
+        return null;
+      }
+      
       // 1. 检测当前时间查询
       if (this.isTimeQuery(trimmedQuery)) {
         return this.getCurrentTimeResult();
@@ -166,16 +176,42 @@ class TimeService {
     }
 
     // 如果正则匹配失败，尝试使用 Date 构造函数直接解析
-    const tryDate = new Date(query);
-    if (!isNaN(tryDate.getTime()) && query.length > 8) {
-      // 确保不是纯数字（纯数字不应该被识别为日期）
-      if (!/^\d+$/.test(query.trim())) {
-        const formatted = this.formatDateTime(tryDate, 'YYYY-MM-DD HH:mm:ss');
-        return {
-          input: query,
-          output: formatted,
-          success: true,
-        };
+    // 但需要排除明显的非日期字符串（包含HTML标签、编码关键字等）
+    const trimmedQuery = query.trim();
+    
+    // 排除包含编码解码关键字的字符串
+    const hasEncodeKeywords = /\b(html|url|base64|encode|decode|编码|解码|md5)\b/i.test(trimmedQuery);
+    // 排除包含HTML标签的字符串
+    const hasHtmlTags = /<[^>]+>/.test(trimmedQuery);
+    // 排除包含字符串工具关键字的字符串
+    const hasStringKeywords = /\b(uppercase|lowercase|title\s+case|大写|小写|标题|camel\s+case|snake\s+case|reverse|反转|trim|count|统计|word\s+count|replace|extract)\b/i.test(trimmedQuery);
+    // 排除包含其他明显非日期字符的情况（但有日期模式时允许）
+    const hasDatePattern = /\d{4}[-\/]\d{2}[-\/]\d{2}/.test(trimmedQuery);
+    
+    // 如果包含编码关键字、HTML标签或字符串工具关键字，且没有日期模式，则不识别为日期
+    if ((hasEncodeKeywords || hasHtmlTags || hasStringKeywords) && !hasDatePattern) {
+      return null;
+    }
+    
+    // 如果包含日期模式，或者看起来像日期字符串，才尝试解析
+    if (hasDatePattern || /^\d{4}/.test(trimmedQuery)) {
+      const tryDate = new Date(query);
+      if (!isNaN(tryDate.getTime()) && query.length > 8) {
+        // 确保不是纯数字（纯数字不应该被识别为日期）
+        if (!/^\d+$/.test(trimmedQuery)) {
+          // 进一步验证：解析的日期应该合理（20xx 或 19xx 年）
+          const dateStr = tryDate.toISOString().split('T')[0];
+          
+          // 只有当输入包含日期模式，或者解析的日期合理时才返回
+          if (hasDatePattern || dateStr.startsWith('20') || dateStr.startsWith('19')) {
+            const formatted = this.formatDateTime(tryDate, 'YYYY-MM-DD HH:mm:ss');
+            return {
+              input: query,
+              output: formatted,
+              success: true,
+            };
+          }
+        }
       }
     }
 

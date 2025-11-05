@@ -279,7 +279,30 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               /^(?:format|格式化)\s+.+?\s+.+?$/i.test(queryTrimmed) ||
               /^.+?\s+(?:format|格式化)\s+.+?$/i.test(queryTrimmed) ||
               // 时区转换：包含 to/in/到 和时区关键词（更宽松的匹配）
-              /\s+(?:to|in|到)\s+(utc|gmt|cst|est|pst|jst|bst|cet|ist|kst|aest|china|中国|beijing|北京|japan|日本|tokyo|东京|eastern|pacific|london|europe|india|印度|korea|韩国|australia|悉尼|utc[+\-]\d+)/i.test(queryTrimmed)
+              /\s+(?:to|in|到)\s+(utc|gmt|cst|est|pst|jst|bst|cet|ist|kst|aest|china|中国|beijing|北京|japan|日本|tokyo|东京|eastern|pacific|london|europe|india|印度|korea|韩国|australia|悉尼|utc[+\-]\d+)/i.test(queryTrimmed) ||
+              // 编码解码关键词检测
+              // URL 编码/解码
+              /(?:url\s+(?:encode|decode|编码|解码)|(?:encode|decode|编码|解码)\s+url)/i.test(queryTrimmed) ||
+              // HTML 编码/解码
+              /(?:html\s+(?:encode|decode|编码|解码)|(?:encode|decode|编码|解码)\s+html)/i.test(queryTrimmed) ||
+              // Base64 编码/解码
+              /(?:base64\s+(?:encode|decode|编码|解码)|(?:encode|decode|编码|解码)\s+base64)/i.test(queryTrimmed) ||
+              // MD5 加密
+              /^md5\s+/i.test(queryTrimmed) ||
+              /\s+md5$/i.test(queryTrimmed) ||
+              // 字符串工具关键词检测
+              /(?:uppercase|lowercase|大写|小写|title\s+case|标题)/i.test(queryTrimmed) ||
+              /(?:camel\s+case|snake\s+case)/i.test(queryTrimmed) ||
+              /(?:reverse|反转)/i.test(queryTrimmed) ||
+              /(?:trim|去除空格)/i.test(queryTrimmed) ||
+              /(?:count|统计|word\s+count)/i.test(queryTrimmed) ||
+              /^replace\s+/i.test(queryTrimmed) ||
+              /^extract\s+/i.test(queryTrimmed) ||
+              // 随机数生成关键词检测
+              /^(?:uuid|generate\s+uuid)$/i.test(queryTrimmed) ||
+              /^uuid\s+v[14]$/i.test(queryTrimmed) ||
+              /^random\s+(string|password|number)/i.test(queryTrimmed) ||
+              /^(string|password|number)\s+random/i.test(queryTrimmed)
             );
             
             // 检测是否为文件搜索（file + 空格 + 关键字）
@@ -378,8 +401,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                                        (/\b(days?|hours?|minutes?|minutes?|seconds?|天|小时|分钟|秒)\b/i.test(query.trim()) ||
                                         /\d+\s*(d|h|m|s|天|小时|分钟|秒)/i.test(query.trim()));
               
+              // 判断是否为文本统计结果（多行输出，包含"字符数"、"单词数"等关键词）
+              const isTextStats = calcResult.output.includes('字符数') || 
+                                 calcResult.output.includes('单词数') ||
+                                 calcResult.output.includes('行数') ||
+                                 calcResult.output.includes('段落数') ||
+                                 /^字符数:/m.test(calcResult.output);
+              
               // 判断是否为时间查询结果（通过输出内容判断）
-              const isTimeResult = !isTimeDifference && !isTimeCalculation && (
+              const isTimeResult = !isTimeDifference && !isTimeCalculation && !isTextStats && (
                 calcResult.output.includes('\n') || 
                 /^\d{4}[-\/]\d{2}/.test(calcResult.output) ||
                 /时间戳|timestamp|ISO|UTC|CST|EST|PST|JST|格式/i.test(calcResult.output)
@@ -633,17 +663,31 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   });
                 }
               } else {
-                // 普通计算器结果
-                combinedResults.push({
-                  id: 'calc-result',
-                  type: 'command' as const,
-                  title: `= ${calcResult.output.split('\n')[0]}`,
-                  description: `计算：${calcResult.input}`,
-                  action: 'calc:copy',
-                  score: 1800,
-                  priorityScore: 1800,
-                  calcData: calcResult,
-                });
+                // 文本统计结果：直接显示多行结果
+                if (isTextStats) {
+                  combinedResults.push({
+                    id: 'text-stats-result',
+                    type: 'command' as const,
+                    title: calcResult.output.split('\n')[0] || '文本统计',
+                    description: calcResult.output.split('\n').slice(1).join(' ').substring(0, 50) || '点击复制',
+                    action: 'calc:copy',
+                    score: 1900,
+                    priorityScore: 1900,
+                    calcData: calcResult,
+                  });
+                } else {
+                  // 普通计算器结果
+                  combinedResults.push({
+                    id: 'calc-result',
+                    type: 'command' as const,
+                    title: `= ${calcResult.output.split('\n')[0]}`,
+                    description: `计算：${calcResult.input}`,
+                    action: 'calc:copy',
+                    score: 1800,
+                    priorityScore: 1800,
+                    calcData: calcResult,
+                  });
+                }
               }
             }
             
@@ -875,8 +919,18 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
         try {
           const calcData = (result as any).calcData;
           if (calcData && calcData.output) {
-            await navigator.clipboard.writeText(calcData.output);
-            console.log('Calculator result copied:', calcData.output);
+            let textToCopy = calcData.output;
+            
+            // 如果是编码解码结果（包含 "→"），只复制转换后的部分
+            if (textToCopy.includes(' → ')) {
+              const parts = textToCopy.split(' → ');
+              if (parts.length === 2) {
+                textToCopy = parts[1].trim();
+              }
+            }
+            
+            await navigator.clipboard.writeText(textToCopy);
+            console.log('Calculator result copied:', textToCopy);
           }
           hideMainWindow();
         } catch (error) {
