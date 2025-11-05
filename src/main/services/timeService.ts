@@ -97,11 +97,12 @@ class TimeService {
       return null;
     } catch (error: any) {
       console.error(`❌ [时间服务] 处理失败: ${error.message}`);
+      const errorMsg = error.message || '时间处理错误';
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
-        error: error.message || '时间处理错误',
+        error: errorMsg,
       };
     }
   }
@@ -319,7 +320,7 @@ class TimeService {
     if (isNaN(date.getTime())) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: '无效的时间戳',
       };
@@ -354,7 +355,7 @@ class TimeService {
     if (!date || isNaN(date.getTime())) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: '无法解析日期格式',
       };
@@ -414,7 +415,7 @@ class TimeService {
       if (!date1 || !date2 || isNaN(date1.getTime()) || isNaN(date2.getTime())) {
         return {
           input: query,
-          output: '',
+          output: errorMsg,
           success: false,
           error: '无法解析时间格式',
         };
@@ -452,7 +453,7 @@ class TimeService {
       if (!baseDate || isNaN(baseDate.getTime())) {
         return {
           input: query,
-          output: '',
+          output: errorMsg,
           success: false,
           error: '无法解析基准时间',
         };
@@ -462,7 +463,7 @@ class TimeService {
       if (durationMs === null) {
         return {
           input: query,
-          output: '',
+          output: errorMsg,
           success: false,
           error: '无法解析时长格式',
         };
@@ -517,7 +518,7 @@ class TimeService {
     if (!date || isNaN(date.getTime())) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: '无法解析日期格式',
       };
@@ -598,7 +599,7 @@ class TimeService {
       if (fromOffset === null) {
         return {
           input: timeStr,
-          output: '',
+          output: errorMsg,
           success: false,
           error: `无法识别源时区: ${fromZone}`,
         };
@@ -613,7 +614,7 @@ class TimeService {
       if (!parsedDate || isNaN(parsedDate.getTime())) {
         return {
           input: timeStr,
-          output: '',
+          output: errorMsg,
           success: false,
           error: '无法解析时间格式',
         };
@@ -633,7 +634,7 @@ class TimeService {
       if (!date || isNaN(date.getTime())) {
         return {
           input: timeStr,
-          output: '',
+          output: errorMsg,
           success: false,
           error: '无法解析时间格式',
         };
@@ -660,7 +661,7 @@ class TimeService {
       
       return {
         input: timeStr,
-        output: '',
+        output: errorMsg,
         success: false,
         error: `无法识别目标时区: ${toZone}`,
       };

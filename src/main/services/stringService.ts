@@ -71,11 +71,12 @@ class StringService {
       return null;
     } catch (error: any) {
       console.error(`❌ [字符串工具] 处理失败: ${error.message}`);
+      const errorMsg = error.message || '字符串处理错误';
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
-        error: error.message || '字符串处理错误',
+        error: errorMsg,
       };
     }
   }
@@ -155,7 +156,7 @@ class StringService {
     } catch (error: any) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: `大小写转换失败: ${error.message}`,
       };
@@ -229,7 +230,7 @@ class StringService {
     } catch (error: any) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: `命名格式转换失败: ${error.message}`,
       };
@@ -294,7 +295,7 @@ class StringService {
     } catch (error: any) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: `字符串反转失败: ${error.message}`,
       };
@@ -356,7 +357,7 @@ class StringService {
     } catch (error: any) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: `去除空格失败: ${error.message}`,
       };
@@ -408,7 +409,7 @@ class StringService {
     } catch (error: any) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: `文本统计失败: ${error.message}`,
       };
@@ -457,7 +458,7 @@ class StringService {
     } catch (error: any) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: `字符串替换失败: ${error.message}`,
       };
@@ -507,7 +508,7 @@ class StringService {
       } catch (e) {
         return {
           input: query,
-          output: '',
+          output: errorMsg,
           success: false,
           error: `无效的正则表达式: ${regexStr}`,
         };
@@ -531,7 +532,7 @@ class StringService {
     } catch (error: any) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: `正则提取失败: ${error.message}`,
       };

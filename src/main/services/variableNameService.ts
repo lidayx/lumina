@@ -48,11 +48,12 @@ class VariableNameService {
       const { text, style } = parsed;
 
       if (!text) {
+        const errorMsg = '请输入描述文本';
         return {
           input: query,
-          output: '',
+          output: errorMsg,
           success: false,
-          error: '请输入描述文本',
+          error: errorMsg,
         };
       }
 
@@ -116,11 +117,12 @@ class VariableNameService {
       };
     } catch (error: any) {
       console.error(`❌ [变量名生成] 处理失败: ${error.message}`);
+      const errorMsg = `变量名生成失败: ${error.message}`;
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
-        error: `变量名生成失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }

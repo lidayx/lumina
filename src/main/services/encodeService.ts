@@ -55,11 +55,12 @@ class EncodeService {
       return null;
     } catch (error: any) {
       console.error(`❌ [编码服务] 处理失败: ${error.message}`);
+      const errorMsg = error.message || '编码处理错误';
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
-        error: error.message || '编码处理错误',
+        error: errorMsg,
       };
     }
   }
@@ -118,11 +119,12 @@ class EncodeService {
         };
       }
     } catch (error: any) {
+      const errorMsg = `URL ${isEncode ? '编码' : '解码'}失败: ${error.message}`;
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
-        error: `URL ${isEncode ? '编码' : '解码'}失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }
@@ -181,11 +183,12 @@ class EncodeService {
         };
       }
     } catch (error: any) {
+      const errorMsg = `HTML ${isEncode ? '编码' : '解码'}失败: ${error.message}`;
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
-        error: `HTML ${isEncode ? '编码' : '解码'}失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }
@@ -272,11 +275,12 @@ class EncodeService {
         };
       }
     } catch (error: any) {
+      const errorMsg = `Base64 ${isEncode ? '编码' : '解码'}失败: ${error.message}`;
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
-        error: `Base64 ${isEncode ? '编码' : '解码'}失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }
@@ -311,11 +315,12 @@ class EncodeService {
         success: true,
       };
     } catch (error: any) {
+      const errorMsg = `MD5 加密失败: ${error.message}`;
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
-        error: `MD5 加密失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }

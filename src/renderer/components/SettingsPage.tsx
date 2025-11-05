@@ -23,7 +23,7 @@ const CommandItem: React.FC<CommandItemProps> = ({ name, shortcut, description }
   </div>
 );
 
-type TabType = 'browser' | 'search-engines' | 'file' | 'general' | 'help' | 'shortcuts';
+type TabType = 'browser' | 'search-engines' | 'file' | 'general' | 'translate' | 'help' | 'shortcuts';
 
 export const SettingsPage: React.FC<SettingsPageProps> = () => {
   const [activeTab, setActiveTab] = useState<TabType>('browser');
@@ -388,6 +388,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 通用设置
+              </div>
+            </button>
+            
+            <button
+              onClick={() => setActiveTab('translate')}
+              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                activeTab === 'translate'
+                  ? 'bg-blue-50 text-blue-700 font-medium'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center">
+                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                </svg>
+                翻译设置
               </div>
             </button>
             
@@ -982,6 +998,61 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                     <kbd className="px-3 py-1.5 bg-gray-100 rounded text-sm font-mono">
                       ⌘ Space
                     </kbd>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'translate' && (
+            <div>
+              <h2 className="text-2xl font-bold mb-2">翻译设置</h2>
+              <p className="text-gray-600 mb-6">配置百度翻译 API 的 AppID 和 Secret Key</p>
+              
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      百度翻译 AppID
+                    </label>
+                    <input
+                      type="text"
+                      value={appSettings.baiduTranslateAppId || ''}
+                      onChange={(e) => updateSetting('baiduTranslateAppId', e.target.value)}
+                      placeholder="请输入百度翻译 AppID"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <p className="mt-1 text-sm text-gray-500">
+                      在 <a href="https://fanyi-api.baidu.com/manage/developer" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">百度翻译开放平台</a> 申请获取
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      百度翻译 Secret Key
+                    </label>
+                    <input
+                      type="password"
+                      value={appSettings.baiduTranslateSecretKey || ''}
+                      onChange={(e) => updateSetting('baiduTranslateSecretKey', e.target.value)}
+                      placeholder="请输入百度翻译 Secret Key"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <p className="mt-1 text-sm text-gray-500">
+                      与 AppID 对应的密钥，请妥善保管
+                    </p>
+                  </div>
+                  
+                  <div className="pt-4 border-t border-gray-200">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h3 className="text-sm font-medium text-blue-900 mb-2">使用说明</h3>
+                      <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                        <li>必须配置 AppID 和 Secret Key 才能使用翻译功能</li>
+                        <li>如果未配置，触发翻译时将提示"请在设置中配置翻译参数"</li>
+                        <li>修改配置后，新的翻译请求将立即生效</li>
+                        <li>请确保您的 AppID 和 Secret Key 有效且有足够的调用额度</li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
               </div>

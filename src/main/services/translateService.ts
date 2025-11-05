@@ -3,7 +3,6 @@
  * 支持多语言翻译，设计时考虑可扩展性，支持后期切换到在线API
  */
 
-import { translate as googleTranslate } from '@vitalets/google-translate-api';
 import * as https from 'https';
 import * as querystring from 'querystring';
 import * as crypto from 'crypto';
@@ -56,10 +55,9 @@ const LANGUAGE_MAP: Record<string, string> = {
 /**
  * 翻译提供者接口
  * 后期可以创建不同的实现类：
- * - GoogleTranslateProvider（当前使用的本地库）
- * - GoogleTranslateAPIProvider（Google API）
  * - BaiduTranslateAPIProvider（百度API）
  * - DeepLAPIProvider（DeepL API）
+ * - 其他翻译API提供者
  */
 export interface ITranslateProvider {
   /**
@@ -93,8 +91,16 @@ const BAIDU_LANG_MAP: Record<string, string> = {
  * 百度翻译提供者（使用官方API）
  */
 class BaiduTranslateProvider implements ITranslateProvider {
-  private readonly appid: string = '20210901000932657';
-  private readonly key: string = 'ww5HsXzP8SBNntiGUoLk';
+  private readonly appid: string;
+  private readonly key: string;
+  
+  constructor(appid: string, key: string) {
+    if (!appid || !key) {
+      throw new Error('百度翻译 AppID 和 Secret Key 不能为空');
+    }
+    this.appid = appid;
+    this.key = key;
+  }
   
   async translate(text: string, from?: string, to?: string): Promise<{
     text: string;
@@ -254,66 +260,58 @@ class BaiduTranslateProvider implements ITranslateProvider {
 }
 
 /**
- * Google Translate 本地库提供者（备用方案）
- */
-class GoogleTranslateProvider implements ITranslateProvider {
-  async translate(text: string, from?: string, to?: string): Promise<{
-    text: string;
-    from: string;
-    to: string;
-  }> {
-    try {
-      console.log(`🌐 [GoogleTranslateProvider] 调用翻译API: text="${text}", from="${from || 'auto'}", to="${to || 'en'}"`);
-      
-      // 添加超时处理
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('翻译请求超时')), 10000); // 10秒超时
-      });
-      
-      const translatePromise = googleTranslate(text, {
-        from: from || 'auto',
-        to: to || 'en',
-      });
-      
-      const result = await Promise.race([translatePromise, timeoutPromise]) as any;
-      console.log(`🌐 [GoogleTranslateProvider] API返回结果:`, result);
-      
-      // 检查结果格式
-      if (!result || !result.text) {
-        throw new Error('翻译API返回格式错误');
-      }
-      
-      const response = {
-        text: result.text,
-        from: result.from?.language?.iso || result.from?.iso || from || 'auto',
-        to: result.to || to || 'en',
-      };
-      console.log(`🌐 [GoogleTranslateProvider] 处理后的结果:`, response);
-      return response;
-    } catch (error: any) {
-      console.error(`❌ [GoogleTranslateProvider] 翻译API错误:`, error);
-      console.error(`❌ [GoogleTranslateProvider] 错误详情:`, {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-      });
-      throw error;
-    }
-  }
-}
-
-/**
  * 翻译服务类
  */
 class TranslateService {
-  private provider: ITranslateProvider;
-  private fallbackProvider: ITranslateProvider;
+  private provider: ITranslateProvider | null = null;
 
   constructor(provider?: ITranslateProvider) {
-    // 默认使用百度翻译（国内访问更快）
-    // 允许注入自定义提供者，便于测试和扩展
-    this.provider = provider || new BaiduTranslateProvider();
-    this.fallbackProvider = new GoogleTranslateProvider();
+    if (provider) {
+      this.provider = provider;
+    } else {
+      // 异步加载配置（避免在构造函数中使用 await）
+      this.loadProviderFromSettings().catch((error) => {
+        console.error('❌ [翻译服务] 初始化时加载配置失败:', error);
+      });
+    }
+  }
+  
+  /**
+   * 从设置服务加载翻译提供者
+   */
+  private async loadProviderFromSettings(): Promise<void> {
+    try {
+      // 使用动态 import 以避免打包后的模块解析问题
+      const { default: settingsService } = await import('./settingsService');
+      const settings = settingsService.getSettings();
+      const baiduAppId = (settings.baiduTranslateAppId || '').trim();
+      const baiduSecretKey = (settings.baiduTranslateSecretKey || '').trim();
+      
+      console.log(`🌐 [翻译服务] 加载配置检查: AppID长度=${baiduAppId.length}, SecretKey长度=${baiduSecretKey.length}`);
+      
+      if (baiduAppId && baiduSecretKey) {
+        try {
+          this.provider = new BaiduTranslateProvider(baiduAppId, baiduSecretKey);
+          console.log(`🌐 [翻译服务] 已加载百度翻译配置: AppID=${baiduAppId.substring(0, Math.min(8, baiduAppId.length))}...`);
+        } catch (error: any) {
+          console.error(`❌ [翻译服务] 创建翻译提供者失败: ${error.message}`);
+          this.provider = null;
+        }
+      } else {
+        this.provider = null;
+        console.log(`⚠️ [翻译服务] 未配置百度翻译 AppID 和 Secret Key (AppID: ${baiduAppId ? '已设置' : '未设置'}, SecretKey: ${baiduSecretKey ? '已设置' : '未设置'})`);
+      }
+    } catch (error) {
+      console.error('❌ [翻译服务] 加载设置失败:', error);
+      this.provider = null;
+    }
+  }
+  
+  /**
+   * 更新翻译提供者配置（当设置变更时调用）
+   */
+  public async updateProviderConfig(): Promise<void> {
+    await this.loadProviderFromSettings();
   }
 
   /**
@@ -343,38 +341,36 @@ class TranslateService {
       const { text, from, to } = parsed;
 
       if (!text) {
+        const errorMsg = '请输入要翻译的文本';
         return {
           input: query,
-          output: '',
+          output: errorMsg,
           success: false,
-          error: '请输入要翻译的文本',
+          error: errorMsg,
         };
       }
 
       console.log(`🌐 [翻译服务] 准备翻译: text="${text}", from="${from || 'auto'}", to="${to || 'en'}"`);
 
-      // 执行翻译（带降级策略）
-      let result;
-      try {
-        result = await this.provider.translate(text, from, to);
-        console.log(`🌐 [翻译服务] 翻译结果:`, result);
-      } catch (error: any) {
-        console.error(`❌ [翻译服务] 主翻译API调用失败，尝试备用方案:`, error.message);
-        
-        // 如果主提供者失败，尝试备用提供者
-        if (this.provider !== this.fallbackProvider) {
-          try {
-            console.log(`🌐 [翻译服务] 使用备用翻译提供者`);
-            result = await this.fallbackProvider.translate(text, from, to);
-            console.log(`🌐 [翻译服务] 备用翻译结果:`, result);
-          } catch (fallbackError: any) {
-            console.error(`❌ [翻译服务] 备用翻译API也失败:`, fallbackError);
-            throw fallbackError;
-          }
-        } else {
-          throw error;
+      // 检查是否已配置翻译提供者
+      if (!this.provider) {
+        // 尝试重新加载配置（可能用户刚刚配置了）
+        await this.loadProviderFromSettings();
+        if (!this.provider) {
+          const errorMsg = '请在设置中配置翻译参数';
+          console.log(`⚠️ [翻译服务] 翻译提供者未配置，无法翻译`);
+          return {
+            input: query,
+            output: errorMsg,
+            success: false,
+            error: errorMsg,
+          };
         }
       }
+
+      // 执行翻译
+      const result = await this.provider.translate(text, from, to);
+      console.log(`🌐 [翻译服务] 翻译结果:`, result);
 
       // 格式化输出（只显示翻译结果）
       const output = result.text;
@@ -390,11 +386,12 @@ class TranslateService {
       };
     } catch (error: any) {
       console.error(`❌ [翻译服务] 翻译失败: ${error.message}`);
+      const errorMsg = this.getErrorMessage(error);
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
-        error: this.getErrorMessage(error),
+        error: errorMsg,
       };
     }
   }

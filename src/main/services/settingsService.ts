@@ -24,6 +24,10 @@ export interface AppSettings {
   
   // 开发者模式
   developerMode: boolean; // 开发者模式，开启后记录 debug 日志
+  
+  // 翻译设置
+  baiduTranslateAppId: string; // 百度翻译 AppID
+  baiduTranslateSecretKey: string; // 百度翻译 Secret Key
 }
 
 /**
@@ -42,6 +46,8 @@ class SettingsService {
     indexingInterval: 30,
     theme: 'auto',
     developerMode: false, // 默认关闭开发者模式
+    baiduTranslateAppId: '', // 百度翻译 AppID（需要在设置中配置）
+    baiduTranslateSecretKey: '', // 百度翻译 Secret Key（需要在设置中配置）
   };
 
   // ========== 私有属性 ==========
@@ -162,6 +168,19 @@ class SettingsService {
           debugLog.setEnabled(updates.developerMode);
         } catch (error) {
           console.error('更新开发者模式失败:', error);
+        }
+      });
+    }
+    
+    if ('baiduTranslateAppId' in updates || 'baiduTranslateSecretKey' in updates) {
+      // 翻译配置变更时，更新翻译服务（异步调用）
+      setImmediate(async () => {
+        try {
+          const { translateService } = await import('./translateService');
+          await translateService.updateProviderConfig();
+          console.log('✅ [设置服务] 已更新翻译服务配置');
+        } catch (error) {
+          console.error('❌ [设置服务] 更新翻译配置失败:', error);
         }
       });
     }

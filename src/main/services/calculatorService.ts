@@ -78,7 +78,8 @@ class CalculatorService {
 
       // 检查是否为空
       if (!expression) {
-        return { input: expression, output: '', success: false, error: '表达式为空' };
+        const errorMsg = '表达式为空';
+        return { input: expression, output: errorMsg, success: false, error: errorMsg };
       }
 
       // 检查是否为纯数字
@@ -152,11 +153,12 @@ class CalculatorService {
       };
     } catch (error: any) {
       console.error(`❌ [计算器] 计算失败: ${error.message}`);
+      const errorMsg = error.message || '计算错误';
       return {
         input: expression,
-        output: '',
+        output: errorMsg,
         success: false,
-        error: error.message || '计算错误',
+        error: errorMsg,
       };
     }
   }
@@ -255,7 +257,7 @@ class CalculatorService {
     const match = expression.match(conversionPattern);
     
     if (!match) {
-      return { input: expression, output: '', success: false };
+      return { input: expression, output: errorMsg, success: false };
     }
 
     const value = parseFloat(match[1]);
@@ -293,7 +295,7 @@ class CalculatorService {
       }
     }
 
-    return { input: expression, output: '', success: false };
+    return { input: expression, output: errorMsg, success: false };
   }
 
   /**

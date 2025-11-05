@@ -55,11 +55,12 @@ class RandomService {
       return null;
     } catch (error: any) {
       console.error(`❌ [随机数服务] 处理失败: ${error.message}`);
+      const errorMsg = error.message || '随机数生成错误';
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
-        error: error.message || '随机数生成错误',
+        error: errorMsg,
       };
     }
   }
@@ -96,11 +97,12 @@ class RandomService {
         success: true,
       };
     } catch (error: any) {
+      const errorMsg = `UUID 生成失败: ${error.message}`;
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
-        error: `UUID 生成失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }
@@ -157,7 +159,7 @@ class RandomService {
     if (length < 1 || length > 1000) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: '长度必须在 1-1000 之间',
       };
@@ -173,7 +175,7 @@ class RandomService {
     } catch (error: any) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: `随机字符串生成失败: ${error.message}`,
       };
@@ -220,7 +222,7 @@ class RandomService {
     if (length < 1 || length > 1000) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: '长度必须在 1-1000 之间',
       };
@@ -236,7 +238,7 @@ class RandomService {
     } catch (error: any) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: `随机密码生成失败: ${error.message}`,
       };
@@ -308,7 +310,7 @@ class RandomService {
     if (min > max) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: '最小值不能大于最大值',
       };
@@ -317,7 +319,7 @@ class RandomService {
     if (min < -Number.MAX_SAFE_INTEGER || max > Number.MAX_SAFE_INTEGER) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: '数值超出安全范围',
       };
@@ -334,7 +336,7 @@ class RandomService {
     } catch (error: any) {
       return {
         input: query,
-        output: '',
+        output: errorMsg,
         success: false,
         error: `随机数字生成失败: ${error.message}`,
       };

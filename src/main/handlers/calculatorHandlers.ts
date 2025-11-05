@@ -15,7 +15,8 @@ export function registerCalculatorHandlers() {
       // 先尝试识别翻译查询（异步）
       const translateResult = await translateService.handleTranslateQuery(expression);
       console.log(`🧮 [计算器Handler] 翻译结果:`, translateResult);
-      if (translateResult && translateResult.success) {
+      if (translateResult) {
+        // 如果识别为翻译查询（无论成功或失败），都返回翻译结果
         console.log(`🧮 [计算器Handler] 返回翻译结果`);
         return {
           input: translateResult.input,
@@ -28,7 +29,8 @@ export function registerCalculatorHandlers() {
       // 再尝试识别变量名生成查询（异步）
       const variableNameResult = await variableNameService.handleVariableNameQuery(expression);
       console.log(`🧮 [计算器Handler] 变量名生成结果:`, variableNameResult);
-      if (variableNameResult && variableNameResult.success) {
+      if (variableNameResult) {
+        // 如果识别为变量名生成查询（无论成功或失败），都返回结果
         console.log(`🧮 [计算器Handler] 返回变量名生成结果`);
         return {
           input: variableNameResult.input,
