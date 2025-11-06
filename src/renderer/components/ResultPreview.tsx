@@ -842,30 +842,30 @@ const CalculatorPreview: React.FC<{ result: SearchResult }> = ({ result }) => {
   const steps = generateCalculationSteps(result.calcData.input, result.calcData.output);
 
   return (
-    <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+    <div className="p-4 border-b border-gray-200 dark:border-gray-700 max-w-full overflow-x-hidden">
       <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">计算结果</h3>
       <div className="space-y-4">
-        <div>
+        <div className="max-w-full overflow-x-hidden">
           <div className="mb-1">
             <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">输入</span>
           </div>
-          <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed">{result.calcData.input || '(空)'}</p>
+          <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed whitespace-pre-wrap">{result.calcData.input || '(空)'}</p>
         </div>
-        <div>
+        <div className="max-w-full overflow-x-hidden">
           <div className="mb-1">
             <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">结果</span>
           </div>
-          <p className="text-lg font-bold text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed">{result.calcData.output || '(无结果)'}</p>
+          <p className="text-lg font-bold text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed whitespace-pre-wrap">{result.calcData.output || '(无结果)'}</p>
         </div>
         {/* 计算步骤 */}
         {steps.length > 0 && (
-          <div>
+          <div className="max-w-full overflow-x-hidden">
             <div className="mb-1">
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">计算步骤</span>
             </div>
             <div className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed space-y-1">
               {steps.map((step, index) => (
-                <p key={index} className="font-mono text-xs">
+                <p key={index} className="font-mono text-xs break-words break-all whitespace-pre-wrap">
                   {index + 1}. {step}
                 </p>
               ))}
@@ -936,7 +936,7 @@ export const ResultPreview: React.FC<ResultPreviewProps> = ({ result, query }) =
   // 如果有计算器数据，优先显示计算器预览
   if (result.calcData) {
     return (
-      <div className="w-full">
+      <div className="w-full max-w-full overflow-x-hidden">
         <CalculatorPreview result={result} />
       </div>
     );

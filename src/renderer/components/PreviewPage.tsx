@@ -60,7 +60,9 @@ export const PreviewPage: React.FC = () => {
 
   return (
     <div className="w-full h-full bg-white dark:bg-gray-800 overflow-y-auto preview-content">
-      <ResultPreview result={previewData.result} query={previewData.query} />
+      <div className="max-w-full overflow-x-hidden">
+        <ResultPreview result={previewData.result} query={previewData.query} />
+      </div>
     </div>
   );
 };

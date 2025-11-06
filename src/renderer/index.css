@@ -48,3 +48,15 @@ body {
 .dark ::-webkit-scrollbar-thumb:hover {
   background: #64748b;
 }
+
+/* 预览页面文本自动换行 */
+.preview-content {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-all;
+}
+
+.preview-content * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
