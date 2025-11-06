@@ -197,6 +197,7 @@ class BookmarkService {
 
   /**
    * 保存书签到数据库
+   * 注意：会保留数据库中现有的统计数据（launchCount, lastUsed），避免重置
    */
   private async saveBookmarksToDatabase(bookmarks: Bookmark[]): Promise<void> {
     if (bookmarks.length === 0) return;
@@ -207,11 +208,26 @@ class BookmarkService {
       const { dbManager } = await import('../database/db');
       const now = new Date();
       
-      // 先删除所有旧的书签记录（使用批量删除优化性能）
-      await dbManager.clearItemsByType('bookmark');
+      // 先获取数据库中现有的书签统计数据，避免重置
+      // 注意：书签的 ID 格式是 `bookmark-${bookmark.id}`，但我们需要通过 URL (path) 来匹配
+      const existingBookmarks = await dbManager.getAllItems('bookmark');
+      const existingStatsMap = new Map<string, { launchCount: number; lastUsed: Date | null; score: number }>();
+      for (const existingBookmark of existingBookmarks) {
+        // 使用 URL (path) 作为键，因为书签 ID 可能会变化
+        existingStatsMap.set(existingBookmark.path, {
+          launchCount: existingBookmark.launchCount || 0,
+          lastUsed: existingBookmark.lastUsed ? new Date(existingBookmark.lastUsed) : null,
+          score: existingBookmark.score || 0,
+        });
+      }
       
       // 批量保存新书签
       const bookmarkItems = bookmarks.map(bookmark => {
+        const bookmarkId = `bookmark-${bookmark.id}`;
+        
+        // 通过 URL 查找现有统计数据
+        const existingStats = existingStatsMap.get(bookmark.url);
+        
         // 验证并转换日期（避免无效日期导致错误）
         let lastUsed: Date | undefined = undefined;
         if (bookmark.dateLastUsed) {
@@ -222,8 +238,15 @@ class BookmarkService {
           }
         }
         
+        // 使用现有统计数据，如果不存在则使用默认值
+        const launchCount = existingStats ? existingStats.launchCount : 0;
+        const finalLastUsed = existingStats && existingStats.lastUsed 
+          ? existingStats.lastUsed 
+          : (lastUsed || undefined);
+        const score = existingStats ? existingStats.score : 0;
+        
         return {
-          id: `bookmark-${bookmark.id}`,
+          id: bookmarkId,
           type: 'bookmark' as const,
           name: bookmark.name,
           nameEn: undefined,
@@ -232,14 +255,19 @@ class BookmarkService {
           icon: bookmark.icon || bookmark.favIconUrl || undefined, // 保存图标 URL
           description: undefined,
           category: undefined,
-          launchCount: 0,
-          lastUsed,
-          score: 0,
+          launchCount: launchCount,
+          lastUsed: finalLastUsed,
+          score: score,
           indexedAt: now,
           searchKeywords: `${bookmark.name} ${bookmark.url}`.toLowerCase(),
         };
       });
       
+      // 先删除所有旧的书签记录（使用批量删除优化性能）
+      // 注意：删除后再保存，但我们已经保存了统计数据
+      await dbManager.clearItemsByType('bookmark');
+      
+      // 批量保存新书签（包含保留的统计数据）
       await dbManager.batchUpsertItems(bookmarkItems);
       
       console.log(`✅ [书签服务] 已保存 ${bookmarks.length} 个书签到数据库`);

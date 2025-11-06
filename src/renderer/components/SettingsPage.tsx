@@ -936,6 +936,30 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 </div>
               </div>
 
+              {/* 预览窗口设置 */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                <div className="p-6">
+                  <h3 className="text-lg font-medium mb-4">预览窗口设置</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <div className="font-medium text-gray-900">启用预览窗口</div>
+                        <div className="text-sm text-gray-500">选择搜索结果时在右侧显示详细信息预览</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={appSettings.previewWindowEnabled !== false}
+                          onChange={(e) => updateSetting('previewWindowEnabled', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* 开发者设置 */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
                 <div className="p-6">

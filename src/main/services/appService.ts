@@ -276,17 +276,36 @@ class AppService {
   /**
    * 保存应用到数据库
    * 批量写入应用数据，清理过期条目
+   * 注意：会保留数据库中现有的统计数据（launchCount, lastUsed），避免重置
    * @param apps 应用数据映射表
    * @returns Promise<void>
    */
   private async saveAppsToDatabase(apps: Map<string, AppInfo>): Promise<void> {
     const { dbManager } = await import('../database/db');
     const now = new Date();
+    
+    // 先获取数据库中现有的应用统计数据，避免重置
+    const existingApps = await dbManager.getAllItems('app');
+    const existingStatsMap = new Map<string, { launchCount: number; lastUsed: Date | null; score: number }>();
+    for (const existingApp of existingApps) {
+      existingStatsMap.set(existingApp.id, {
+        launchCount: existingApp.launchCount || 0,
+        lastUsed: existingApp.lastUsed ? new Date(existingApp.lastUsed) : null,
+        score: existingApp.score || 0,
+      });
+    }
+    
     const appArray = Array.from(apps.values()).map(app => {
       const nameEn = /^[a-zA-Z0-9\s.-]+$/.test(app.name) ? app.name : null;
       const nameCn = /[\u4e00-\u9fa5]/.test(app.name) ? app.name : null;
       const searchKeys = this.getAppSearchKeys(app.name);
       const searchKeywords = searchKeys.join(',');
+      
+      // 获取现有统计数据（如果存在），否则使用扫描时的值
+      const existingStats = existingStatsMap.get(app.id);
+      const launchCount = existingStats ? existingStats.launchCount : (app.launchCount || 0);
+      const lastUsed = existingStats && existingStats.lastUsed ? existingStats.lastUsed : (app.lastUsed || new Date());
+      const score = existingStats ? existingStats.score : (launchCount * 0.1);
       
       return {
         id: app.id,
@@ -297,9 +316,9 @@ class AppService {
         path: app.path,
         icon: app.icon,
         category: app.category,
-        launchCount: app.launchCount,
-        lastUsed: app.lastUsed,
-        score: app.launchCount * 0.1,
+        launchCount: launchCount,
+        lastUsed: lastUsed,
+        score: score,
         indexedAt: now,
         searchKeywords,
       };

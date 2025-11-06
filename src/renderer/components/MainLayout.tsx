@@ -83,6 +83,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
   const hideMainWindow = () => {
     setQuery(''); // 清空搜索
     setResults([]); // 清空结果
+    // 先隐藏预览窗口
+    window.electron.preview.hide();
     // 延迟隐藏窗口，确保状态更新完成
     setTimeout(() => {
       window.electron.windowHide('main').catch((err) => {
@@ -1188,9 +1190,33 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
   }, [results, selectedIndex]);
 
   // 管理预览窗口
+  const [previewWindowEnabled, setPreviewWindowEnabled] = React.useState(true);
+
+  // 加载预览窗口设置（定期检查，以便实时响应设置变化）
   React.useEffect(() => {
-    // 只有在有选中结果且查询不为空时才显示预览窗口
-    if (selectedResult && query) {
+    const loadPreviewSetting = async () => {
+      try {
+        const settings = await window.electron.settings.getAll();
+        setPreviewWindowEnabled(settings.previewWindowEnabled !== false); // 默认启用
+      } catch {
+        setPreviewWindowEnabled(true); // 默认启用
+      }
+    };
+
+    // 初始加载
+    loadPreviewSetting();
+
+    // 定期检查设置变化（每2秒检查一次，避免过于频繁）
+    const interval = setInterval(loadPreviewSetting, 2000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    // 只有在有选中结果、查询不为空且预览窗口启用时才显示预览窗口
+    if (selectedResult && query && previewWindowEnabled) {
       // 先更新内容，再显示窗口（确保内容准备好后再显示）
       console.log('[MainLayout] 更新预览内容，选中结果:', selectedResult);
       
@@ -1209,11 +1235,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
 
     return () => {
       // 清理时隐藏预览窗口
-      if (!selectedResult || !query) {
+      if (!selectedResult || !query || !previewWindowEnabled) {
         window.electron.preview.hide();
       }
     };
-  }, [selectedResult, query]);
+  }, [selectedResult, query, previewWindowEnabled]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">

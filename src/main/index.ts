@@ -212,6 +212,11 @@ ipcMain.handle('window-show', (_event, windowType: string) => {
 
 ipcMain.handle('window-hide', (_event, windowType: string) => {
   windowManager.hideWindow(windowType as any);
+  // 如果隐藏的是主窗口，同时隐藏预览窗口
+  if (windowType === 'main') {
+    const { hidePreviewWindow } = require('./windows/previewWindow');
+    hidePreviewWindow();
+  }
 });
 
 ipcMain.handle('window-toggle', (_event, windowType: string) => {

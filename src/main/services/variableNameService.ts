@@ -225,7 +225,14 @@ class VariableNameService {
       }
       // 英文字母或数字
       else if (/[a-zA-Z0-9]/.test(char)) {
-        currentWord += char;
+        // 检测驼峰命名：如果当前字符是大写，且前面有小写字母，说明是新单词的开始
+        if (/[A-Z]/.test(char) && currentWord && /[a-z]/.test(currentWord)) {
+          // 将当前累积的单词加入数组
+          words.push(currentWord);
+          currentWord = char;
+        } else {
+          currentWord += char;
+        }
       }
       // 分隔符（空格、连字符、下划线等）
       else {
@@ -239,6 +246,23 @@ class VariableNameService {
     // 处理最后一个单词
     if (currentWord) {
       words.push(currentWord);
+    }
+
+    // 如果只有一个单词，尝试识别驼峰命名并分割
+    if (words.length === 1 && words[0]) {
+      const singleWord = words[0];
+      // 检测是否包含大写字母（驼峰命名或帕斯卡命名）
+      if (/[A-Z]/.test(singleWord)) {
+        // 按大写字母分割：在驼峰命名中，大写字母通常是新单词的开始
+        // 例如：userName -> user, Name
+        const camelCaseWords = singleWord.split(/(?=[A-Z])/);
+        if (camelCaseWords.length > 1) {
+          // 返回分割后的单词数组（全部转为小写）
+          return camelCaseWords
+            .filter(word => word.length > 0)
+            .map(word => word.toLowerCase());
+        }
+      }
     }
 
     // 过滤空单词并规范化
