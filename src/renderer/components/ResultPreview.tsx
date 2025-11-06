@@ -511,7 +511,19 @@ const WebPreview: React.FC<{ result: SearchResult; query: string }> = ({ result,
           </div>
           <div className="flex items-center gap-2">
             {result.icon && (
-              <span className="text-lg">{result.icon}</span>
+              result.icon.startsWith('data:') || result.icon.startsWith('file://') ? (
+                <img 
+                  src={result.icon} 
+                  alt={engineName}
+                  className="w-5 h-5 rounded flex-shrink-0"
+                  onError={(e) => {
+                    // 图标加载失败时隐藏
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <span className="text-lg">{result.icon}</span>
+              )
             )}
             <p className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed">{engineName}</p>
           </div>

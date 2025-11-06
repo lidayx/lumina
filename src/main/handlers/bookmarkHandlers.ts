@@ -40,15 +40,37 @@ export function registerBookmarkHandlers() {
   // 获取书签详细信息
   ipcMain.handle('bookmark-get-info', async (_event, url: string) => {
     try {
+      const { dbManager } = await import('../database/db');
+      
+      // 从书签服务获取书签基本信息
       const bookmarks = bookmarkService.getAllBookmarks();
       const bookmark = bookmarks.find(b => b.url === url);
+      
       if (bookmark) {
+        // 从数据库获取访问次数
+        // 书签在数据库中的 path 字段存储的是 URL，type 是 'bookmark'
+        let accessCount = 0;
+        let dateLastUsed = bookmark.dateLastUsed;
+        
+        // 获取所有书签类型的数据库项，然后根据 path (URL) 查找
+        const dbItems = await dbManager.getAllItems('bookmark');
+        const dbItem = dbItems.find(item => item.path === url);
+        
+        if (dbItem) {
+          // 找到数据库项，使用数据库中的统计数据
+          accessCount = dbItem.launchCount || 0;
+          if (dbItem.lastUsed) {
+            dateLastUsed = new Date(dbItem.lastUsed);
+          }
+        }
+        
         return {
           success: true,
           info: {
             ...bookmark,
-            // 计算访问次数（如果有使用统计）
-            accessCount: bookmark.dateLastUsed ? 1 : 0, // 简化处理，实际应该从数据库获取
+            // 使用数据库中的访问次数
+            accessCount: accessCount,
+            dateLastUsed: dateLastUsed,
           },
         };
       }

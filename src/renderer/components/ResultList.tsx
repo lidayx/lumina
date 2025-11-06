@@ -23,6 +23,7 @@ interface ResultListProps {
   selectedIndex: number;
   query: string; // 查询关键词，用于高亮
   onSelect: (index: number) => void;
+  onHover?: (index: number) => void; // 鼠标悬停时的回调
 }
 
 const getTypeIcon = (type: string) => {
@@ -97,8 +98,9 @@ const ResultItem = React.memo<{
   isSelected: boolean;
   query: string; // 查询关键词，用于高亮
   onSelect: () => void;
+  onHover?: () => void; // 鼠标悬停回调
   itemRef: (el: HTMLDivElement | null) => void;
-}>(({ result, index, isSelected, query, onSelect, itemRef }) => {
+}>(({ result, index, isSelected, query, onSelect, onHover, itemRef }) => {
   // 调试图标渲染
   if (index === 0 && result.icon) {
     console.log('🔍 [前端渲染] 第一个结果图标:', {
@@ -116,6 +118,7 @@ const ResultItem = React.memo<{
       key={result.id}
       ref={itemRef}
       onClick={onSelect}
+      onMouseEnter={onHover}
       className={`
         flex items-center px-4 py-2.5 rounded cursor-pointer transition-colors
         ${
@@ -192,6 +195,7 @@ export const ResultList: React.FC<ResultListProps> = ({
   selectedIndex,
   query,
   onSelect,
+  onHover,
 }) => {
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -233,6 +237,7 @@ export const ResultList: React.FC<ResultListProps> = ({
           isSelected={index === selectedIndex}
           query={query}
           onSelect={() => onSelect(index)}
+          onHover={onHover ? () => onHover(index) : undefined}
           itemRef={(el) => {
             itemRefs.current[index] = el;
           }}

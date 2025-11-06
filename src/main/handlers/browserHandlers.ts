@@ -74,6 +74,16 @@ export function registerBrowserHandlers() {
   // 使用默认浏览器打开URL
   ipcMain.handle('browser-open-url', async (_event, url: string) => {
     try {
+      // 检查是否是书签，如果是则更新访问统计
+      const { dbManager } = await import('../database/db');
+      const bookmarkItems = await dbManager.getAllItems('bookmark');
+      const bookmarkItem = bookmarkItems.find(item => item.path === url);
+      
+      if (bookmarkItem) {
+        // 更新书签的访问统计
+        dbManager.updateItemUsage(bookmarkItem.id);
+      }
+      
       await browserService.openUrl(url);
       return { success: true };
     } catch (error) {

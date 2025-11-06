@@ -265,8 +265,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             // 检测是否为计算表达式或时间查询（需要包含运算符、函数、单位转换符号或时间关键词）
             const queryTrimmed = query.trim();
             const isCalculation = (
-              // 包含运算符或特殊字符，且不是纯数字
-              (/[\+\-*/().,π \t]/.test(queryTrimmed) && !/^[\d.,\s]+$/.test(queryTrimmed)) ||
+              // 包含运算符或特殊字符（不包括空格），且不是纯数字
+              // 注意：空格本身不应该触发计算器，只有明确的数学运算符才应该
+              (/[\+\-*/().,π]/.test(queryTrimmed) && !/^[\d.,\s]+$/.test(queryTrimmed)) ||
               // 包含数学函数（使用单词边界，避免误匹配如 "weixin" 中的 "in"）
               /\b(sin|cos|tan|log|sqrt)\b/i.test(queryTrimmed) ||
               // 包含单位转换关键字（单词边界）
@@ -336,8 +337,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               match: fileSearchMatch 
             });
             
-            // 如果检测到文件搜索，禁用计算器（文件搜索优先）
-            const finalIsCalculation = isFileSearch ? false : isCalculation;
+            // 如果检测到文件搜索或 URL，禁用计算器（文件搜索和 URL 优先）
+            const finalIsCalculation = (isFileSearch || urlCheck.isURL) ? false : isCalculation;
             
             // 获取设置以决定是否搜索文件
             const settings = await window.electron.settings.getAll().catch(() => ({}));
@@ -455,8 +456,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             }
             
             // 计算器结果（如果有，包括时间查询结果）
-            // 处理错误结果
-            if (calcResult && !calcResult.success && calcResult.error) {
+            // 处理错误结果（如果检测到 URL，不显示计算器错误）
+            if (calcResult && !calcResult.success && calcResult.error && !urlCheck.isURL) {
               combinedResults.push({
                 id: 'calc-error',
                 type: 'command' as const,
@@ -827,8 +828,22 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             
             // URL 检测结果（如果有）- 显示多个浏览器选项
             if (urlCheck.isURL && urlCheck.url) {
-              const browserOptions = await generateBrowserOptions(urlCheck.url);
-              combinedResults.push(...browserOptions);
+              try {
+                const browserOptions = await generateBrowserOptions(urlCheck.url);
+                combinedResults.push(...browserOptions);
+              } catch (error: any) {
+                console.error('生成浏览器选项失败:', error);
+                // 即使获取浏览器列表失败，也显示一个默认选项
+                combinedResults.push({
+                  id: `browser-default-${urlCheck.url}`,
+                  type: 'web' as const,
+                  title: '系统默认 (默认)',
+                  description: '打开此网址',
+                  action: `browser:default:${urlCheck.url}`,
+                  score: 1500,
+                  priorityScore: 1500,
+                });
+              }
             }
             
             // 应用添加类型优先加分
@@ -930,6 +945,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
     const timer = setTimeout(searchAll, 300);
     return () => clearTimeout(timer);
   }, [query]); // 移除 appResults 依赖，直接通过 IPC 搜索
+
+  // 处理鼠标悬停（只更新选中索引，不执行操作）
+  const handleHover = (index: number) => {
+    if (index >= 0 && index < results.length) {
+      setSelectedIndex(index);
+    }
+  };
 
   const handleSelect = async (index: number) => {
     setSelectedIndex(index);
@@ -1212,9 +1234,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
           {query && (
             <div className="w-full mt-2 max-h-[450px] overflow-y-auto">
               {results.length > 0 ? (
-                <ResultList results={results} selectedIndex={selectedIndex} query={query} onSelect={handleSelect} />
+                <ResultList results={results} selectedIndex={selectedIndex} query={query} onSelect={handleSelect} onHover={handleHover} />
               ) : showNoResult ? (
-                <ResultList results={[]} selectedIndex={selectedIndex} query={query} onSelect={handleSelect} />
+                <ResultList results={[]} selectedIndex={selectedIndex} query={query} onSelect={handleSelect} onHover={handleHover} />
               ) : null}
             </div>
           )}

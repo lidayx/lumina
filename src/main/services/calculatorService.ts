@@ -257,7 +257,8 @@ class CalculatorService {
     const match = expression.match(conversionPattern);
     
     if (!match) {
-      return { input: expression, output: errorMsg, success: false };
+      const errorMsg = '无法识别的单位换算格式';
+      return { input: expression, output: errorMsg, success: false, error: errorMsg };
     }
 
     const value = parseFloat(match[1]);
@@ -295,7 +296,8 @@ class CalculatorService {
       }
     }
 
-    return { input: expression, output: errorMsg, success: false };
+    const errorMsg = '不支持的单位换算';
+    return { input: expression, output: errorMsg, success: false, error: errorMsg };
   }
 
   /**

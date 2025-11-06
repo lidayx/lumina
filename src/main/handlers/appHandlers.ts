@@ -88,9 +88,15 @@ export function registerAppHandlers() {
   ipcMain.handle('app-get-info', async (_event, appId: string) => {
     try {
       const fs = require('fs');
-      // 直接从应用服务获取最新数据（内存中的数据已经是最新的，因为 launchApp 会更新内存）
+      const { dbManager } = await import('../database/db');
+      
+      // 先从数据库获取最新的统计数据（launchCount, lastUsed）
+      const dbItem = await dbManager.getItemById(appId);
+      
+      // 从应用服务获取应用基本信息
       const apps = await appService.getAllApps();
       const app = apps.find((a: any) => a.id === appId);
+      
       if (app && app.path) {
         // 如果文件存在，获取文件统计信息
         let stats = null;
@@ -100,10 +106,16 @@ export function registerAppHandlers() {
           // 文件可能不存在，忽略错误
         }
         
+        // 合并数据库中的统计数据和应用基本信息
         return {
           success: true,
           info: {
             ...app,
+            // 使用数据库中的最新统计数据（如果存在）
+            ...(dbItem && {
+              launchCount: dbItem.launchCount || 0,
+              lastUsed: dbItem.lastUsed ? new Date(dbItem.lastUsed) : app.lastUsed,
+            }),
             // 如果文件存在，添加文件信息
             ...(stats && {
               installDate: stats.birthtime || stats.ctime, // 创建时间作为安装时间
