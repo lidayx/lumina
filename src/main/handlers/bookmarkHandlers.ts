@@ -36,5 +36,27 @@ export function registerBookmarkHandlers() {
       throw error;
     }
   });
+
+  // 获取书签详细信息
+  ipcMain.handle('bookmark-get-info', async (_event, url: string) => {
+    try {
+      const bookmarks = bookmarkService.getAllBookmarks();
+      const bookmark = bookmarks.find(b => b.url === url);
+      if (bookmark) {
+        return {
+          success: true,
+          info: {
+            ...bookmark,
+            // 计算访问次数（如果有使用统计）
+            accessCount: bookmark.dateLastUsed ? 1 : 0, // 简化处理，实际应该从数据库获取
+          },
+        };
+      }
+      return { success: false, error: '书签未找到' };
+    } catch (error) {
+      console.error('获取书签信息失败:', error);
+      return { success: false, error: String(error) };
+    }
+  });
 }
 

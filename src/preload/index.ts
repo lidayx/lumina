@@ -40,6 +40,8 @@ contextBridge.exposeInMainWorld('electron', {
         open: (filePath: string) => ipcRenderer.invoke('file-open', filePath),
         revealFolder: (filePath: string) => ipcRenderer.invoke('file-reveal-folder', filePath),
         getInfo: (filePath: string) => ipcRenderer.invoke('file-get-info', filePath),
+        getImageSize: (filePath: string) => ipcRenderer.invoke('file-get-image-size', filePath),
+        getVideoInfo: (filePath: string) => ipcRenderer.invoke('file-get-video-info', filePath),
         index: (paths?: string[]) => ipcRenderer.invoke('file-index', paths),
       },
       
@@ -94,6 +96,7 @@ contextBridge.exposeInMainWorld('electron', {
         getAll: () => ipcRenderer.invoke('bookmark-get-all'),
         search: (query: string) => ipcRenderer.invoke('bookmark-search', query),
         reload: () => ipcRenderer.invoke('bookmark-reload'),
+        getInfo: (url: string) => ipcRenderer.invoke('bookmark-get-info', url),
       },
       
       // 应用设置相关
@@ -147,6 +150,8 @@ contextBridge.exposeInMainWorld('electron', {
       open: (filePath: string) => Promise<any>;
       revealFolder: (filePath: string) => Promise<any>;
       getInfo: (filePath: string) => Promise<any>;
+      getImageSize: (filePath: string) => Promise<any>;
+      getVideoInfo: (filePath: string) => Promise<any>;
       index: (paths?: string[]) => Promise<any>;
     };
     web: {
@@ -189,6 +194,7 @@ contextBridge.exposeInMainWorld('electron', {
       getAll: () => Promise<any[]>;
       search: (query: string) => Promise<any[]>;
       reload: () => Promise<any>;
+      getInfo: (url: string) => Promise<any>;
     };
     settings: {
       getAll: () => Promise<any>;
