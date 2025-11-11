@@ -247,12 +247,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
       // 搜索应用和文件
       React.useEffect(() => {
         const searchAll = async () => {
+          console.log('🚀 [搜索开始] query:', query);
           if (!query.trim()) {
+            console.log('⚠️ [搜索] 查询为空，清空结果');
             setResults([]);
             setLoading(false);
             return;
           }
 
+          console.log('✅ [搜索] 开始搜索，query:', query);
           setLoading(true);
           try {
             // 先尝试解析别名（优先级最高）
@@ -279,16 +282,34 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             const isClipboardSearch = clipboardMatch !== null;
             const clipboardQuery = clipboardMatch ? (clipboardMatch[1] || '') : '';
             
-            // 检测是否为计算表达式或时间查询（需要包含运算符、函数、单位转换符号或时间关键词）
+            // 检测是否为计算表达式
+            // 优先检测简单的数学表达式（如 "1+2", "3*4"），避免被其他功能误匹配
             const queryTrimmed = actualQuery.trim();
+            
+            // 先检测简单的数学表达式（纯数字+运算符+纯数字，无其他关键词）
+            const isSimpleMath = /^\d+\s*[\+\-*/]\s*\d+$/.test(queryTrimmed);
+            console.log('🔍 [计算器检测-简单数学]', {
+              query: queryTrimmed,
+              isSimpleMath,
+              testResult: /^\d+\s*[\+\-*/]\s*\d+$/.test(queryTrimmed),
+            });
+            
+            // 检测是否为计算表达式（包含运算符、函数、单位转换等）
             const isCalculation = (
+              // 简单数学表达式（优先）
+              isSimpleMath ||
               // 包含运算符或特殊字符（不包括空格），且不是纯数字
-              // 注意：空格本身不应该触发计算器，只有明确的数学运算符才应该
               (/[\+\-*/().,π]/.test(queryTrimmed) && !/^[\d.,\s]+$/.test(queryTrimmed)) ||
               // 包含数学函数（使用单词边界，避免误匹配如 "weixin" 中的 "in"）
               /\b(sin|cos|tan|log|sqrt)\b/i.test(queryTrimmed) ||
-              // 包含单位转换关键字（单词边界）
-              /\b(to|到)\b/i.test(queryTrimmed) ||
+              // 包含单位转换关键字（单词边界），但排除时间/翻译/变量名相关的 to
+              (/\b(to|到)\b/i.test(queryTrimmed) && 
+               !/^(?:translate|翻译|fanyi|fy|en|zh|cn)\s+/i.test(queryTrimmed) &&
+               !/^(?:varname|变量名|camel|snake|pascal)\s+/i.test(queryTrimmed) &&
+               !/^\d{4}[-\/]\d{2}[-\/]\d{2}/.test(queryTrimmed) &&
+               !/^(timestamp|ts)\s+\d{10,13}$/i.test(queryTrimmed) &&
+               !/^\d{10,13}\s+(?:to|转)\s+date$/i.test(queryTrimmed) &&
+               !/^.+?\s+(?:to|转)\s+timestamp$/i.test(queryTrimmed)) ||
               // 包含单位转换箭头符号
               /=>/.test(queryTrimmed) ||
               // 时间查询关键词（精确匹配单个词，避免误匹配应用名）
@@ -311,7 +332,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               /^(?:varname|变量名|camel|snake|pascal)\s+/i.test(queryTrimmed) ||
               /\s+(?:varname|变量名)$/i.test(queryTrimmed) ||
               // 时间计算：包含 - 或 + 且看起来像日期格式
-              /^\d{4}[-\/]\d{2}[-\/]\d{2}/.test(queryTrimmed) && /[\+\-]/.test(queryTrimmed) ||
+              (/^\d{4}[-\/]\d{2}[-\/]\d{2}/.test(queryTrimmed) && /[\+\-]/.test(queryTrimmed)) ||
               // 日期格式化：format 或格式化关键字
               /^(?:format|格式化)\s+.+?\s+.+?$/i.test(queryTrimmed) ||
               /^.+?\s+(?:format|格式化)\s+.+?$/i.test(queryTrimmed) ||
@@ -364,6 +385,16 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             // 如果检测到文件搜索或 URL，禁用计算器（文件搜索和 URL 优先）
             const finalIsCalculation = (isFileSearch || urlCheck.isURL) ? false : isCalculation;
             
+            console.log('🔍 [计算器检测-前置]', {
+              query: actualQuery,
+              queryTrimmed,
+              isSimpleMath,
+              isCalculation,
+              isFileSearch,
+              isURL: urlCheck.isURL,
+              finalIsCalculation,
+            });
+            
             // 获取设置以决定是否搜索文件
             const settings = await window.electron.settings.getAll().catch(() => ({}));
             const fileSearchEnabled = settings?.fileSearchEnabled !== false; // 默认启用
@@ -382,33 +413,83 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             if (!isFileSearch && !urlCheck.isURL) {
               // 按优先级顺序尝试各个模块
               encodeResult = await window.electron.encode.handleQuery(actualQuery).catch(() => null);
+              if (encodeResult) {
+                console.log('🔍 [模块检测] encodeResult 匹配:', actualQuery);
+              }
               if (!encodeResult) {
                 stringResult = await window.electron.string.handleQuery(actualQuery).catch(() => null);
+                if (stringResult) {
+                  console.log('🔍 [模块检测] stringResult 匹配:', actualQuery);
+                }
               }
               if (!encodeResult && !stringResult) {
                 timeResult = await window.electron.time.handleQuery(actualQuery).catch(() => null);
+                if (timeResult) {
+                  console.log('🔍 [模块检测] timeResult 匹配:', actualQuery);
+                }
               }
               if (!encodeResult && !stringResult && !timeResult) {
                 randomResult = await window.electron.random.handleQuery(actualQuery).catch(() => null);
+                if (randomResult) {
+                  console.log('🔍 [模块检测] randomResult 匹配:', actualQuery);
+                }
               }
               if (!encodeResult && !stringResult && !timeResult && !randomResult) {
                 translateResult = await window.electron.translate.handleQuery(actualQuery).catch(() => null);
+                if (translateResult) {
+                  console.log('🔍 [模块检测] translateResult 匹配:', actualQuery);
+                }
               }
               if (!encodeResult && !stringResult && !timeResult && !randomResult && !translateResult) {
-                variableNameResult = await window.electron.varname.handleQuery(actualQuery).catch(() => null);
+                // 先检查是否是数学表达式（简单或包含括号），如果是则跳过变量名生成
+                const isMathExpression = /^\d+\s*[\+\-*/]\s*\d+$/.test(actualQuery.trim()) || // 简单数学表达式
+                                         /^[\d\s\+\-*/().,π]+$/.test(actualQuery.trim()) && /[\+\-*/().,π]/.test(actualQuery.trim()); // 包含运算符的数学表达式
+                if (!isMathExpression) {
+                  variableNameResult = await window.electron.varname.handleQuery(actualQuery).catch(() => null);
+                  if (variableNameResult) {
+                    console.log('🔍 [模块检测] variableNameResult 匹配:', actualQuery);
+                  }
+                } else {
+                  console.log('🔍 [模块检测] 跳过变量名生成（数学表达式）:', actualQuery);
+                  variableNameResult = null;
+                }
               }
             }
             
             // 如果所有独立模块都没有处理，再尝试计算器
-            const calcResult = (!encodeResult && !stringResult && !timeResult && !randomResult && !translateResult && !variableNameResult && finalIsCalculation)
+            const shouldCallCalculator = !encodeResult && !stringResult && !timeResult && !randomResult && !translateResult && !variableNameResult && finalIsCalculation;
+            console.log('🔍 [计算器检测]', {
+              query: actualQuery,
+              shouldCallCalculator,
+              finalIsCalculation,
+              isSimpleMath,
+              isCalculation,
+              hasOtherResults: !!(encodeResult || stringResult || timeResult || randomResult || translateResult || variableNameResult),
+              encodeResult: encodeResult ? '有结果' : 'null',
+              stringResult: stringResult ? '有结果' : 'null',
+              timeResult: timeResult ? '有结果' : 'null',
+              randomResult: randomResult ? '有结果' : 'null',
+              translateResult: translateResult ? '有结果' : 'null',
+              variableNameResult: variableNameResult ? '有结果' : 'null',
+            });
+            const calcResult = shouldCallCalculator
               ? await window.electron.calculator.calculate(actualQuery).catch((err) => {
-                  console.error('计算器计算失败:', err);
+                  console.error('❌ [前端] 计算器计算失败:', err);
                   return null;
                 })
               : null;
+            if (calcResult) {
+              console.log('✅ [前端] 计算器返回结果:', {
+                success: calcResult.success,
+                output: calcResult.output,
+                error: calcResult.error,
+              });
+            } else if (shouldCallCalculator) {
+              console.log('⚠️ [前端] 计算器应该被调用但没有返回结果');
+            }
             
-            // 如果计算器返回 null（功能关闭或无法识别），继续搜索网页和其他内容
-            const shouldSearchWeb = !isFileSearch && (!finalIsCalculation || calcResult === null);
+            // 如果计算器返回 null（功能关闭或无法识别）或返回错误，继续搜索网页和其他内容
+            const shouldSearchWeb = !isFileSearch && (!finalIsCalculation || calcResult === null || (calcResult && !calcResult.success));
             
             // 检测功能关键词（用于智能补全）
             // 只在输入关键词本身或关键词后跟空格时触发补全，避免误触发
@@ -583,10 +664,17 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             const defaultBrowser = await window.electron.browser.getDefault().catch(() => null);
             
             console.log('🔍 [搜索结果]', {
+              query: actualQuery,
               isCalculation,
               isFileSearch,
               finalIsCalculation,
-              calcResult,
+              encodeResult: encodeResult ? '有结果' : 'null',
+              stringResult: stringResult ? '有结果' : 'null',
+              timeResult: timeResult ? '有结果' : 'null',
+              randomResult: randomResult ? '有结果' : 'null',
+              translateResult: translateResult ? '有结果' : 'null',
+              variableNameResult: variableNameResult ? '有结果' : 'null',
+              calcResult: calcResult ? `成功: ${calcResult.output}` : 'null',
               webResultsCount: webResults?.length || 0,
             });
 
@@ -949,16 +1037,38 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             
             // 时间工具结果（如果有）
             if (timeResult && timeResult.success) {
-              combinedResults.push({
-                id: 'time-result',
-                type: 'time' as const,
-                title: timeResult.output.trim(),
-                description: `时间工具：${timeResult.input}`,
-                action: 'time:copy',
-                score: 2000,
-                priorityScore: 2000,
-                timeData: timeResult,
-              });
+              // 将多行输出拆分成多条结果
+              const outputLines = timeResult.output.split('\n').filter(line => line.trim());
+              if (outputLines.length > 1) {
+                // 多条结果，为每行创建一个选项
+                outputLines.forEach((line: string, index: number) => {
+                  combinedResults.push({
+                    id: `time-result-${index}`,
+                    type: 'time' as const,
+                    title: line.trim(),
+                    description: `时间工具 ${index + 1}/${outputLines.length}：${timeResult.input}`,
+                    action: 'time:copy',
+                    score: 2000 - index,
+                    priorityScore: 2000 - index,
+                    timeData: {
+                      ...timeResult,
+                      output: line.trim(), // 只包含当前行的输出
+                    },
+                  });
+                });
+              } else {
+                // 单条结果
+                combinedResults.push({
+                  id: 'time-result',
+                  type: 'time' as const,
+                  title: timeResult.output.trim(),
+                  description: `时间工具：${timeResult.input}`,
+                  action: 'time:copy',
+                  score: 2000,
+                  priorityScore: 2000,
+                  timeData: timeResult,
+                });
+              }
             } else if (timeResult && !timeResult.success && timeResult.error) {
               combinedResults.push({
                 id: 'time-error',
@@ -1092,21 +1202,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             }
             
             // 计算器结果（如果有，仅数学计算和单位换算）
-            // 处理错误结果（如果检测到 URL，不显示计算器错误）
-            if (calcResult && !calcResult.success && calcResult.error && !urlCheck.isURL) {
-              combinedResults.push({
-                id: 'calc-error',
-                type: 'command' as const,
-                title: `错误: ${calcResult.error}`,
-                description: calcResult.input || query,
-                action: 'calc:copy',
-                score: 1000,
-                priorityScore: 1000,
-                calcData: calcResult,
-              });
-            }
+            // 不显示计算器错误结果，让系统继续搜索网页等其他内容
+            // 如果计算器返回错误，不添加到结果列表，继续执行其他搜索
+            
             // 处理成功结果
-            else if (calcResult && calcResult.success) {
+            if (calcResult && calcResult.success) {
               // 判断是否为时间差计算结果（优先判断，避免误判）
               // 时间差结果格式：包含"天"、"小时"、"分钟"、"秒"等关键词，并且包含"总计:"
               const isTimeDifference = calcResult.output.includes('总计:') && 
@@ -1606,8 +1706,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
       /^(?:translate|翻译|fanyi|fy|en|zh|cn|url|html|base64|md5|encode|decode|编码|解码|bianma|jiema|pwd|password|密码|uuid|random|time|时间|timestamp|date|日期|uppercase|lowercase|大写|小写|title|camel|snake|reverse|反转|trim|count|统计|replace|extract|varname|变量名)/i.test(query.trim())
     ) ? 150 : 300;
     
-    const timer = setTimeout(searchAll, debounceDelay);
+    console.log('⏱️ [防抖] 设置延迟:', debounceDelay, 'ms, query:', query);
+    const timer = setTimeout(() => {
+      console.log('⏱️ [防抖] 延迟结束，开始执行搜索');
+      searchAll();
+    }, debounceDelay);
     return () => {
+      console.log('⏱️ [防抖] 清除定时器');
       clearTimeout(timer);
       // 定期清理过期缓存
       completionCache.clearExpired();
@@ -2017,8 +2122,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-      <div className="flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl flex flex-col">
+      <div className="flex items-center justify-center p-4 overflow-x-hidden">
+        <div className="w-full max-w-2xl flex flex-col min-w-0">
           {/* 主搜索框 */}
           <div className="w-full">
             <SearchBar 
@@ -2032,7 +2137,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
 
           {/* 搜索结果区域 */}
           {query && (
-            <div className="w-full mt-2 max-h-[450px] overflow-y-auto">
+            <div className="w-full mt-2 max-h-[450px] overflow-y-auto overflow-x-hidden">
               {results.length > 0 ? (
                 <ResultList results={results} selectedIndex={selectedIndex} query={query} onSelect={handleSelect} onHover={handleHover} />
               ) : showNoResult ? (

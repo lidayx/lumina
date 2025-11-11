@@ -311,11 +311,11 @@ const ResultItem = React.memo<{
 
       {/* Content */}
       <div className="ml-3 flex-1 min-w-0 overflow-hidden">
-        <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+        <div className="text-sm font-medium text-gray-900 dark:text-white truncate break-words">
           {highlightText(result.title, query)}
         </div>
         {result.description && (
-          <div className="text-xs text-gray-500 dark:text-gray-500 truncate mt-0.5">
+          <div className="text-xs text-gray-500 dark:text-gray-500 truncate mt-0.5 break-words">
             {highlightText(result.description, query)}
           </div>
         )}

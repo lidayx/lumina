@@ -59,9 +59,9 @@ export const WINDOW_CONFIGS = {
     height: 80, // 初始高度（只有输入框）
     minWidth: 500,
     minHeight: 80, // 最小高度保持输入框可见
-    maximizable: false, // 不允许最大化
+    maximizable: isDev, // 开发模式下允许最大化
     minimizable: true,
-    resizable: false, // 禁止调整大小
+    resizable: isDev, // 开发模式下允许调整大小
   }),
   settings: () => ({
     type: 'settings' as WindowType,
@@ -96,9 +96,9 @@ export const WINDOW_CONFIGS = {
       height: mainWindowMaxHeight, // 固定为主窗口最大高度
       minWidth: 300,
       minHeight: 200,
-      maximizable: false,
+      maximizable: isDev, // 开发模式下允许最大化
       minimizable: true,
-      resizable: false, // 禁止调整大小，保持固定尺寸
+      resizable: isDev, // 开发模式下允许调整大小
     };
   },
 };

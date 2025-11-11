@@ -108,6 +108,13 @@ class CalculatorService {
       // 这样可以避免在功能关闭时显示"表达式格式错误"，而是继续显示其他搜索结果
       // 检查是否包含数学运算符或函数，如果没有，则不尝试计算
       const hasMathOperators = /[\+\-*/().,π]/.test(expression) || /\b(sin|cos|tan|log|sqrt)\b/i.test(expression);
+      console.log(`🔍 [计算器] 检查数学运算符: ${expression}`, {
+        hasPlus: /\+/.test(expression),
+        hasMinus: /-/.test(expression),
+        hasMultiply: /\*/.test(expression),
+        hasDivide: /\//.test(expression),
+        hasMathOperators,
+      });
       if (!hasMathOperators) {
         // 没有数学运算符，返回 null，让系统继续尝试其他搜索方式
         console.log(`ℹ️ [计算器] 未识别为计算查询，返回 null: ${expression}`);

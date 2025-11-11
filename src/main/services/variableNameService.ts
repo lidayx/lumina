@@ -49,7 +49,9 @@ class VariableNameService {
 
       // 解析查询
       const parsed = this.parseVariableNameQuery(trimmedQuery);
+      console.log(`🏷️ [变量名服务] 解析查询: "${trimmedQuery}"`, { parsed });
       if (!parsed) {
+        console.log(`🏷️ [变量名服务] 未识别为变量名查询，返回 null: "${trimmedQuery}"`);
         return null;
       }
 
@@ -142,6 +144,14 @@ class VariableNameService {
     text: string;
     style?: NamingStyle;
   } | null {
+    // 先排除明显的数学表达式（简单表达式或包含括号的表达式）
+    const isSimpleMath = /^\d+\s*[\+\-*/]\s*\d+$/.test(query);
+    const isMathExpression = /^[\d\s\+\-*/().,π]+$/.test(query) && /[\+\-*/().,π]/.test(query);
+    if (isSimpleMath || isMathExpression) {
+      console.log(`🏷️ [变量名服务] 检测到数学表达式，跳过: "${query}"`);
+      return null;
+    }
+
     // 1. 快捷方式：camel <文本>、snake <文本>、pascal <文本>
     let pattern = /^(camel|snake|pascal)\s+(.+)$/i;
     let match = query.match(pattern);

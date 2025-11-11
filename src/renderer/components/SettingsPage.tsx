@@ -720,7 +720,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
           {activeTab === 'search-engines' && (
             <div>
               <h2 className="text-2xl font-bold mb-2">搜索引擎设置</h2>
-              <p className="text-gray-600 mb-6">配置网页搜索的搜索引擎</p>
+              <p className="text-gray-600 mb-6">配置网页搜索的搜索引擎。系统会自动为每个搜索引擎生成对应的品牌 logo，无需手动上传图标。</p>
               
               {/* 搜索引擎列表 */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
@@ -1988,8 +1988,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                       <div className="font-medium text-gray-900 mb-2">网页搜索</div>
                       <p className="text-xs text-gray-600 mb-2">快速访问搜索引擎，支持：</p>
                       <ul className="text-xs text-gray-600 space-y-1 ml-4 list-disc">
-                        <li>多个搜索引擎（百度、谷歌、必应、DuckDuckGo 等）</li>
-                        <li>自定义搜索引擎</li>
+                        <li>多个搜索引擎（百度、谷歌、必应、GitHub、知乎等）</li>
+                        <li>自动识别图标：系统会自动为每个搜索引擎生成对应的品牌 logo</li>
+                        <li>自定义搜索引擎（只需配置名称和 URL 模板）</li>
                         <li>历史记录追踪常用网站</li>
                         <li>快捷键快速切换引擎</li>
                       </ul>
