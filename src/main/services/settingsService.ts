@@ -34,6 +34,14 @@ export interface AppSettings {
   clipboardEnabled: boolean; // 是否启用剪贴板历史
   clipboardMaxItems: number; // 最大记录数（默认 50）
   clipboardRetentionDays: number; // 保留天数（默认 7）
+  
+  // 密码生成设置
+  passwordDefaultLength: number; // 默认密码长度（默认 16）
+  passwordDefaultCount: number; // 默认生成密码数量（默认 10）
+  passwordIncludeLowercase: boolean; // 包含小写字母（默认 true）
+  passwordIncludeUppercase: boolean; // 包含大写字母（默认 true）
+  passwordIncludeNumbers: boolean; // 包含数字（默认 true）
+  passwordIncludeSpecial: boolean; // 包含特殊字符（默认 true）
 }
 
 /**
@@ -57,6 +65,12 @@ class SettingsService {
     clipboardEnabled: true, // 默认启用剪贴板历史
     clipboardMaxItems: 50, // 默认最大记录 50 条
     clipboardRetentionDays: 7, // 默认保留 7 天
+    passwordDefaultLength: 16, // 默认密码长度 16
+    passwordDefaultCount: 10, // 默认生成 10 个密码
+    passwordIncludeLowercase: true, // 默认包含小写字母
+    passwordIncludeUppercase: true, // 默认包含大写字母
+    passwordIncludeNumbers: true, // 默认包含数字
+    passwordIncludeSpecial: true, // 默认包含特殊字符
   };
 
   // ========== 私有属性 ==========
@@ -203,10 +217,12 @@ class SettingsService {
       while (stmt.step()) {
         const row = stmt.getAsObject() as any;
         try {
-          settings[row.key] = JSON.parse(row.value);
+          const parsedValue = JSON.parse(row.value);
+          settings[row.key] = parsedValue;
         } catch (e) {
           // 如果解析失败，尝试直接使用值
           settings[row.key] = row.value;
+          console.warn(`⚠️ [设置服务] 解析设置 ${row.key} 失败，使用原始值:`, row.value);
         }
       }
       

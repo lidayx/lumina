@@ -216,13 +216,17 @@ export const ResultList: React.FC<ResultListProps> = ({
 
   if (results.length === 0) {
     return (
-      <div className="py-8 text-center">
-        <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700/50 mb-3">
-          <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+      <div className="flex items-center px-4 py-2.5">
+        <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700/50 flex items-center justify-center">
+            <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
         </div>
-        <p className="text-sm text-gray-500 dark:text-gray-400">未找到匹配结果</p>
+        <div className="ml-3 flex-1 min-w-0">
+          <p className="text-sm text-gray-500 dark:text-gray-400">未找到匹配结果</p>
+        </div>
       </div>
     );
   }

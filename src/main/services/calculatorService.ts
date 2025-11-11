@@ -115,12 +115,20 @@ class CalculatorService {
       const randomResult = randomService.handleRandomQuery(expression);
       if (randomResult && randomResult.success) {
         // 将 RandomResult 转换为 CalculationResult
-        return {
+        // 保留 outputs 和 isMultiple 标志，用于前端处理多个密码
+        const result: any = {
           input: randomResult.input,
           output: randomResult.output,
           success: randomResult.success,
           error: randomResult.error,
         };
+        if (randomResult.outputs) {
+          result.outputs = randomResult.outputs;
+        }
+        if (randomResult.isMultiple) {
+          result.isMultiple = randomResult.isMultiple;
+        }
+        return result;
       }
 
       // 尝试识别时间查询（在单位换算之前）

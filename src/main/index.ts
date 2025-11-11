@@ -214,8 +214,12 @@ ipcMain.handle('window-hide', (_event, windowType: string) => {
   windowManager.hideWindow(windowType as any);
   // 如果隐藏的是主窗口，同时隐藏预览窗口
   if (windowType === 'main') {
-    const { hidePreviewWindow } = require('./windows/previewWindow');
-    hidePreviewWindow();
+    // 使用动态导入以避免打包后的模块解析问题
+    import('./windows/previewWindow').then(({ hidePreviewWindow }) => {
+      hidePreviewWindow();
+    }).catch((error) => {
+      console.error('Error hiding preview window:', error);
+    });
   }
 });
 

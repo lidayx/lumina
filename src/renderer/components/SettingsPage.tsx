@@ -23,7 +23,7 @@ const CommandItem: React.FC<CommandItemProps> = ({ name, shortcut, description }
   </div>
 );
 
-type TabType = 'browser' | 'search-engines' | 'file' | 'general' | 'translate' | 'clipboard' | 'help' | 'shortcuts';
+type TabType = 'browser' | 'search-engines' | 'file' | 'general' | 'translate' | 'clipboard' | 'password' | 'help' | 'shortcuts';
 
 export const SettingsPage: React.FC<SettingsPageProps> = () => {
   const [activeTab, setActiveTab] = useState<TabType>('general');
@@ -420,6 +420,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
                 剪贴板设置
+              </div>
+            </button>
+            
+            <button
+              onClick={() => setActiveTab('password')}
+              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                activeTab === 'password'
+                  ? 'bg-blue-50 text-blue-700 font-medium'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center">
+                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                密码生成设置
               </div>
             </button>
             
@@ -1176,6 +1192,142 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
             </div>
           )}
 
+          {activeTab === 'password' && (
+            <div>
+              <h2 className="text-2xl font-bold mb-2">密码生成设置</h2>
+              <p className="text-gray-600 mb-6">配置密码生成的默认规则</p>
+              
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="space-y-6">
+                  {/* 默认密码长度 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      默认密码长度
+                    </label>
+                    <input
+                      type="number"
+                      min="4"
+                      max="1000"
+                      value={appSettings.passwordDefaultLength || 16}
+                      onChange={(e) => updateSetting('passwordDefaultLength', parseInt(e.target.value) || 16)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <p className="mt-1 text-sm text-gray-500">
+                      建议值：12-32 位。当输入 <code className="px-1 py-0.5 bg-blue-100 rounded text-xs">pwd</code> 时使用此长度。
+                    </p>
+                  </div>
+                  
+                  {/* 默认生成数量 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      默认生成数量
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={appSettings.passwordDefaultCount || 10}
+                      onChange={(e) => updateSetting('passwordDefaultCount', parseInt(e.target.value) || 10)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <p className="mt-1 text-sm text-gray-500">
+                      建议值：5-20 个。每次生成密码时默认生成的数量。
+                    </p>
+                  </div>
+                  
+                  {/* 字符集设置 */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <label className="block text-sm font-medium text-gray-700 mb-4">
+                      包含字符类型
+                    </label>
+                    <div className="space-y-3">
+                      {/* 小写字母 */}
+                      <div className="flex items-center justify-between py-2">
+                        <div>
+                          <div className="font-medium text-gray-900">小写字母 (a-z)</div>
+                          <div className="text-sm text-gray-500">包含小写英文字母</div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={appSettings.passwordIncludeLowercase ?? true}
+                            onChange={(e) => updateSetting('passwordIncludeLowercase', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                      
+                      {/* 大写字母 */}
+                      <div className="flex items-center justify-between py-2">
+                        <div>
+                          <div className="font-medium text-gray-900">大写字母 (A-Z)</div>
+                          <div className="text-sm text-gray-500">包含大写英文字母</div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={appSettings.passwordIncludeUppercase ?? true}
+                            onChange={(e) => updateSetting('passwordIncludeUppercase', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                      
+                      {/* 数字 */}
+                      <div className="flex items-center justify-between py-2">
+                        <div>
+                          <div className="font-medium text-gray-900">数字 (0-9)</div>
+                          <div className="text-sm text-gray-500">包含数字字符</div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={appSettings.passwordIncludeNumbers ?? true}
+                            onChange={(e) => updateSetting('passwordIncludeNumbers', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                      
+                      {/* 特殊字符 */}
+                      <div className="flex items-center justify-between py-2">
+                        <div>
+                          <div className="font-medium text-gray-900">特殊字符 (!@#$%...)</div>
+                          <div className="text-sm text-gray-500">包含特殊符号</div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={appSettings.passwordIncludeSpecial ?? true}
+                            onChange={(e) => updateSetting('passwordIncludeSpecial', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* 使用说明 */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h3 className="text-sm font-medium text-blue-900 mb-2">使用说明</h3>
+                      <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                        <li>在搜索框中输入 <code className="px-1 py-0.5 bg-blue-100 rounded text-xs">pwd</code>、<code className="px-1 py-0.5 bg-blue-100 rounded text-xs">password</code> 或 <code className="px-1 py-0.5 bg-blue-100 rounded text-xs">密码</code> 生成密码</li>
+                        <li>输入 <code className="px-1 py-0.5 bg-blue-100 rounded text-xs">pwd 20</code> 可以指定密码长度为 20 位</li>
+                        <li>默认生成 10 个密码，每个密码是一个结果选项，可以选择任意一个复制</li>
+                        <li>密码生成规则可在本页面配置，包括长度、数量和字符类型</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'help' && (
             <div>
               <h2 className="text-2xl font-bold mb-2">帮助中心</h2>
@@ -1557,12 +1709,25 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                       <p className="text-xs text-gray-600">生成指定长度的随机字符串（字母+数字）</p>
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">
-                      <div className="font-medium text-gray-900 mb-2">随机密码</div>
+                      <div className="font-medium text-gray-900 mb-2">随机密码（旧格式）</div>
                       <div className="flex flex-wrap gap-2 mb-2">
                         <code className="px-2 py-1 bg-white rounded text-xs">random password 20</code>
                         <code className="px-2 py-1 bg-white rounded text-xs">20 random password</code>
                       </div>
                       <p className="text-xs text-gray-600">生成指定长度的随机密码（包含大小写字母、数字、特殊字符）</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">密码生成（新功能）</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">pwd</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">pwd 20</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">password</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">密码</code>
+                      </div>
+                      <p className="text-xs text-gray-600 mb-2">快速生成多个安全密码，默认生成 10 个，每个密码是一个结果选项，可选择任意一个复制</p>
+                      <p className="text-xs text-gray-500">• 输入 <code className="px-1 py-0.5 bg-white rounded text-xs">pwd</code> 使用默认长度生成密码</p>
+                      <p className="text-xs text-gray-500">• 输入 <code className="px-1 py-0.5 bg-white rounded text-xs">pwd 20</code> 生成 20 位长度的密码</p>
+                      <p className="text-xs text-gray-500">• 可在设置中配置默认长度、生成数量和字符类型（大小写字母、数字、特殊字符）</p>
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="font-medium text-gray-900 mb-2">随机数字</div>

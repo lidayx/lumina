@@ -324,7 +324,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               /^(?:uuid|generate\s+uuid)$/i.test(queryTrimmed) ||
               /^uuid\s+v[14]$/i.test(queryTrimmed) ||
               /^random\s+(string|password|number)/i.test(queryTrimmed) ||
-              /^(string|password|number)\s+random/i.test(queryTrimmed)
+              /^(string|password|number)\s+random/i.test(queryTrimmed) ||
+              // 密码生成关键词检测（pwd/password/密码）
+              /^(?:pwd|password|密码)(?:\s+\d+)?$/i.test(queryTrimmed)
             );
             
             // 检测是否为文件搜索（file + 空格 + 关键字）
@@ -497,8 +499,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               // 判断是否为变量名生成结果（优先判断）
               const isVariableNameResult = /原始描述:|camelCase:|snake_case:|PascalCase:|CONSTANT:|kebab-case:/i.test(calcResult.output);
               
+              // 判断是否为密码生成结果（多个密码）
+              // 检查 calcData 中是否有 outputs 和 isMultiple 标志
+              const isPasswordGeneration = (calcResult as any).outputs && (calcResult as any).isMultiple;
+              
               // 判断是否为时间查询结果（通过输出内容判断）
-              const isTimeResult = !isTimeDifference && !isTimeCalculation && !isTextStats && !isVariableNameResult && (
+              const isTimeResult = !isTimeDifference && !isTimeCalculation && !isTextStats && !isVariableNameResult && !isPasswordGeneration && (
                 calcResult.output.includes('\n') || 
                 /^\d{4}[-\/]\d{2}/.test(calcResult.output) ||
                 /时间戳|timestamp|ISO|UTC|CST|EST|PST|JST|格式/i.test(calcResult.output)
@@ -785,7 +791,26 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               }
               else {
                 // 文本统计结果：直接显示多行结果
-                if (isTextStats) {
+                // 密码生成结果：为每个密码创建一个选项
+                if (isPasswordGeneration && (calcResult as any).outputs) {
+                  const passwords = (calcResult as any).outputs as string[];
+                  passwords.forEach((password: string, index: number) => {
+                    combinedResults.push({
+                      id: `password-${index}`,
+                      type: 'command' as const,
+                      title: password,
+                      description: `密码 ${index + 1}/${passwords.length} - 点击复制`,
+                      action: 'calc:copy',
+                      score: 1900 - index,
+                      priorityScore: 1900 - index,
+                      calcData: {
+                        input: calcResult.input,
+                        output: password,
+                        success: true,
+                      },
+                    });
+                  });
+                } else if (isTextStats) {
                   combinedResults.push({
                     id: 'text-stats-result',
                     type: 'command' as const,

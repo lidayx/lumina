@@ -4,6 +4,7 @@
  */
 
 import { randomBytes, randomInt } from 'crypto';
+import { settingsService } from './settingsService';
 
 // ========== 类型定义 ==========
 
@@ -12,6 +13,8 @@ export interface RandomResult {
   output: string;
   success: boolean;
   error?: string;
+  outputs?: string[]; // 用于返回多个结果（如多个密码）
+  isMultiple?: boolean; // 标识是否为多个结果
 }
 
 /**
@@ -28,25 +31,31 @@ class RandomService {
     try {
       const trimmedQuery = query.trim();
 
-      // 1. 检测 UUID 生成
+      // 1. 检测密码生成（pwd/password/密码）- 优先检测，因为更常用
+      const passwordResult = this.handlePasswordGeneration(trimmedQuery);
+      if (passwordResult) {
+        return passwordResult;
+      }
+
+      // 2. 检测 UUID 生成
       const uuidResult = this.handleUuid(trimmedQuery);
       if (uuidResult) {
         return uuidResult;
       }
 
-      // 2. 检测随机字符串
+      // 3. 检测随机字符串
       const randomStringResult = this.handleRandomString(trimmedQuery);
       if (randomStringResult) {
         return randomStringResult;
       }
 
-      // 3. 检测随机密码
+      // 4. 检测随机密码（旧格式：random password）
       const randomPasswordResult = this.handleRandomPassword(trimmedQuery);
       if (randomPasswordResult) {
         return randomPasswordResult;
       }
 
-      // 4. 检测随机数字
+      // 5. 检测随机数字
       const randomNumberResult = this.handleRandomNumber(trimmedQuery);
       if (randomNumberResult) {
         return randomNumberResult;
@@ -197,7 +206,258 @@ class RandomService {
     return result;
   }
 
-  // ========== 随机密码 ==========
+  // ========== 密码生成（新功能：pwd/password/密码） ==========
+
+  /**
+   * 处理密码生成（支持 pwd/password/密码 关键词）
+   * 默认生成10个密码，每个密码是一个结果选项
+   * 支持 pwd 10 格式，10代表密码长度
+   */
+  private async handlePasswordGenerationAsync(query: string): Promise<RandomResult | null> {
+    // 匹配: pwd、password、密码（可选后跟长度）
+    // 支持: pwd、pwd 10、password 16、密码 20 等格式
+    let pattern = /^(?:pwd|password|密码)(?:\s+(\d+))?$/i;
+    let match = query.match(pattern);
+
+    if (!match) {
+      return null;
+    }
+
+    // 获取设置服务以读取默认配置
+    let defaultLength = 16; // 默认密码长度
+    let defaultCount = 10; // 默认生成数量
+    let includeLowercase = true;
+    let includeUppercase = true;
+    let includeNumbers = true;
+    let includeSpecial = true;
+
+    try {
+      // 动态导入设置服务（避免循环依赖）
+      const { default: settingsService } = await import('./settingsService');
+      const settings = settingsService.getSettings();
+      
+      // 从设置中读取密码生成规则
+      if (settings.passwordDefaultLength !== undefined) {
+        defaultLength = settings.passwordDefaultLength;
+      }
+      if (settings.passwordDefaultCount !== undefined) {
+        defaultCount = settings.passwordDefaultCount;
+      }
+      if (settings.passwordIncludeLowercase !== undefined) {
+        includeLowercase = Boolean(settings.passwordIncludeLowercase);
+      }
+      if (settings.passwordIncludeUppercase !== undefined) {
+        includeUppercase = Boolean(settings.passwordIncludeUppercase);
+      }
+      if (settings.passwordIncludeNumbers !== undefined) {
+        includeNumbers = Boolean(settings.passwordIncludeNumbers);
+      }
+      if (settings.passwordIncludeSpecial !== undefined) {
+        includeSpecial = Boolean(settings.passwordIncludeSpecial);
+      }
+    } catch (error) {
+      console.warn('⚠️ [随机数服务] 无法读取设置，使用默认值:', error);
+    }
+
+    // 解析长度（如果提供）
+    const length = match[1] ? parseInt(match[1], 10) : defaultLength;
+
+    if (length < 1 || length > 1000) {
+      return {
+        input: query,
+        output: '长度必须在 1-1000 之间',
+        success: false,
+        error: '长度必须在 1-1000 之间',
+      };
+    }
+
+    try {
+      // 生成多个密码
+      const passwords: string[] = [];
+      for (let i = 0; i < defaultCount; i++) {
+        const password = this.generatePasswordWithRules(
+          length,
+          includeLowercase,
+          includeUppercase,
+          includeNumbers,
+          includeSpecial
+        );
+        passwords.push(password);
+      }
+
+      return {
+        input: query,
+        output: passwords[0], // 第一个密码作为主输出（向后兼容）
+        outputs: passwords, // 所有密码
+        success: true,
+        isMultiple: true, // 标识为多个结果
+      };
+    } catch (error: any) {
+      return {
+        input: query,
+        output: '密码生成失败',
+        success: false,
+        error: `密码生成失败: ${error.message}`,
+      };
+    }
+  }
+
+  /**
+   * 处理密码生成（同步包装器）
+   */
+  private handlePasswordGeneration(query: string): RandomResult | null {
+    // 由于 handleRandomQuery 是同步的，我们需要使用同步方式
+    // 但为了获取最新设置，我们使用 require 但清除缓存
+    let pattern = /^(?:pwd|password|密码)(?:\s+(\d+))?$/i;
+    let match = query.match(pattern);
+
+    if (!match) {
+      return null;
+    }
+
+    // 获取设置服务以读取默认配置
+    let defaultLength = 16; // 默认密码长度
+    let defaultCount = 10; // 默认生成数量
+    let includeLowercase = true;
+    let includeUppercase = true;
+    let includeNumbers = true;
+    let includeSpecial = true;
+
+    try {
+      // 直接使用导入的 settingsService 单例实例
+      const settings = settingsService.getSettings();
+      
+      // 从设置中读取密码生成规则
+      // 重要：必须检查 undefined，因为如果设置从未保存过，值会是 undefined
+      // 但如果设置被保存为 false，必须正确读取 false 值
+      if (settings.passwordDefaultLength !== undefined) {
+        defaultLength = settings.passwordDefaultLength;
+      }
+      if (settings.passwordDefaultCount !== undefined) {
+        defaultCount = settings.passwordDefaultCount;
+      }
+      if (settings.passwordIncludeLowercase !== undefined) {
+        includeLowercase = Boolean(settings.passwordIncludeLowercase);
+      }
+      if (settings.passwordIncludeUppercase !== undefined) {
+        includeUppercase = Boolean(settings.passwordIncludeUppercase);
+      }
+      if (settings.passwordIncludeNumbers !== undefined) {
+        includeNumbers = Boolean(settings.passwordIncludeNumbers);
+      }
+      // 关键：必须明确检查 undefined，false 是有效值
+      if ('passwordIncludeSpecial' in settings) {
+        includeSpecial = Boolean(settings.passwordIncludeSpecial);
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ [随机数服务] 无法读取设置，使用默认值:', error);
+    }
+
+    // 解析长度（如果提供）
+    const length = match[1] ? parseInt(match[1], 10) : defaultLength;
+
+    if (length < 1 || length > 1000) {
+      return {
+        input: query,
+        output: '长度必须在 1-1000 之间',
+        success: false,
+        error: '长度必须在 1-1000 之间',
+      };
+    }
+
+    try {
+      // 生成多个密码
+      const passwords: string[] = [];
+      for (let i = 0; i < defaultCount; i++) {
+        const password = this.generatePasswordWithRules(
+          length,
+          includeLowercase,
+          includeUppercase,
+          includeNumbers,
+          includeSpecial
+        );
+        passwords.push(password);
+      }
+
+      return {
+        input: query,
+        output: passwords[0], // 第一个密码作为主输出（向后兼容）
+        outputs: passwords, // 所有密码
+        success: true,
+        isMultiple: true, // 标识为多个结果
+      };
+    } catch (error: any) {
+      return {
+        input: query,
+        output: '密码生成失败',
+        success: false,
+        error: `密码生成失败: ${error.message}`,
+      };
+    }
+  }
+
+  /**
+   * 根据规则生成密码
+   */
+  private generatePasswordWithRules(
+    length: number,
+    includeLowercase: boolean,
+    includeUppercase: boolean,
+    includeNumbers: boolean,
+    includeSpecial: boolean
+  ): string {
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const numbers = '0123456789';
+    const special = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+
+    // 确保参数是布尔值
+    const hasLowercase = Boolean(includeLowercase);
+    const hasUppercase = Boolean(includeUppercase);
+    const hasNumbers = Boolean(includeNumbers);
+    const hasSpecial = Boolean(includeSpecial);
+
+    // 构建字符集
+    let charSet = '';
+    const requiredChars: string[] = [];
+
+    if (hasLowercase) {
+      charSet += lowercase;
+      requiredChars.push(lowercase[Math.floor(Math.random() * lowercase.length)]);
+    }
+    if (hasUppercase) {
+      charSet += uppercase;
+      requiredChars.push(uppercase[Math.floor(Math.random() * uppercase.length)]);
+    }
+    if (hasNumbers) {
+      charSet += numbers;
+      requiredChars.push(numbers[Math.floor(Math.random() * numbers.length)]);
+    }
+    if (hasSpecial) {
+      charSet += special;
+      requiredChars.push(special[Math.floor(Math.random() * special.length)]);
+    }
+
+    if (charSet.length === 0) {
+      throw new Error('至少需要选择一种字符类型');
+    }
+
+
+    // 确保至少包含每种类型的一个字符
+    let result = requiredChars.join('');
+    
+    // 填充剩余长度
+    const randomBytesArray = randomBytes(length);
+    for (let i = result.length; i < length; i++) {
+      result += charSet[randomBytesArray[i] % charSet.length];
+    }
+    
+    // 打乱顺序
+    return result.split('').sort(() => Math.random() - 0.5).join('');
+  }
+
+  // ========== 随机密码（旧格式：random password） ==========
 
   /**
    * 处理随机密码生成
