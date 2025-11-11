@@ -1079,7 +1079,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                     </div>
                     
                     {/* 随机密码功能（旧格式） */}
-                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100" style={{ display: 'none' }}>
                       <div>
                         <div className="font-medium text-gray-900">随机密码（旧格式）</div>
                         <div className="text-sm text-gray-500">random password 格式的密码生成</div>
