@@ -893,6 +893,135 @@ const CalculatorPreview: React.FC<{ result: SearchResult }> = ({ result }) => {
 /**
  * 默认预览组件
  */
+
+/**
+ * 编码解码结果预览组件
+ */
+const EncodePreview: React.FC<{ result: SearchResult }> = ({ result }) => {
+  if (!result.encodeData) return null;
+
+  const encodeData = result.encodeData;
+  const isEncode = encodeData.output && !encodeData.output.includes('解码');
+  const operationType = isEncode ? '编码' : '解码';
+
+  return (
+    <div className="p-4 border-b border-gray-200 dark:border-gray-700 max-w-full overflow-x-hidden">
+      <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">编码解码结果</h3>
+      <div className="space-y-4">
+        <div className="max-w-full overflow-x-hidden">
+          <div className="mb-1">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">输入</span>
+          </div>
+          <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed whitespace-pre-wrap">{encodeData.input || '(空)'}</p>
+        </div>
+        <div className="max-w-full overflow-x-hidden">
+          <div className="mb-1">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{operationType}结果</span>
+          </div>
+          <p className="text-lg font-bold text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed whitespace-pre-wrap">{encodeData.output || '(无结果)'}</p>
+        </div>
+        {encodeData.error && (
+          <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+            <div className="mb-1">
+              <span className="text-xs font-medium text-red-500 dark:text-red-400 uppercase tracking-wide">错误</span>
+            </div>
+            <p className="text-sm text-red-600 dark:text-red-400 break-words leading-relaxed">{encodeData.error}</p>
+          </div>
+        )}
+        <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            按 Enter 键复制结果
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * 字符串工具结果预览组件
+ */
+const StringPreview: React.FC<{ result: SearchResult }> = ({ result }) => {
+  if (!result.stringData) return null;
+
+  const stringData = result.stringData;
+
+  return (
+    <div className="p-4 border-b border-gray-200 dark:border-gray-700 max-w-full overflow-x-hidden">
+      <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">字符串处理结果</h3>
+      <div className="space-y-4">
+        <div className="max-w-full overflow-x-hidden">
+          <div className="mb-1">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">输入</span>
+          </div>
+          <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed whitespace-pre-wrap">{stringData.input || '(空)'}</p>
+        </div>
+        <div className="max-w-full overflow-x-hidden">
+          <div className="mb-1">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">结果</span>
+          </div>
+          <p className="text-lg font-bold text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed whitespace-pre-wrap">{stringData.output || '(无结果)'}</p>
+        </div>
+        {stringData.error && (
+          <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+            <div className="mb-1">
+              <span className="text-xs font-medium text-red-500 dark:text-red-400 uppercase tracking-wide">错误</span>
+            </div>
+            <p className="text-sm text-red-600 dark:text-red-400 break-words leading-relaxed">{stringData.error}</p>
+          </div>
+        )}
+        <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            按 Enter 键复制结果
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * 时间工具结果预览组件
+ */
+const TimePreview: React.FC<{ result: SearchResult }> = ({ result }) => {
+  if (!result.timeData) return null;
+
+  const timeData = result.timeData;
+
+  return (
+    <div className="p-4 border-b border-gray-200 dark:border-gray-700 max-w-full overflow-x-hidden">
+      <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">时间工具结果</h3>
+      <div className="space-y-4">
+        <div className="max-w-full overflow-x-hidden">
+          <div className="mb-1">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">输入</span>
+          </div>
+          <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed whitespace-pre-wrap">{timeData.input || '(空)'}</p>
+        </div>
+        <div className="max-w-full overflow-x-hidden">
+          <div className="mb-1">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">结果</span>
+          </div>
+          <p className="text-lg font-bold text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed whitespace-pre-wrap">{timeData.output || '(无结果)'}</p>
+        </div>
+        {timeData.error && (
+          <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+            <div className="mb-1">
+              <span className="text-xs font-medium text-red-500 dark:text-red-400 uppercase tracking-wide">错误</span>
+            </div>
+            <p className="text-sm text-red-600 dark:text-red-400 break-words leading-relaxed">{timeData.error}</p>
+          </div>
+        )}
+        <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            按 Enter 键复制结果
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DefaultPreview: React.FC<{ result: SearchResult }> = ({ result }) => {
   return (
     <div className="p-4 border-b border-gray-200 dark:border-gray-700">
@@ -942,6 +1071,34 @@ export const ResultPreview: React.FC<ResultPreviewProps> = ({ result, query }) =
     );
   }
 
+
+  // 如果有编码解码数据，显示编码解码预览
+  if (result.encodeData) {
+    return (
+      <div className="w-full max-w-full overflow-x-hidden">
+        <EncodePreview result={result} />
+      </div>
+    );
+  }
+
+  // 如果有字符串工具数据，显示字符串工具预览
+  if (result.stringData) {
+    return (
+      <div className="w-full max-w-full overflow-x-hidden">
+        <StringPreview result={result} />
+      </div>
+    );
+  }
+
+  // 如果有时间工具数据，显示时间工具预览
+  if (result.timeData) {
+    return (
+      <div className="w-full max-w-full overflow-x-hidden">
+        <TimePreview result={result} />
+      </div>
+    );
+  }
+
   // 如果是书签，使用书签预览组件
   if (result.action.startsWith('bookmark:')) {
     return (
@@ -975,6 +1132,24 @@ export const ResultPreview: React.FC<ResultPreviewProps> = ({ result, query }) =
       return (
         <div className="w-full">
           <CommandPreview result={result} />
+        </div>
+      );
+    case 'encode':
+      return (
+        <div className="w-full">
+          <EncodePreview result={result} />
+        </div>
+      );
+    case 'string':
+      return (
+        <div className="w-full">
+          <StringPreview result={result} />
+        </div>
+      );
+    case 'time':
+      return (
+        <div className="w-full">
+          <TimePreview result={result} />
         </div>
       );
     default:

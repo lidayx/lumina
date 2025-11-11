@@ -1425,7 +1425,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
         if (actionParts[1] === 'complete') {
           // 功能补全：设置输入框为补全文本，并在末尾添加空格以便用户继续输入
           const completeText = actionParts.slice(3).join(':');
-          // 如果格式不包含占位符（如 <长度>），则在末尾添加空格
+          // 移除占位符（如 <长度>），然后添加空格
           const formatText = completeText.replace(/<[^>]+>/g, '').trim();
           setQuery(formatText + ' ');
         } else if (actionParts[1] === 'example') {
