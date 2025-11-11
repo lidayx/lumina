@@ -105,6 +105,7 @@ contextBridge.exposeInMainWorld('electron', {
         help: () => ipcRenderer.invoke('random-help'),
       },
       encode: {
+        handleQuery: (query: string) => ipcRenderer.invoke('encode-handle-query', query),
         complete: (partial: string) => ipcRenderer.invoke('encode-complete', partial),
         help: () => ipcRenderer.invoke('encode-help'),
       },

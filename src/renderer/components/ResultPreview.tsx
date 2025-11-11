@@ -901,12 +901,21 @@ const EncodePreview: React.FC<{ result: SearchResult }> = ({ result }) => {
   if (!result.encodeData) return null;
 
   const encodeData = result.encodeData;
-  const isEncode = encodeData.output && !encodeData.output.includes('解码');
-  const operationType = isEncode ? '编码' : '解码';
+  
+  // 根据输入内容判断操作类型
+  const inputLower = (encodeData.input || '').toLowerCase();
+  let operationType = '编码解码';
+  if (/decode|解码|jiema|jiemi|jm/.test(inputLower)) {
+    operationType = '解码';
+  } else if (/encode|编码|bianma|jiami|bm/.test(inputLower)) {
+    operationType = '编码';
+  } else if (/md5/.test(inputLower)) {
+    operationType = '加密';
+  }
 
   return (
     <div className="p-4 border-b border-gray-200 dark:border-gray-700 max-w-full overflow-x-hidden">
-      <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">编码解码结果</h3>
+      <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">{operationType}结果</h3>
       <div className="space-y-4">
         <div className="max-w-full overflow-x-hidden">
           <div className="mb-1">
@@ -914,18 +923,34 @@ const EncodePreview: React.FC<{ result: SearchResult }> = ({ result }) => {
           </div>
           <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed whitespace-pre-wrap">{encodeData.input || '(空)'}</p>
         </div>
-        <div className="max-w-full overflow-x-hidden">
-          <div className="mb-1">
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{operationType}结果</span>
-          </div>
-          <p className="text-lg font-bold text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed whitespace-pre-wrap">{encodeData.output || '(无结果)'}</p>
-        </div>
-        {encodeData.error && (
-          <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+        {encodeData.success ? (
+          <div className="max-w-full overflow-x-hidden">
             <div className="mb-1">
-              <span className="text-xs font-medium text-red-500 dark:text-red-400 uppercase tracking-wide">错误</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{operationType}结果</span>
             </div>
-            <p className="text-sm text-red-600 dark:text-red-400 break-words leading-relaxed">{encodeData.error}</p>
+            <p className="text-lg font-bold text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed whitespace-pre-wrap">
+              {encodeData.output.includes(' → ') 
+                ? encodeData.output.split(' → ')[1] 
+                : encodeData.output || '(无结果)'}
+            </p>
+          </div>
+        ) : encodeData.error ? (
+          <div className="max-w-full overflow-x-hidden">
+            <div className="mb-1">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{operationType}结果</span>
+            </div>
+            <p className="text-lg font-bold text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed whitespace-pre-wrap">
+              {encodeData.error}
+            </p>
+          </div>
+        ) : (
+          <div className="max-w-full overflow-x-hidden">
+            <div className="mb-1">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{operationType}结果</span>
+            </div>
+            <p className="text-lg font-bold text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed whitespace-pre-wrap">
+              (无结果)
+            </p>
           </div>
         )}
         <div className="pt-2 border-t border-gray-100 dark:border-gray-700">

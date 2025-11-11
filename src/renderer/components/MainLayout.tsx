@@ -371,8 +371,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             console.log('🔍 [文件搜索] 设置:', { fileSearchEnabled });
 
             // 并行搜索所有类型（统一防抖，确保结果同时返回以便正确排序）
-            // 先获取计算结果，以便决定是否搜索网页
-            const calcResult = finalIsCalculation 
+            // 先尝试编码解码模块（独立模块，优先级高于计算器）
+            let encodeResult = null;
+            if (!isFileSearch && !urlCheck.isURL) {
+              encodeResult = await window.electron.encode.handleQuery(actualQuery).catch(() => null);
+            }
+            
+            // 如果编码解码模块没有处理，再尝试计算器
+            const calcResult = (!encodeResult && finalIsCalculation) 
               ? await window.electron.calculator.calculate(actualQuery).catch((err) => {
                   console.error('计算器计算失败:', err);
                   return null;
@@ -597,10 +603,21 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             const isOnlyKeyword = featureType && actualQuery.trim().toLowerCase() === queryLower && 
                                  (/^(?:bianma|jiema|jiami|jiemi|bm|jm|url|html|base64|md5|encode|decode|编码|解码)$/i.test(queryLower));
             
+            // 检查是否输入了完整的编码解码命令格式（即使没有参数）
+            const isCompleteEncodeCommand = featureType === 'encode' && (
+              /^(?:url|html|base64)\s+(?:encode|decode|编码|解码)$/i.test(actualQuery.trim()) ||
+              /^(?:url|html|base64)(?:encode|decode|编码|解码)$/i.test(actualQuery.trim()) ||
+              /^md5$/i.test(actualQuery.trim())
+            );
+            
+            // 如果有编码解码结果（无论成功还是失败），不显示补全建议
+            const hasEncodeResult = encodeResult !== null;
+            
             const shouldShowFeatureCompletion = featureType && 
                                                !isCommandMode && 
                                                !isFileSearch && 
                                                !urlCheck.isURL &&
+                                               !hasEncodeResult && // 如果有编码解码结果（包括错误），不显示补全
                                                (isOnlyKeyword || !calcResult || !calcResult.success);
             
             // 调试日志
@@ -650,12 +667,25 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               }
               
               // 显示功能补全建议（提高优先级，确保显示在最前面）
-              featureCompletions.forEach((suggestion: any, index: number) => {
+              // 如果输入了完整命令格式，使用过滤后的补全建议
+              const completionsToShow = isCompleteEncodeCommand ? filteredCompletions : featureCompletions;
+              completionsToShow.forEach((suggestion: any, index: number) => {
                 // 提取参数信息（如果有）
                 const formatParts = suggestion.format.split(' ');
                 const hasParams = formatParts.length > 2 || suggestion.format.includes('<');
                 
-                // 根据功能类型选择图标
+                // 根据功能类型选择结果类型和图标
+                const featureTypeMap: Record<string, 'encode' | 'string' | 'time' | 'command'> = {
+                  'encode': 'encode',
+                  'string': 'string',
+                  'time': 'time',
+                  'translate': 'command',
+                  'random': 'command',
+                  'varname': 'command',
+                };
+                const resultType = featureTypeMap[featureType] || 'command';
+                
+                // 根据功能类型选择图标（emoji，用于标题显示）
                 const featureIcons: Record<string, string> = {
                   'encode': '🔐',
                   'translate': '🌐',
@@ -668,7 +698,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                 
                 combinedResults.push({
                   id: `feature-complete-${featureType}-${index}`,
-                  type: 'command' as const,
+                  type: resultType as any,
                   title: `${icon} ${suggestion.format}`,
                   description: hasParams 
                     ? `${suggestion.description} | 示例: ${suggestion.example}` 
@@ -683,7 +713,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               });
               
               // 如果没有补全建议且没有帮助，显示提示
-              if (featureCompletions.length === 0 && !featureHelp) {
+              if (completionsToShow.length === 0 && !featureHelp) {
                 combinedResults.push({
                   id: `feature-no-suggestion-${featureType}`,
                   type: 'command' as const,
@@ -803,6 +833,57 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   },
                 });
               }
+            }
+            
+            // 编码解码结果（独立处理，使用专门的图标）
+            if (encodeResult && encodeResult.success) {
+              // 处理编码解码输出格式（可能包含 "→"）
+              const outputParts = encodeResult.output.split(' → ');
+              const displayOutput = outputParts.length > 1 ? outputParts[1] : encodeResult.output;
+              
+              // 根据查询内容判断操作类型
+              const inputLower = encodeResult.input.toLowerCase();
+              let operationType = '编码解码';
+              if (/decode|解码|jiema|jiemi|jm/.test(inputLower)) {
+                operationType = '解码';
+              } else if (/encode|编码|bianma|jiami|bm/.test(inputLower)) {
+                operationType = '编码';
+              } else if (/md5/.test(inputLower)) {
+                operationType = '加密';
+              }
+              
+              combinedResults.push({
+                id: 'encode-result',
+                type: 'encode' as const,
+                title: displayOutput.trim(),
+                description: `${operationType}：${encodeResult.input}`,
+                action: 'encode:copy',
+                score: 2000,
+                priorityScore: 2000,
+                encodeData: encodeResult,
+              });
+            } else if (encodeResult && !encodeResult.success && encodeResult.error) {
+              // 根据查询内容判断操作类型
+              const inputLower = (encodeResult.input || query).toLowerCase();
+              let operationType = '编码解码';
+              if (/decode|解码|jiema|jiemi|jm/.test(inputLower)) {
+                operationType = '解码';
+              } else if (/encode|编码|bianma|jiami|bm/.test(inputLower)) {
+                operationType = '编码';
+              } else if (/md5/.test(inputLower)) {
+                operationType = '加密';
+              }
+              
+              combinedResults.push({
+                id: 'encode-error',
+                type: 'encode' as const,
+                title: encodeResult.error, // 不显示"错误:"前缀
+                description: `${operationType}：${encodeResult.input || query}`,
+                action: 'encode:copy',
+                score: 1000,
+                priorityScore: 1000,
+                encodeData: encodeResult,
+              });
             }
             
             // 计算器结果（如果有，包括时间查询结果）
@@ -1502,6 +1583,30 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
         } else if (actionParts[1] === 'continue') {
           // 继续输入：不执行操作
           console.log('继续输入功能文本');
+        }
+      }
+      // 处理编码解码结果
+      else if (result.action === 'encode:copy') {
+        // 将编码解码结果复制到剪贴板
+        try {
+          const encodeData = (result as any).encodeData;
+          if (encodeData && encodeData.output) {
+            let textToCopy = encodeData.output;
+            
+            // 如果包含 "→"，只复制转换后的部分
+            if (textToCopy.includes(' → ')) {
+              const parts = textToCopy.split(' → ');
+              if (parts.length === 2) {
+                textToCopy = parts[1].trim();
+              }
+            }
+            
+            await navigator.clipboard.writeText(textToCopy);
+            console.log('Encode result copied:', textToCopy);
+          }
+          hideMainWindow();
+        } catch (error) {
+          console.error('Failed to copy encode result:', error);
         }
       }
       // 处理计算器结果

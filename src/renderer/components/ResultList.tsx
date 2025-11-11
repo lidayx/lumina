@@ -3,7 +3,7 @@ import { highlightText } from '../utils/highlightText';
 
 export interface SearchResult {
   id: string;
-  type: 'app' | 'file' | 'command' | 'web' | 'history';
+  type: 'app' | 'file' | 'command' | 'web' | 'history' | 'encode' | 'string' | 'time';
   title: string;
   description?: string;
   icon?: string;
@@ -16,6 +16,24 @@ export interface SearchResult {
     success: boolean;
     error?: string;
   }; // 计算器结果数据
+  encodeData?: {
+    input: string;
+    output: string;
+    success: boolean;
+    error?: string;
+  }; // 编码解码结果数据
+  stringData?: {
+    input: string;
+    output: string;
+    success: boolean;
+    error?: string;
+  }; // 字符串工具结果数据
+  timeData?: {
+    input: string;
+    output: string;
+    success: boolean;
+    error?: string;
+  }; // 时间工具结果数据
   suggestionData?: any; // 补全建议数据（用于Tab补全）
 }
 
@@ -68,6 +86,39 @@ const getTypeIcon = (type: string) => {
           />
         </svg>
       );
+    case 'encode':
+      return (
+        <svg className="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+          />
+        </svg>
+      );
+    case 'string':
+      return (
+        <svg className="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
+        </svg>
+      );
+    case 'time':
+      return (
+        <svg className="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+      );
     default:
       return (
         <svg className="h-10 w-10" fill="currentColor" viewBox="0 0 24 24">
@@ -87,6 +138,12 @@ const getTypeColor = (type: string) => {
       return 'text-purple-500';
     case 'command':
       return 'text-purple-500';
+    case 'encode':
+      return 'text-green-500';
+    case 'string':
+      return 'text-orange-500';
+    case 'time':
+      return 'text-indigo-500';
     default:
       return 'text-gray-500';
   }

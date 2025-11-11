@@ -15,6 +15,7 @@ import { registerClipboardHandlers } from './handlers/clipboardHandlers';
 import { registerShortcutHandlers } from './handlers/shortcutHandlers';
 import { registerAliasHandlers } from './handlers/aliasHandlers';
 import { registerFeatureCompletionHandlers } from './handlers/featureCompletionHandlers';
+import { registerEncodeHandlers } from './handlers/encodeHandlers';
 import { indexService } from './services/indexService';
 import { appService } from './services/appService';
 import { fileService } from './services/fileService';
@@ -258,14 +259,15 @@ registerWebHandlers();
 registerBrowserHandlers();
 registerWindowHandlers();
 registerCommandHandlers();
-registerCalculatorHandlers();
-registerTimeHandlers();
-registerBookmarkHandlers();
-registerSettingsHandlers();
-registerClipboardHandlers();
-registerShortcutHandlers();
-registerAliasHandlers();
-registerFeatureCompletionHandlers();
+    registerCalculatorHandlers();
+    registerTimeHandlers();
+    registerBookmarkHandlers();
+    registerSettingsHandlers();
+    registerClipboardHandlers();
+    registerShortcutHandlers();
+    registerAliasHandlers();
+    registerFeatureCompletionHandlers();
+    registerEncodeHandlers();
 
 // 初始化服务
 app.on('ready', async () => {

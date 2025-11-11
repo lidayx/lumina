@@ -4,7 +4,6 @@
  */
 
 import { timeService } from './timeService';
-import { encodeService } from './encodeService';
 import { stringService } from './stringService';
 import { randomService } from './randomService';
 import { translateService } from './translateService';
@@ -97,18 +96,7 @@ class CalculatorService {
         return { input: expression, output: expression, success: true };
       }
 
-      // 尝试识别编码解码查询（在时间查询之前，因为编码解码匹配更精确）
-      // 注意：encodeService 内部已检查 featureEncodeDecode 开关
-      const encodeResult = encodeService.handleEncodeQuery(expression);
-      if (encodeResult && encodeResult.success) {
-        // 将 EncodeResult 转换为 CalculationResult
-        return {
-          input: encodeResult.input,
-          output: encodeResult.output,
-          success: encodeResult.success,
-          error: encodeResult.error,
-        };
-      }
+      // 注意：编码解码查询已移至独立的 encodeHandlers，不再通过计算器服务处理
 
       // 尝试识别字符串工具查询
       // 注意：stringService 内部已检查 featureStringTools 开关
