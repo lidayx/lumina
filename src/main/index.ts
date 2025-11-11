@@ -12,12 +12,17 @@ import { registerTimeHandlers } from './handlers/timeHandlers';
 import { registerBookmarkHandlers } from './handlers/bookmarkHandlers';
 import { registerSettingsHandlers } from './handlers/settingsHandlers';
 import { registerClipboardHandlers } from './handlers/clipboardHandlers';
+import { registerShortcutHandlers } from './handlers/shortcutHandlers';
+import { registerAliasHandlers } from './handlers/aliasHandlers';
+import { registerFeatureCompletionHandlers } from './handlers/featureCompletionHandlers';
 import { indexService } from './services/indexService';
 import { appService } from './services/appService';
 import { fileService } from './services/fileService';
 import { trayService } from './services/trayService';
 import bookmarkService from './services/bookmarkService';
 import { clipboardService } from './services/clipboardService';
+import { shortcutService } from './services/shortcutService';
+import { aliasService } from './services/aliasService';
 import { debugLog } from './utils/debugLog';
 
 // 单实例限制：防止同时运行多个应用实例
@@ -258,19 +263,23 @@ registerTimeHandlers();
 registerBookmarkHandlers();
 registerSettingsHandlers();
 registerClipboardHandlers();
+registerShortcutHandlers();
+registerAliasHandlers();
+registerFeatureCompletionHandlers();
 
-// 注册全局快捷键
-app.on('ready', () => {
-  const shortcut = 'Shift+Space';
-  const ret = globalShortcut.register(shortcut, () => {
-    showMainWindow();
+// 初始化服务
+app.on('ready', async () => {
+  // 初始化别名服务
+  await aliasService.initialize();
+  
+  // 初始化并注册全局快捷键
+  shortcutService.initialize();
+  
+  // 监听设置变化，重新注册快捷键
+  // 注意：这里可以通过 IPC 事件来触发重新注册
+  ipcMain.on('settings-updated', () => {
+    shortcutService.loadAndRegister();
   });
-
-  if (!ret) {
-    console.log('全局快捷键注册失败');
-  } else {
-    console.log(`✅ 已注册全局快捷键: ${shortcut}`);
-  }
 
   console.log('Lumina is ready!');
 });

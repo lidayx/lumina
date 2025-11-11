@@ -283,6 +283,10 @@ class TranslateService {
     try {
       // 使用动态 import 以避免打包后的模块解析问题
       const { default: settingsService } = await import('./settingsService');
+      
+      // 等待设置服务加载完成（最多等待 5 秒）
+      await settingsService.waitForLoad(5000);
+      
       const settings = settingsService.getSettings();
       const baiduAppId = (settings.baiduTranslateAppId || '').trim();
       const baiduSecretKey = (settings.baiduTranslateSecretKey || '').trim();
@@ -508,6 +512,94 @@ class TranslateService {
     }
     
     return `翻译失败: ${message}`;
+  }
+
+  /**
+   * 翻译补全（智能建议）
+   * @param partial 部分输入的翻译查询
+   * @returns 匹配的翻译格式建议
+   */
+  public completeTranslate(partial: string): Array<{ format: string; description: string; example: string }> {
+    if (!partial || !partial.trim()) {
+      return [];
+    }
+
+    const query = partial.toLowerCase().trim();
+    const suggestions: Array<{ format: string; description: string; example: string; score: number }> = [];
+
+    // 翻译格式列表
+    const formats = [
+      { format: 'en', description: '翻译为英文', example: 'en 你好', keywords: ['en', '英文', 'english'] },
+      { format: 'zh', description: '翻译为中文', example: 'zh hello world', keywords: ['zh', '中文', 'chinese', 'cn'] },
+      { format: 'translate', description: '自动检测语言翻译', example: 'translate hello world', keywords: ['translate', '翻译'] },
+      { format: '翻译', description: '自动检测语言翻译', example: '翻译 你好世界', keywords: ['翻译', 'translate'] },
+      { format: 'to zh', description: '指定目标语言为中文', example: 'hello to zh', keywords: ['to', '到', 'zh', '中文'] },
+      { format: 'to en', description: '指定目标语言为英文', example: '你好 to en', keywords: ['to', '到', 'en', '英文'] },
+    ];
+
+    // 智能匹配：支持部分输入匹配
+    for (const format of formats) {
+      let score = 0;
+      const formatLower = format.format.toLowerCase();
+      const queryWords = query.split(/\s+/).filter(w => w.length > 0);
+      
+      // 完全匹配（最高优先级）
+      if (formatLower === query) {
+        score = 1000;
+      }
+      // 开头匹配
+      else if (formatLower.startsWith(query)) {
+        score = 500;
+      }
+      // 包含匹配
+      else if (formatLower.includes(query)) {
+        score = 200;
+      }
+      // 关键词匹配
+      else if (queryWords.length > 0) {
+        const matchedKeywords = queryWords.filter(word => 
+          format.keywords.some(kw => kw.toLowerCase().includes(word) || word.includes(kw.toLowerCase()))
+        );
+        if (matchedKeywords.length > 0) {
+          score = 300 + matchedKeywords.length * 50;
+        }
+      }
+      // 描述匹配
+      if (format.description.includes(query)) {
+        score = Math.max(score, 100);
+      }
+
+      if (score > 0) {
+        suggestions.push({ ...format, score });
+      }
+    }
+
+    // 按分数降序排序
+    suggestions.sort((a, b) => b.score - a.score);
+    
+    return suggestions.slice(0, 5).map(({ score, ...rest }) => rest);
+  }
+
+  /**
+   * 获取翻译帮助信息
+   */
+  public getTranslateHelp(): {
+    title: string;
+    description: string;
+    formats: Array<{ format: string; description: string; example: string }>;
+  } {
+    return {
+      title: '翻译功能',
+      description: '支持多语言翻译，自动检测源语言',
+      formats: [
+        { format: 'en <文本>', description: '翻译为英文', example: 'en 你好' },
+        { format: 'zh <文本>', description: '翻译为中文', example: 'zh hello' },
+        { format: 'translate <文本>', description: '自动检测语言翻译', example: 'translate hello world' },
+        { format: '翻译 <文本>', description: '自动检测语言翻译', example: '翻译 你好世界' },
+        { format: '<文本> to <语言>', description: '指定目标语言', example: 'hello to zh' },
+        { format: 'translate <文本> to <语言>', description: '完整格式', example: 'translate hello to zh' },
+      ],
+    };
   }
 }
 

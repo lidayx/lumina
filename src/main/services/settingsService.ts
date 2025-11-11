@@ -55,6 +55,9 @@ export interface AppSettings {
   featureTranslation: boolean; // 翻译功能（默认 true）
   featureVariableName: boolean; // 变量名生成功能（默认 true）
   featureCalculator: boolean; // 计算器功能（默认 true）
+  
+  // 快捷键设置
+  globalShortcut: string; // 全局快捷键（默认 "Shift+Space"）
 }
 
 /**
@@ -95,6 +98,7 @@ class SettingsService {
     featureTranslation: true, // 默认启用翻译功能
     featureVariableName: true, // 默认启用变量名生成功能
     featureCalculator: true, // 默认启用计算器功能
+    globalShortcut: 'Shift+Space', // 默认全局快捷键
   };
 
   // ========== 私有属性 ==========
@@ -109,6 +113,29 @@ class SettingsService {
     this.loadSettings().catch(err => {
       console.error('❌ [设置服务] 初始化加载失败:', err);
     });
+  }
+
+  /**
+   * 检查设置是否已加载
+   */
+  public isLoaded(): boolean {
+    return this.loaded;
+  }
+
+  /**
+   * 等待设置加载完成
+   */
+  public async waitForLoad(maxWait: number = 5000): Promise<void> {
+    if (this.loaded) return;
+    
+    const startTime = Date.now();
+    while (!this.loaded && (Date.now() - startTime) < maxWait) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    if (!this.loaded) {
+      console.warn('⚠️ [设置服务] 等待加载超时');
+    }
   }
 
   /**
@@ -368,6 +395,19 @@ class SettingsService {
           console.log('✅ [设置服务] 已更新剪贴板服务配置');
         } catch (error) {
           console.error('❌ [设置服务] 更新剪贴板配置失败:', error);
+        }
+      });
+    }
+    
+    if ('globalShortcut' in updates) {
+      // 全局快捷键变更时，更新快捷键服务（异步调用）
+      setImmediate(async () => {
+        try {
+          const { shortcutService } = await import('./shortcutService');
+          shortcutService.loadAndRegister();
+          console.log('✅ [设置服务] 已更新全局快捷键');
+        } catch (error) {
+          console.error('❌ [设置服务] 更新快捷键配置失败:', error);
         }
       });
     }

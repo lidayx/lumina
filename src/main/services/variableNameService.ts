@@ -329,6 +329,89 @@ class VariableNameService {
     if (!word) return '';
     return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
   }
+
+  /**
+   * 变量名生成补全（智能建议）
+   */
+  public completeVariableName(partial: string): Array<{ format: string; description: string; example: string }> {
+    if (!partial || !partial.trim()) {
+      return [];
+    }
+
+    const query = partial.toLowerCase().trim();
+    const suggestions: Array<{ format: string; description: string; example: string; score: number }> = [];
+
+    const formats = [
+      { format: 'varname', description: '生成变量名（所有风格）', example: 'varname user name', keywords: ['varname', '变量名'] },
+      { format: '变量名', description: '生成变量名（中文）', example: '变量名 用户名', keywords: ['变量名', 'varname'] },
+      { format: 'camel', description: '生成驼峰命名', example: 'camel user name', keywords: ['camel', '驼峰'] },
+      { format: 'snake', description: '生成蛇形命名', example: 'snake user name', keywords: ['snake', '蛇形'] },
+      { format: 'pascal', description: '生成帕斯卡命名', example: 'pascal user name', keywords: ['pascal', '帕斯卡'] },
+    ];
+
+    // 智能匹配：支持部分输入匹配
+    for (const format of formats) {
+      let score = 0;
+      const formatLower = format.format.toLowerCase();
+      const queryWords = query.split(/\s+/).filter(w => w.length > 0);
+      
+      // 完全匹配（最高优先级）
+      if (formatLower === query) {
+        score = 1000;
+      }
+      // 开头匹配
+      else if (formatLower.startsWith(query)) {
+        score = 500;
+      }
+      // 包含匹配
+      else if (formatLower.includes(query)) {
+        score = 200;
+      }
+      // 关键词匹配
+      else if (queryWords.length > 0) {
+        const matchedKeywords = queryWords.filter(word => 
+          format.keywords.some(kw => kw.toLowerCase().includes(word) || word.includes(kw.toLowerCase()))
+        );
+        if (matchedKeywords.length > 0) {
+          score = 300 + matchedKeywords.length * 50;
+        }
+      }
+      // 描述匹配
+      if (format.description.includes(query)) {
+        score = Math.max(score, 100);
+      }
+
+      if (score > 0) {
+        suggestions.push({ ...format, score });
+      }
+    }
+
+    // 按分数降序排序
+    suggestions.sort((a, b) => b.score - a.score);
+    
+    return suggestions.slice(0, 5).map(({ score, ...rest }) => rest);
+  }
+
+  /**
+   * 获取变量名生成帮助信息
+   */
+  public getVariableNameHelp(): {
+    title: string;
+    description: string;
+    formats: Array<{ format: string; description: string; example: string }>;
+  } {
+    return {
+      title: '变量名生成',
+      description: '根据描述生成多种命名风格的变量名',
+      formats: [
+        { format: 'varname <描述>', description: '生成所有风格的变量名', example: 'varname user name' },
+        { format: '变量名 <描述>', description: '生成变量名（中文）', example: '变量名 用户名' },
+        { format: 'camel <描述>', description: '生成驼峰命名（camelCase）', example: 'camel user name' },
+        { format: 'snake <描述>', description: '生成蛇形命名（snake_case）', example: 'snake user name' },
+        { format: 'pascal <描述>', description: '生成帕斯卡命名（PascalCase）', example: 'pascal user name' },
+      ],
+    };
+  }
 }
 
 // ========== 导出 ==========

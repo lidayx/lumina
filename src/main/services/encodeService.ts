@@ -331,6 +331,123 @@ class EncodeService {
       };
     }
   }
+
+  /**
+   * 编码解码补全（智能建议）
+   */
+  public completeEncode(partial: string): Array<{ format: string; description: string; example: string }> {
+    if (!partial || !partial.trim()) {
+      return [];
+    }
+
+    const query = partial.toLowerCase().trim();
+    const suggestions: Array<{ format: string; description: string; example: string; score: number }> = [];
+
+    const formats = [
+      { format: 'url encode', description: 'URL 编码', example: 'url encode hello world', keywords: ['url', 'encode', '编码', 'en'] },
+      { format: 'url decode', description: 'URL 解码', example: 'url decode hello%20world', keywords: ['url', 'decode', '解码', 'de'] },
+      { format: 'html encode', description: 'HTML 编码', example: 'html encode <div>', keywords: ['html', 'encode', '编码', 'en'] },
+      { format: 'html decode', description: 'HTML 解码', example: 'html decode &lt;div&gt;', keywords: ['html', 'decode', '解码', 'de'] },
+      { format: 'base64 encode', description: 'Base64 编码', example: 'base64 encode hello', keywords: ['base64', 'encode', '编码', 'en'] },
+      { format: 'base64 decode', description: 'Base64 解码', example: 'base64 decode aGVsbG8=', keywords: ['base64', 'decode', '解码', 'de'] },
+      { format: 'md5', description: 'MD5 加密', example: 'md5 hello world', keywords: ['md5', '加密'] },
+    ];
+
+    // 智能匹配：支持部分输入匹配
+    for (const format of formats) {
+      let score = 0;
+      const formatLower = format.format.toLowerCase();
+      const queryWords = query.split(/\s+/).filter(w => w.length > 0);
+      
+      // 完全匹配（最高优先级）
+      if (formatLower === query) {
+        score = 1000;
+      }
+      // 开头匹配（例如："url en" 匹配 "url encode"）
+      else if (formatLower.startsWith(query)) {
+        score = 500;
+      }
+      // 格式包含查询（例如："url en" 在 "url encode" 中）
+      else if (formatLower.includes(query)) {
+        score = 200;
+      }
+      // 智能匹配：查询以格式的第一个词开头，且后续词部分匹配
+      // 例如："url e" 匹配 "url encode"
+      else if (queryWords.length > 0) {
+        const formatWords = formatLower.split(/\s+/);
+        const formatFirstWord = formatWords[0];
+        
+        // 检查查询是否以格式的第一个词开头
+        if (queryWords[0] === formatFirstWord || query.startsWith(formatFirstWord)) {
+          // 如果查询只有一个词，且匹配格式的第一个词，给高分
+          if (queryWords.length === 1 && queryWords[0] === formatFirstWord) {
+            score = 450;
+          }
+          // 如果查询有多个词，检查后续词是否匹配格式的后续词
+          else if (queryWords.length > 1) {
+            const querySecondWord = queryWords[1];
+            const matchedSecondWord = formatWords.slice(1).some(fw => 
+              fw.startsWith(querySecondWord) || querySecondWord.startsWith(fw)
+            );
+            if (matchedSecondWord) {
+              score = 450;
+            } else {
+              // 即使第二个词不完全匹配，只要第一个词匹配就给分
+              score = 350;
+            }
+          } else {
+            score = 350;
+          }
+        }
+      }
+      
+      // 关键词匹配：检查查询中的每个词是否匹配格式的关键词
+      if (queryWords.length > 0 && score === 0) {
+        const matchedKeywords = queryWords.filter(word => 
+          format.keywords.some(kw => kw.toLowerCase().includes(word) || word.includes(kw.toLowerCase()))
+        );
+        if (matchedKeywords.length > 0) {
+          score = 300 + matchedKeywords.length * 50;
+        }
+      }
+      // 描述匹配
+      if (format.description.includes(query)) {
+        score = Math.max(score, 100);
+      }
+
+      if (score > 0) {
+        suggestions.push({ ...format, score });
+      }
+    }
+
+    // 按分数降序排序
+    suggestions.sort((a, b) => b.score - a.score);
+    
+    return suggestions.slice(0, 5).map(({ score, ...rest }) => rest);
+  }
+
+  /**
+   * 获取编码解码帮助信息
+   */
+  public getEncodeHelp(): {
+    title: string;
+    description: string;
+    formats: Array<{ format: string; description: string; example: string }>;
+  } {
+    return {
+      title: '编码解码',
+      description: '支持 URL、HTML、Base64 编码/解码和 MD5 加密',
+      formats: [
+        { format: 'url encode <文本>', description: 'URL 编码', example: 'url encode hello world' },
+        { format: 'url decode <文本>', description: 'URL 解码', example: 'url decode hello%20world' },
+        { format: 'html encode <文本>', description: 'HTML 编码', example: 'html encode <div>' },
+        { format: 'html decode <文本>', description: 'HTML 解码', example: 'html decode &lt;div&gt;' },
+        { format: 'base64 encode <文本>', description: 'Base64 编码', example: 'base64 encode hello' },
+        { format: 'base64 decode <文本>', description: 'Base64 解码', example: 'base64 decode aGVsbG8=' },
+        { format: 'md5 <文本>', description: 'MD5 加密', example: 'md5 hello world' },
+      ],
+    };
+  }
 }
 
 export const encodeService = new EncodeService();

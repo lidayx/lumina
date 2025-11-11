@@ -878,6 +878,92 @@ class TimeService {
     
     return parts.join(' ') + `\n总计: ${ms}毫秒`;
   }
+
+  /**
+   * 时间工具补全（智能建议）
+   */
+  public completeTime(partial: string): Array<{ format: string; description: string; example: string }> {
+    if (!partial || !partial.trim()) {
+      return [];
+    }
+
+    const query = partial.toLowerCase().trim();
+    const suggestions: Array<{ format: string; description: string; example: string; score: number }> = [];
+
+    const formats = [
+      { format: 'time', description: '显示当前时间', example: 'time', keywords: ['time', '时间'] },
+      { format: '时间', description: '显示当前时间（中文）', example: '时间', keywords: ['时间', 'time'] },
+      { format: 'timestamp', description: '时间戳转日期', example: 'timestamp 1705312245', keywords: ['timestamp', '时间戳'] },
+      { format: 'to timestamp', description: '日期转时间戳', example: '2024-01-15 to timestamp', keywords: ['to', '到', 'timestamp', '时间戳'] },
+      { format: '时间差', description: '计算时间差', example: '2024-01-15 - 2024-01-10', keywords: ['时间差', 'difference', '-'] },
+      { format: '时间加减', description: '时间加减', example: '2024-01-15 + 2 days', keywords: ['时间加减', 'add', 'subtract', '+', '-'] },
+      { format: '时区转换', description: '时区转换', example: '2024-01-15 to UTC', keywords: ['时区', 'timezone', 'to', '到'] },
+    ];
+
+    // 智能匹配：支持部分输入匹配
+    for (const format of formats) {
+      let score = 0;
+      const formatLower = format.format.toLowerCase();
+      const queryWords = query.split(/\s+/).filter(w => w.length > 0);
+      
+      // 完全匹配（最高优先级）
+      if (formatLower === query) {
+        score = 1000;
+      }
+      // 开头匹配
+      else if (formatLower.startsWith(query)) {
+        score = 500;
+      }
+      // 包含匹配
+      else if (formatLower.includes(query)) {
+        score = 200;
+      }
+      // 关键词匹配
+      else if (queryWords.length > 0) {
+        const matchedKeywords = queryWords.filter(word => 
+          format.keywords.some(kw => kw.toLowerCase().includes(word) || word.includes(kw.toLowerCase()))
+        );
+        if (matchedKeywords.length > 0) {
+          score = 300 + matchedKeywords.length * 50;
+        }
+      }
+      // 描述匹配
+      if (format.description.includes(query)) {
+        score = Math.max(score, 100);
+      }
+
+      if (score > 0) {
+        suggestions.push({ ...format, score });
+      }
+    }
+
+    // 按分数降序排序
+    suggestions.sort((a, b) => b.score - a.score);
+    
+    return suggestions.slice(0, 5).map(({ score, ...rest }) => rest);
+  }
+
+  /**
+   * 获取时间工具帮助信息
+   */
+  public getTimeHelp(): {
+    title: string;
+    description: string;
+    formats: Array<{ format: string; description: string; example: string }>;
+  } {
+    return {
+      title: '时间工具',
+      description: '支持时间查询、时间戳转换、时间计算、时区转换',
+      formats: [
+        { format: 'time', description: '显示当前时间（多种格式）', example: 'time 或 时间' },
+        { format: 'timestamp <时间戳>', description: '时间戳转日期', example: 'timestamp 1705312245' },
+        { format: '<日期> to timestamp', description: '日期转时间戳', example: '2024-01-15 to timestamp' },
+        { format: '<日期1> - <日期2>', description: '计算时间差', example: '2024-01-15 - 2024-01-10' },
+        { format: '<日期> + <时长>', description: '时间加减', example: '2024-01-15 + 2 days' },
+        { format: '<日期> to <时区>', description: '时区转换', example: '2024-01-15 to UTC' },
+      ],
+    };
+  }
 }
 
 export const timeService = new TimeService();

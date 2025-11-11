@@ -66,5 +66,25 @@ export function registerCommandHandlers() {
       throw error;
     }
   });
+
+  // 命令补全
+  ipcMain.handle('command-complete', async (_event, partial: string) => {
+    try {
+      return commandService.completeCommand(partial);
+    } catch (error) {
+      console.error('命令补全失败:', error);
+      throw error;
+    }
+  });
+
+  // 获取命令帮助
+  ipcMain.handle('command-help', async (_event, commandId: string) => {
+    try {
+      return commandService.getCommandHelp(commandId);
+    } catch (error) {
+      console.error('获取命令帮助失败:', error);
+      throw error;
+    }
+  });
 }
 

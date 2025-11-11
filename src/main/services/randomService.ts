@@ -42,33 +42,33 @@ class RandomService {
 
       // 2. 检测 UUID 生成
       if (settings.featureUuidGeneration !== false) {
-        const uuidResult = this.handleUuid(trimmedQuery);
-        if (uuidResult) {
-          return uuidResult;
+      const uuidResult = this.handleUuid(trimmedQuery);
+      if (uuidResult) {
+        return uuidResult;
         }
       }
 
       // 3. 检测随机字符串
       if (settings.featureRandomString !== false) {
-        const randomStringResult = this.handleRandomString(trimmedQuery);
-        if (randomStringResult) {
-          return randomStringResult;
+      const randomStringResult = this.handleRandomString(trimmedQuery);
+      if (randomStringResult) {
+        return randomStringResult;
         }
       }
 
       // 4. 检测随机密码（旧格式：random password）
       if (settings.featureRandomPassword !== false) {
-        const randomPasswordResult = this.handleRandomPassword(trimmedQuery);
-        if (randomPasswordResult) {
-          return randomPasswordResult;
+      const randomPasswordResult = this.handleRandomPassword(trimmedQuery);
+      if (randomPasswordResult) {
+        return randomPasswordResult;
         }
       }
 
       // 5. 检测随机数字
       if (settings.featureRandomNumber !== false) {
-        const randomNumberResult = this.handleRandomNumber(trimmedQuery);
-        if (randomNumberResult) {
-          return randomNumberResult;
+      const randomNumberResult = this.handleRandomNumber(trimmedQuery);
+      if (randomNumberResult) {
+        return randomNumberResult;
         }
       }
 
@@ -612,6 +612,96 @@ class RandomService {
         error: `随机数字生成失败: ${error.message}`,
       };
     }
+  }
+
+  /**
+   * 随机数生成补全（智能建议）
+   * @param partial 部分输入的查询
+   * @returns 匹配的格式建议
+   */
+  public completeRandom(partial: string): Array<{ format: string; description: string; example: string }> {
+    if (!partial || !partial.trim()) {
+      return [];
+    }
+
+    const query = partial.toLowerCase().trim();
+    const suggestions: Array<{ format: string; description: string; example: string; score: number }> = [];
+
+    // 随机数生成格式列表
+    const formats = [
+      { format: 'pwd', description: '生成密码（默认10个，长度16）', example: 'pwd', keywords: ['pwd', 'password', '密码'] },
+      { format: 'pwd <长度>', description: '生成指定长度的密码', example: 'pwd 20', keywords: ['pwd', 'password', '密码', '长度'] },
+      { format: 'password', description: '生成密码（同 pwd）', example: 'password', keywords: ['password', 'pwd', '密码'] },
+      { format: '密码', description: '生成密码（中文）', example: '密码 16', keywords: ['密码', 'pwd', 'password'] },
+      { format: 'uuid', description: '生成 UUID v4', example: 'uuid', keywords: ['uuid'] },
+      { format: 'uuid v1', description: '生成 UUID v1', example: 'uuid v1', keywords: ['uuid', 'v1'] },
+      { format: 'random string', description: '生成随机字符串', example: 'random string 10', keywords: ['random', 'string', '字符串'] },
+      { format: 'random number', description: '生成随机数字', example: 'random number 1-100', keywords: ['random', 'number', '数字'] },
+    ];
+
+    // 智能匹配：支持部分输入匹配
+    for (const format of formats) {
+      let score = 0;
+      const formatLower = format.format.toLowerCase();
+      const queryWords = query.split(/\s+/).filter(w => w.length > 0);
+      
+      // 完全匹配（最高优先级）
+      if (formatLower === query || formatLower.replace(/<[^>]+>/g, '').trim() === query) {
+        score = 1000;
+      }
+      // 开头匹配
+      else if (formatLower.startsWith(query) || formatLower.replace(/<[^>]+>/g, '').trim().startsWith(query)) {
+        score = 500;
+      }
+      // 包含匹配
+      else if (formatLower.includes(query)) {
+        score = 200;
+      }
+      // 关键词匹配
+      else if (queryWords.length > 0) {
+        const matchedKeywords = queryWords.filter(word => 
+          format.keywords.some(kw => kw.toLowerCase().includes(word) || word.includes(kw.toLowerCase()))
+        );
+        if (matchedKeywords.length > 0) {
+          score = 300 + matchedKeywords.length * 50;
+        }
+      }
+      // 描述匹配
+      if (format.description.includes(query)) {
+        score = Math.max(score, 100);
+      }
+
+      if (score > 0) {
+        suggestions.push({ ...format, score });
+      }
+    }
+
+    // 按分数降序排序
+    suggestions.sort((a, b) => b.score - a.score);
+    
+    return suggestions.slice(0, 5).map(({ score, ...rest }) => rest);
+  }
+
+  /**
+   * 获取随机数生成帮助信息
+   */
+  public getRandomHelp(): {
+    title: string;
+    description: string;
+    formats: Array<{ format: string; description: string; example: string }>;
+  } {
+    return {
+      title: '随机数生成',
+      description: '支持密码、UUID、随机字符串、随机数字生成',
+      formats: [
+        { format: 'pwd [长度]', description: '生成密码（默认10个，长度16）', example: 'pwd 或 pwd 20' },
+        { format: 'password [长度]', description: '生成密码（同 pwd）', example: 'password 16' },
+        { format: '密码 [长度]', description: '生成密码（中文）', example: '密码 20' },
+        { format: 'uuid [v1|v4]', description: '生成 UUID', example: 'uuid 或 uuid v1' },
+        { format: 'random string <长度>', description: '生成随机字符串', example: 'random string 10' },
+        { format: 'random number <最小值>-<最大值>', description: '生成随机数字', example: 'random number 1-100' },
+      ],
+    };
   }
 }
 

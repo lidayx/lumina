@@ -546,6 +546,97 @@ class StringService {
       };
     }
   }
+
+  /**
+   * 字符串工具补全（智能建议）
+   */
+  public completeString(partial: string): Array<{ format: string; description: string; example: string }> {
+    if (!partial || !partial.trim()) {
+      return [];
+    }
+
+    const query = partial.toLowerCase().trim();
+    const suggestions: Array<{ format: string; description: string; example: string; score: number }> = [];
+
+    const formats = [
+      { format: 'uppercase', description: '转换为大写', example: 'uppercase hello world', keywords: ['uppercase', '大写'] },
+      { format: 'lowercase', description: '转换为小写', example: 'lowercase HELLO WORLD', keywords: ['lowercase', '小写'] },
+      { format: 'title case', description: '转换为标题格式', example: 'title case hello world', keywords: ['title', '标题'] },
+      { format: 'camel case', description: '转换为驼峰命名', example: 'camel case hello world', keywords: ['camel', '驼峰'] },
+      { format: 'snake case', description: '转换为蛇形命名', example: 'snake case hello world', keywords: ['snake', '蛇形'] },
+      { format: 'reverse', description: '反转字符串', example: 'reverse hello', keywords: ['reverse', '反转'] },
+      { format: 'trim', description: '去除空格', example: 'trim  hello  ', keywords: ['trim', '去除'] },
+      { format: 'count', description: '统计字符数', example: 'count hello world', keywords: ['count', '统计'] },
+      { format: 'replace', description: '替换字符串', example: 'replace hello world hello hi', keywords: ['replace', '替换'] },
+    ];
+
+    // 智能匹配：支持部分输入匹配
+    for (const format of formats) {
+      let score = 0;
+      const formatLower = format.format.toLowerCase();
+      const queryWords = query.split(/\s+/).filter(w => w.length > 0);
+      
+      // 完全匹配（最高优先级）
+      if (formatLower === query) {
+        score = 1000;
+      }
+      // 开头匹配
+      else if (formatLower.startsWith(query)) {
+        score = 500;
+      }
+      // 包含匹配
+      else if (formatLower.includes(query)) {
+        score = 200;
+      }
+      // 关键词匹配
+      else if (queryWords.length > 0) {
+        const matchedKeywords = queryWords.filter(word => 
+          format.keywords.some(kw => kw.toLowerCase().includes(word) || word.includes(kw.toLowerCase()))
+        );
+        if (matchedKeywords.length > 0) {
+          score = 300 + matchedKeywords.length * 50;
+        }
+      }
+      // 描述匹配
+      if (format.description.includes(query)) {
+        score = Math.max(score, 100);
+      }
+
+      if (score > 0) {
+        suggestions.push({ ...format, score });
+      }
+    }
+
+    // 按分数降序排序
+    suggestions.sort((a, b) => b.score - a.score);
+    
+    return suggestions.slice(0, 5).map(({ score, ...rest }) => rest);
+  }
+
+  /**
+   * 获取字符串工具帮助信息
+   */
+  public getStringHelp(): {
+    title: string;
+    description: string;
+    formats: Array<{ format: string; description: string; example: string }>;
+  } {
+    return {
+      title: '字符串工具',
+      description: '支持大小写转换、命名格式转换、字符串操作等',
+      formats: [
+        { format: 'uppercase <文本>', description: '转换为大写', example: 'uppercase hello' },
+        { format: 'lowercase <文本>', description: '转换为小写', example: 'lowercase HELLO' },
+        { format: 'title case <文本>', description: '转换为标题格式', example: 'title case hello world' },
+        { format: 'camel case <文本>', description: '转换为驼峰命名', example: 'camel case hello world' },
+        { format: 'snake case <文本>', description: '转换为蛇形命名', example: 'snake case hello world' },
+        { format: 'reverse <文本>', description: '反转字符串', example: 'reverse hello' },
+        { format: 'trim <文本>', description: '去除首尾空格', example: 'trim  hello  ' },
+        { format: 'count <文本>', description: '统计字符数、单词数', example: 'count hello world' },
+        { format: 'replace <文本> <旧> <新>', description: '替换字符串', example: 'replace hello world hello hi' },
+      ],
+    };
+  }
 }
 
 export const stringService = new StringService();

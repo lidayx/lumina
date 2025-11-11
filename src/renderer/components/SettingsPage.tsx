@@ -23,7 +23,7 @@ const CommandItem: React.FC<CommandItemProps> = ({ name, shortcut, description }
   </div>
 );
 
-type TabType = 'browser' | 'search-engines' | 'file' | 'general' | 'translate' | 'clipboard' | 'password' | 'help' | 'shortcuts';
+type TabType = 'browser' | 'search-engines' | 'file' | 'general' | 'translate' | 'clipboard' | 'password' | 'help' | 'shortcuts' | 'aliases';
 
 export const SettingsPage: React.FC<SettingsPageProps> = () => {
   const [activeTab, setActiveTab] = useState<TabType>('general');
@@ -44,11 +44,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
   const [fileSearchPaths, setFileSearchPaths] = useState<string[]>([]);
   const [newFilePath, setNewFilePath] = useState('');
   const [logFilePath, setLogFilePath] = useState<string>('');
+  const [aliases, setAliases] = useState<any[]>([]);
+  const [isAddingAlias, setIsAddingAlias] = useState(false);
+  const [editingAlias, setEditingAlias] = useState<any>(null);
+  const [newAliasName, setNewAliasName] = useState('');
+  const [newAliasCommand, setNewAliasCommand] = useState('');
+  const [newAliasType, setNewAliasType] = useState<'app' | 'web' | 'command' | 'search'>('app');
+  const [newAliasDescription, setNewAliasDescription] = useState('');
   
   useEffect(() => {
     loadBrowsers();
     loadSearchEngines();
     loadSettings();
+    loadAliases();
     
     // 监听来自主进程的标签切换消息
     const handleTabSwitch = (tab: TabType) => {
@@ -61,6 +69,92 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       window.electron.removeListener('settings-switch-tab', handleTabSwitch);
     };
   }, []);
+
+  const loadAliases = async () => {
+    try {
+      const result = await window.electron.alias.getAll();
+      setAliases(result || []);
+    } catch (error) {
+      console.error('加载别名列表失败:', error);
+    }
+  };
+
+  const handleSaveAlias = async () => {
+    if (!newAliasName.trim() || !newAliasCommand.trim()) {
+      alert('请输入别名和命令');
+      return;
+    }
+
+    try {
+      if (editingAlias) {
+        // 更新别名
+        const { success } = await window.electron.alias.update(editingAlias.name, {
+          command: newAliasCommand,
+          type: newAliasType,
+          description: newAliasDescription || undefined,
+        });
+        if (success) {
+          await loadAliases();
+          handleCancelAlias();
+        } else {
+          alert('更新别名失败');
+        }
+      } else {
+        // 添加新别名
+        const { success, error } = await window.electron.alias.add(
+          newAliasName,
+          newAliasCommand,
+          newAliasType,
+          newAliasDescription || undefined
+        );
+        if (success) {
+          await loadAliases();
+          handleCancelAlias();
+        } else {
+          alert(error || '添加别名失败');
+        }
+      }
+    } catch (error) {
+      console.error('保存别名失败:', error);
+      alert('保存别名失败');
+    }
+  };
+
+  const handleCancelAlias = () => {
+    setIsAddingAlias(false);
+    setEditingAlias(null);
+    setNewAliasName('');
+    setNewAliasCommand('');
+    setNewAliasType('app');
+    setNewAliasDescription('');
+  };
+
+  const handleEditAlias = (alias: any) => {
+    setEditingAlias(alias);
+    setNewAliasName(alias.name);
+    setNewAliasCommand(alias.command);
+    setNewAliasType(alias.type);
+    setNewAliasDescription(alias.description || '');
+    setIsAddingAlias(true);
+  };
+
+  const handleDeleteAlias = async (name: string) => {
+    if (!confirm(`确定要删除别名 "${name}" 吗？`)) {
+      return;
+    }
+
+    try {
+      const { success } = await window.electron.alias.remove(name);
+      if (success) {
+        await loadAliases();
+      } else {
+        alert('删除别名失败');
+      }
+    } catch (error) {
+      console.error('删除别名失败:', error);
+      alert('删除别名失败');
+    }
+  };
   
   const loadSettings = async () => {
     try {
@@ -97,6 +191,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       // 如果关闭了翻译功能，且当前在翻译设置页面，切换到通用设置
       if (key === 'featureTranslation' && value === false && activeTab === 'translate') {
         setActiveTab('general');
+      }
+      
+      // 如果更新了全局快捷键，通知主进程重新注册（settingsService 也会处理，这里作为双重保障）
+      if (key === 'globalShortcut') {
+        try {
+          await window.electron.shortcut.set(value);
+        } catch (error) {
+          console.error('更新快捷键失败:', error);
+        }
       }
     } catch (error) {
       console.error('更新设置失败:', error);
@@ -453,6 +556,38 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 </div>
               </button>
             )}
+            
+            <button
+              onClick={() => setActiveTab('shortcuts')}
+              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                activeTab === 'shortcuts'
+                  ? 'bg-blue-50 text-blue-700 font-medium'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center">
+                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+                快捷键设置
+              </div>
+            </button>
+            
+            <button
+              onClick={() => setActiveTab('aliases')}
+              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                activeTab === 'aliases'
+                  ? 'bg-blue-50 text-blue-700 font-medium'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center">
+                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                命令别名
+              </div>
+            </button>
             
             <button
               onClick={() => setActiveTab('help')}
@@ -1235,8 +1370,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   <h3 className="text-lg font-medium mb-4">其他设置</h3>
                   <div className="space-y-4">
                     <div className="text-sm text-gray-600">
-                      <p className="mb-2">全局快捷键：<span className="font-mono bg-gray-100 px-2 py-1 rounded">Shift+Space</span></p>
-                      <p className="text-gray-500">快捷键已固定为 Shift+Space</p>
+                      <p className="mb-2">全局快捷键：<span className="font-mono bg-gray-100 px-2 py-1 rounded">{appSettings.globalShortcut || 'Shift+Space'}</span></p>
+                      <p className="text-gray-500">可在"快捷键设置"标签页中自定义</p>
                     </div>
                     
                     <div className="pt-4 border-t border-gray-200">
@@ -1265,20 +1400,310 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
 
           {activeTab === 'shortcuts' && (
             <div>
-              <h2 className="text-2xl font-bold mb-2">快捷键</h2>
-              <p className="text-gray-600 mb-6">查看和自定义快捷键</p>
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center py-3 border-b border-gray-200">
+              <h2 className="text-2xl font-bold mb-2">快捷键设置</h2>
+              <p className="text-gray-600 mb-6">自定义全局快捷键</p>
+              
+              {/* 全局快捷键设置 */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                <div className="p-6">
+                  <h3 className="text-lg font-medium mb-4">全局快捷键</h3>
+                  <div className="space-y-4">
                     <div>
-                      <div className="font-medium">打开搜索</div>
-                      <div className="text-sm text-gray-500">启动或切换主窗口</div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        打开搜索窗口
+                      </label>
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="text"
+                          id="shortcut-input"
+                          value={appSettings.globalShortcut || 'Shift+Space'}
+                          onChange={() => {
+                            // 允许手动输入，但不自动保存
+                            // 用户可以通过按下快捷键或手动输入后按 Enter 来保存
+                          }}
+                          onKeyDown={async (e) => {
+                            const input = e.target as HTMLInputElement;
+                            
+                            // 如果按下了修饰键，说明用户想要捕获快捷键
+                            if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) {
+                              e.preventDefault();
+                              const parts: string[] = [];
+                              
+                              // 检测修饰键
+                              // macOS: metaKey = Command, altKey = Option
+                              // Windows/Linux: metaKey = Windows key, ctrlKey = Control, altKey = Alt
+                              const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+                              if (e.metaKey) parts.push(isMac ? 'Command' : 'Control');
+                              if (e.ctrlKey && !isMac) parts.push('Control'); // macOS 上 ctrlKey 通常不使用
+                              if (e.altKey) parts.push(isMac ? 'Option' : 'Alt');
+                              if (e.shiftKey) parts.push('Shift');
+                              
+                              // 检测普通键
+                              if (e.key && e.key.length === 1 && /[A-Z0-9]/.test(e.key.toUpperCase())) {
+                                parts.push(e.key.toUpperCase());
+                              } else if (e.key === ' ') {
+                                parts.push('Space');
+                              } else if (e.key === 'Enter' || e.key === 'Return') {
+                                parts.push('Enter');
+                              } else if (e.key === 'Tab') {
+                                parts.push('Tab');
+                              } else if (e.key === 'Escape' || e.key === 'Esc') {
+                                parts.push('Escape');
+                              } else if (e.key.startsWith('F') && /^F[1-9]|F1[0-2]$/.test(e.key)) {
+                                parts.push(e.key);
+                              } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                                parts.push(e.key.replace('Arrow', ''));
+                              } else if (e.key === 'Backspace') {
+                                parts.push('Backspace');
+                              } else if (e.key === 'Delete') {
+                                parts.push('Delete');
+                              }
+                              
+                              // 如果有修饰键和普通键，组合成快捷键
+                              if (parts.length >= 2) {
+                                const newShortcut = parts.join('+');
+                                input.value = newShortcut;
+                                
+                                // 自动保存
+                                try {
+                                  const { available } = await window.electron.shortcut.checkAvailable(newShortcut);
+                                  if (!available && newShortcut !== (appSettings.globalShortcut || 'Shift+Space')) {
+                                    alert('该快捷键已被占用，请选择其他快捷键');
+                                    return;
+                                  }
+                                  const { success } = await window.electron.shortcut.set(newShortcut);
+                                  if (success) {
+                                    await updateSetting('globalShortcut', newShortcut);
+                                    // 不显示 alert，避免打断用户体验
+                                  } else {
+                                    alert('快捷键设置失败，请检查格式');
+                                  }
+                                } catch (error) {
+                                  console.error('设置快捷键失败:', error);
+                                  alert('设置快捷键失败');
+                                }
+                              }
+                            } else if (e.key === 'Enter') {
+                              // 手动输入后按 Enter 保存
+                              e.preventDefault();
+                              const newShortcut = input.value.trim();
+                              if (newShortcut && newShortcut !== (appSettings.globalShortcut || 'Shift+Space')) {
+                                try {
+                                  const { available } = await window.electron.shortcut.checkAvailable(newShortcut);
+                                  if (!available) {
+                                    alert('该快捷键已被占用，请选择其他快捷键');
+                                    return;
+                                  }
+                                  const { success } = await window.electron.shortcut.set(newShortcut);
+                                  if (success) {
+                                    await updateSetting('globalShortcut', newShortcut);
+                                    alert('快捷键设置成功！');
+                                  } else {
+                                    alert('快捷键设置失败，请检查格式');
+                                  }
+                                } catch (error) {
+                                  console.error('设置快捷键失败:', error);
+                                  alert('设置快捷键失败');
+                                }
+                              }
+                            }
+                          }}
+                          placeholder="点击输入框后按下快捷键，或手动输入（例如: Shift+Space）"
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                        />
+                        <button
+                          onClick={async () => {
+                            try {
+                              const { shortcut, formatted } = await window.electron.shortcut.getCurrent();
+                              if (shortcut) {
+                                alert(`当前快捷键: ${formatted || shortcut}`);
+                              } else {
+                                alert('当前未设置快捷键');
+                              }
+                            } catch (error) {
+                              console.error('获取快捷键失败:', error);
+                            }
+                          }}
+                          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                        >
+                          查看当前
+                        </button>
+                      </div>
+                      <p className="mt-2 text-sm text-gray-500">
+                        💡 提示：点击输入框后直接按下快捷键即可自动设置，或手动输入格式（例如: Shift+Space, Ctrl+Shift+K）
+                      </p>
+                      <p className="mt-1 text-sm text-gray-500">
+                        支持的修饰键：Shift, Ctrl, Alt, Option, Command/Cmd, Super, Meta
+                      </p>
                     </div>
-                    <kbd className="px-3 py-1.5 bg-gray-100 rounded text-sm font-mono">
-                      ⌘ Space
-                    </kbd>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'aliases' && (
+            <div>
+              <h2 className="text-2xl font-bold mb-2">命令别名</h2>
+              <p className="text-gray-600 mb-6">为常用应用、命令或搜索设置快捷别名</p>
+              
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium">别名列表</h3>
+                    <button
+                      onClick={() => {
+                        handleCancelAlias();
+                        setIsAddingAlias(true);
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                    >
+                      + 添加别名
+                    </button>
+                  </div>
+
+                  {/* 别名列表 */}
+                  {aliases.length > 0 ? (
+                    <div className="space-y-2">
+                      {aliases.map((alias) => (
+                        <div key={alias.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-mono font-medium text-blue-600">{alias.name}</span>
+                              <span className="text-gray-400">→</span>
+                              <span className="text-gray-700">{alias.command}</span>
+                              <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
+                                {alias.type}
+                              </span>
+                            </div>
+                            {alias.description && (
+                              <div className="text-sm text-gray-500 mt-1">{alias.description}</div>
+                            )}
+                            <div className="text-xs text-gray-400 mt-1">使用 {alias.useCount || 0} 次</div>
+                          </div>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleEditAlias(alias)}
+                              className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            >
+                              编辑
+                            </button>
+                            <button
+                              onClick={() => handleDeleteAlias(alias.name)}
+                              className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              删除
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      暂无别名，点击"添加别名"创建第一个别名
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 添加/编辑别名 */}
+              {isAddingAlias && (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                  <div className="p-6">
+                    <h3 className="text-lg font-medium mb-4">
+                      {editingAlias ? '编辑别名' : '添加别名'}
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          别名 <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="例如: g, c, chrome"
+                          value={newAliasName}
+                          onChange={(e) => setNewAliasName(e.target.value)}
+                          disabled={!!editingAlias}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                        />
+                        <p className="mt-1 text-sm text-gray-500">简短易记的别名，用于快速访问</p>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          命令 <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="例如: google, chrome, 或完整的搜索命令"
+                          value={newAliasCommand}
+                          onChange={(e) => setNewAliasCommand(e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                        <p className="mt-1 text-sm text-gray-500">实际执行的命令或应用名称</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          类型
+                        </label>
+                        <select
+                          value={newAliasType}
+                          onChange={(e) => setNewAliasType(e.target.value as any)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="app">应用</option>
+                          <option value="web">网页搜索</option>
+                          <option value="command">命令</option>
+                          <option value="search">搜索</option>
+                        </select>
+                        <p className="mt-1 text-sm text-gray-500">
+                          app: 启动应用 | web: 网页搜索（支持命令链，如 "g 搜索词"）| command: 系统命令 | search: 通用搜索
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          描述 <span className="text-gray-400">(选填)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="例如: 打开 Google 搜索"
+                          value={newAliasDescription}
+                          onChange={(e) => setNewAliasDescription(e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+
+                      <div className="flex space-x-3 pt-4">
+                        <button
+                          onClick={handleSaveAlias}
+                          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                        >
+                          {editingAlias ? '保存' : '添加'}
+                        </button>
+                        <button
+                          onClick={handleCancelAlias}
+                          className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 使用说明 */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+                <h3 className="text-sm font-medium text-blue-900 mb-2">使用说明</h3>
+                <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                  <li>别名用于快速访问常用应用、命令或搜索</li>
+                  <li>例如：设置别名 <code className="px-1 py-0.5 bg-blue-100 rounded text-xs">g</code> → <code className="px-1 py-0.5 bg-blue-100 rounded text-xs">google</code></li>
+                  <li>输入 <code className="px-1 py-0.5 bg-blue-100 rounded text-xs">g</code> 可快速打开 Google</li>
+                  <li>输入 <code className="px-1 py-0.5 bg-blue-100 rounded text-xs">g 搜索词</code> 可在 Google 搜索（命令链功能）</li>
+                  <li>网页搜索类型支持命令链，应用类型不支持参数</li>
+                </ul>
               </div>
             </div>
           )}

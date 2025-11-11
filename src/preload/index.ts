@@ -78,6 +78,8 @@ contextBridge.exposeInMainWorld('electron', {
         executeRaw: (command: string) => ipcRenderer.invoke('command-execute-raw', command),
         getHistory: (limit?: number) => ipcRenderer.invoke('command-get-history', limit),
         clearHistory: () => ipcRenderer.invoke('command-clear-history'),
+        complete: (partial: string) => ipcRenderer.invoke('command-complete', partial),
+        help: (commandId: string) => ipcRenderer.invoke('command-help', commandId),
       },
       
       // 计算器相关
@@ -89,6 +91,30 @@ contextBridge.exposeInMainWorld('electron', {
       time: {
         getAllFormats: (dateISOString?: string) => ipcRenderer.invoke('time-get-all-formats', dateISOString),
         handleQuery: (query: string) => ipcRenderer.invoke('time-handle-query', query),
+        complete: (partial: string) => ipcRenderer.invoke('time-complete', partial),
+        help: () => ipcRenderer.invoke('time-help'),
+      },
+      
+      // 功能补全相关
+      translate: {
+        complete: (partial: string) => ipcRenderer.invoke('translate-complete', partial),
+        help: () => ipcRenderer.invoke('translate-help'),
+      },
+      random: {
+        complete: (partial: string) => ipcRenderer.invoke('random-complete', partial),
+        help: () => ipcRenderer.invoke('random-help'),
+      },
+      encode: {
+        complete: (partial: string) => ipcRenderer.invoke('encode-complete', partial),
+        help: () => ipcRenderer.invoke('encode-help'),
+      },
+      string: {
+        complete: (partial: string) => ipcRenderer.invoke('string-complete', partial),
+        help: () => ipcRenderer.invoke('string-help'),
+      },
+      varname: {
+        complete: (partial: string) => ipcRenderer.invoke('varname-complete', partial),
+        help: () => ipcRenderer.invoke('varname-help'),
       },
       
       // 书签相关
@@ -105,6 +131,24 @@ contextBridge.exposeInMainWorld('electron', {
         update: (updates: any) => ipcRenderer.invoke('settings-update', updates),
         reset: () => ipcRenderer.invoke('settings-reset'),
         getLogFile: () => ipcRenderer.invoke('settings-get-log-file'),
+      },
+      
+      // 快捷键相关
+      shortcut: {
+        getCurrent: () => ipcRenderer.invoke('shortcut-get-current'),
+        set: (shortcut: string) => ipcRenderer.invoke('shortcut-set', shortcut),
+        checkAvailable: (shortcut: string) => ipcRenderer.invoke('shortcut-check-available', shortcut),
+        format: (shortcut: string) => ipcRenderer.invoke('shortcut-format', shortcut),
+      },
+      
+      // 别名相关
+      alias: {
+        getAll: () => ipcRenderer.invoke('alias-get-all'),
+        add: (name: string, command: string, type: string, description?: string) => ipcRenderer.invoke('alias-add', name, command, type, description),
+        remove: (name: string) => ipcRenderer.invoke('alias-remove', name),
+        update: (name: string, updates: any) => ipcRenderer.invoke('alias-update', name, updates),
+        get: (name: string) => ipcRenderer.invoke('alias-get', name),
+        resolve: (input: string) => ipcRenderer.invoke('alias-resolve', input),
       },
       
       // 剪贴板相关
@@ -201,6 +245,20 @@ contextBridge.exposeInMainWorld('electron', {
       update: (updates: any) => Promise<any>;
       reset: () => Promise<any>;
       getLogFile: () => Promise<string>;
+    };
+    shortcut: {
+      getCurrent: () => Promise<{ shortcut: string | null; formatted: string | null }>;
+      set: (shortcut: string) => Promise<{ success: boolean }>;
+      checkAvailable: (shortcut: string) => Promise<{ available: boolean }>;
+      format: (shortcut: string) => Promise<{ formatted: string }>;
+    };
+    alias: {
+      getAll: () => Promise<any[]>;
+      add: (name: string, command: string, type: string, description?: string) => Promise<{ success: boolean; alias?: any; error?: string }>;
+      remove: (name: string) => Promise<{ success: boolean }>;
+      update: (name: string, updates: any) => Promise<{ success: boolean }>;
+      get: (name: string) => Promise<{ alias?: any }>;
+      resolve: (input: string) => Promise<{ resolved: string; alias?: any; hasArgs: boolean } | null>;
     };
     clipboard: {
       getHistory: (limit?: number) => Promise<any[]>;

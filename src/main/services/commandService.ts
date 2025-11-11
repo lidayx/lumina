@@ -188,6 +188,137 @@ class CommandService {
   }
 
   /**
+   * 命令补全（类似 shell 的 Tab 补全）
+   * @param partial 部分输入的命令名或描述
+   * @returns 匹配的命令列表，按相关性排序
+   */
+  public completeCommand(partial: string): CommandInfo[] {
+    if (!partial || !partial.trim()) {
+      return [];
+    }
+
+    const searchTerm = partial.toLowerCase().trim();
+    const results: CommandInfo[] = [];
+    const scoredResults: Array<{ cmd: CommandInfo; score: number }> = [];
+
+    for (const cmd of this.commands.values()) {
+      let score = 0;
+      
+      // 名称完全匹配（最高优先级）
+      if (cmd.name.toLowerCase() === searchTerm) {
+        score = 1000;
+      }
+      // 名称开头匹配
+      else if (cmd.name.toLowerCase().startsWith(searchTerm)) {
+        score = 500;
+      }
+      // 名称包含
+      else if (cmd.name.toLowerCase().includes(searchTerm)) {
+        score = 200;
+      }
+      // 快捷键匹配
+      else if (cmd.shortcut?.toLowerCase() === searchTerm) {
+        score = 400;
+      }
+      // 快捷键开头匹配
+      else if (cmd.shortcut?.toLowerCase().startsWith(searchTerm)) {
+        score = 300;
+      }
+      // 描述包含
+      else if (cmd.description.toLowerCase().includes(searchTerm)) {
+        score = 100;
+      }
+
+      if (score > 0) {
+        scoredResults.push({ cmd, score });
+      }
+    }
+
+    // 按分数降序排序
+    scoredResults.sort((a, b) => b.score - a.score);
+    
+    return scoredResults.map(item => item.cmd);
+  }
+
+  /**
+   * 获取命令帮助信息（参数提示）
+   * @param commandId 命令ID或命令名称
+   * @returns 命令的帮助信息
+   */
+  public getCommandHelp(commandId: string): {
+    command: CommandInfo | null;
+    help: string;
+    examples: string[];
+    parameters?: string[];
+  } | null {
+    // 先尝试通过 ID 查找
+    let cmd = this.commands.get(commandId);
+    
+    // 如果没找到，尝试通过名称查找
+    if (!cmd) {
+      for (const c of this.commands.values()) {
+        if (c.name === commandId || c.name.toLowerCase() === commandId.toLowerCase()) {
+          cmd = c;
+          break;
+        }
+      }
+    }
+
+    if (!cmd) {
+      return null;
+    }
+
+    // 根据命令类型生成帮助信息
+    const help: string = cmd.description || '无描述';
+    const examples: string[] = [];
+    const parameters: string[] = [];
+
+    // 为不同类型的命令生成示例
+    switch (cmd.category) {
+      case 'system':
+        if (cmd.id === 'cmd-lock') {
+          examples.push('> 锁屏');
+          examples.push('> lock');
+        } else if (cmd.id === 'cmd-sleep') {
+          examples.push('> 睡眠');
+        } else if (cmd.id === 'cmd-restart') {
+          examples.push('> 重启');
+        } else if (cmd.id === 'cmd-shutdown') {
+          examples.push('> 关机');
+        }
+        break;
+      case 'media':
+        if (cmd.id === 'cmd-mute') {
+          examples.push('> 静音');
+          examples.push('> mute');
+        } else if (cmd.id === 'cmd-vol-up') {
+          examples.push('> 音量+');
+          examples.push('> vol+');
+        } else if (cmd.id === 'cmd-vol-down') {
+          examples.push('> 音量-');
+          examples.push('> vol-');
+        } else if (cmd.id === 'cmd-play-pause') {
+          examples.push('> 播放/暂停');
+          examples.push('> play');
+        }
+        break;
+      case 'app':
+        examples.push(`> ${cmd.name}`);
+        if (cmd.shortcut) {
+          examples.push(`> ${cmd.shortcut}`);
+        }
+        break;
+    }
+
+    return {
+      command: cmd,
+      help,
+      examples,
+      parameters,
+    };
+  }
+
+  /**
    * 获取命令历史
    */
   public getHistory(limit: number = 10): CommandHistory[] {

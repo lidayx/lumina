@@ -253,19 +253,32 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
 
           setLoading(true);
           try {
+            // 先尝试解析别名（优先级最高）
+            let actualQuery = query.trim();
+            try {
+              const aliasResult = await window.electron.alias.resolve(query.trim());
+              if (aliasResult && aliasResult.resolved) {
+                actualQuery = aliasResult.resolved;
+                console.log(`🔗 [别名] "${query.trim()}" -> "${actualQuery}"`);
+              }
+            } catch (error) {
+              // 别名解析失败，继续使用原查询
+              console.log('别名解析失败，使用原查询');
+            }
+
             // 检测是否为 URL
-            const urlCheck = isURL(query.trim());
+            const urlCheck = isURL(actualQuery.trim());
             
             // 检测是否为设置关键词
-            const isSettingsQuery = ['设置', 'settings', 'setting', '配置', 'preferences'].includes(query.trim().toLowerCase());
+            const isSettingsQuery = ['设置', 'settings', 'setting', '配置', 'preferences'].includes(actualQuery.trim().toLowerCase());
             
             // 检测是否为剪贴板搜索（优先检测，避免被其他查询拦截）
-            const clipboardMatch = query.trim().match(/^(?:clip|clipboard|剪贴板|cb)(?:\s+(.+))?$/i);
+            const clipboardMatch = actualQuery.trim().match(/^(?:clip|clipboard|剪贴板|cb)(?:\s+(.+))?$/i);
             const isClipboardSearch = clipboardMatch !== null;
             const clipboardQuery = clipboardMatch ? (clipboardMatch[1] || '') : '';
             
             // 检测是否为计算表达式或时间查询（需要包含运算符、函数、单位转换符号或时间关键词）
-            const queryTrimmed = query.trim();
+            const queryTrimmed = actualQuery.trim();
             const isCalculation = (
               // 包含运算符或特殊字符（不包括空格），且不是纯数字
               // 注意：空格本身不应该触发计算器，只有明确的数学运算符才应该
@@ -334,6 +347,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             const isFileSearch = fileSearchMatch !== null;
             const fileSearchQuery = fileSearchMatch ? fileSearchMatch[1] : '';
             
+            // 检测是否为命令模式（以 > 开头）
+            const commandMatch = query.trim().match(/^>\s*(.*)$/);
+            const isCommandMode = commandMatch !== null;
+            const commandQuery = commandMatch ? commandMatch[1] : '';
+            
             console.log('🔍 [文件搜索] 检测:', { 
               query, 
               isFileSearch, 
@@ -353,7 +371,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             // 并行搜索所有类型（统一防抖，确保结果同时返回以便正确排序）
             // 先获取计算结果，以便决定是否搜索网页
             const calcResult = finalIsCalculation 
-              ? await window.electron.calculator.calculate(query).catch((err) => {
+              ? await window.electron.calculator.calculate(actualQuery).catch((err) => {
                   console.error('计算器计算失败:', err);
                   return null;
                 })
@@ -362,17 +380,122 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             // 如果计算器返回 null（功能关闭或无法识别），继续搜索网页和其他内容
             const shouldSearchWeb = !isFileSearch && (!finalIsCalculation || calcResult === null);
             
+            // 检测功能关键词（用于智能补全）
+            // 只在输入关键词本身或关键词后跟空格时触发补全，避免误触发
+            const queryLower = actualQuery.toLowerCase().trim();
+            // 改进关键词检测：支持部分输入，如 "url e" 也能识别为编码关键词
+            const isTranslateKeyword = /^(?:translate|翻译|fanyi|fy|en|zh|cn)(\s|$)/i.test(queryLower) || 
+                                      /^(?:translate|翻译|fanyi|fy|en|zh|cn)\s+\w/i.test(queryLower);
+            const isRandomKeyword = /^(?:pwd|password|密码|uuid|random)(\s|$)/i.test(queryLower) ||
+                                   /^(?:pwd|password|密码|uuid|random)\s+\w/i.test(queryLower);
+            const isEncodeKeyword = /^(?:url|html|base64|md5|encode|decode|编码|解码)(\s|$)/i.test(queryLower) ||
+                                   /^(?:url|html|base64|md5|encode|decode|编码|解码)\s+\w/i.test(queryLower);
+            // 调试日志
+            if (queryLower.startsWith('url') || queryLower.startsWith('html') || queryLower.startsWith('base64')) {
+              console.log('🔍 [编码关键词检测]', { queryLower, isEncodeKeyword, test1: /^(?:url|html|base64|md5|encode|decode|编码|解码)(\s|$)/i.test(queryLower), test2: /^(?:url|html|base64|md5|encode|decode|编码|解码)\s+\w/i.test(queryLower) });
+            }
+            const isStringKeyword = /^(?:uppercase|lowercase|大写|小写|title|camel|snake|reverse|反转|trim|count|统计|replace|extract)(\s|$)/i.test(queryLower) ||
+                                   /^(?:uppercase|lowercase|大写|小写|title|camel|snake|reverse|反转|trim|count|统计|replace|extract)\s+\w/i.test(queryLower);
+            const isVarnameKeyword = /^(?:varname|变量名|camel|snake|pascal)(\s|$)/i.test(queryLower) ||
+                                    /^(?:varname|变量名|camel|snake|pascal)\s+\w/i.test(queryLower);
+            const isTimeKeyword = /^(?:time|时间|timestamp|date|日期)(\s|$)/i.test(queryLower) ||
+                                 /^(?:time|时间|timestamp|date|日期)\s+\w/i.test(queryLower);
+            
+            // 命令补全（如果处于命令模式）
+            let commandCompletions: any[] = [];
+            let commandHelp: any = null;
+            if (isCommandMode) {
+              try {
+                if (commandQuery) {
+                  // 有输入，进行命令补全
+                  commandCompletions = await window.electron.command.complete(commandQuery).catch(() => []);
+                  // 如果只有一个匹配结果，获取帮助信息
+                  if (commandCompletions.length === 1) {
+                    commandHelp = await window.electron.command.help(commandCompletions[0].id).catch(() => null);
+                  }
+                } else {
+                  // 没有输入，显示所有命令
+                  commandCompletions = await window.electron.command.getAll().catch(() => []);
+                }
+              } catch (error) {
+                console.error('命令补全失败:', error);
+              }
+            }
+            
+            // 功能补全（如果检测到功能关键词且不在命令模式）
+            let featureCompletions: any[] = [];
+            let featureHelp: any = null;
+            let featureType: string | null = null;
+            
+            if (!isCommandMode && !isFileSearch && !urlCheck.isURL) {
+              try {
+                if (isTranslateKeyword) {
+                  featureType = 'translate';
+                  const queryForComplete = actualQuery.replace(/^(?:translate|翻译|fanyi|fy|en|zh|cn)\s*/i, '').trim();
+                  if (queryForComplete) {
+                    featureCompletions = await window.electron.translate.complete(queryForComplete).catch(() => []);
+                  } else {
+                    featureHelp = await window.electron.translate.help().catch(() => null);
+                  }
+                } else if (isRandomKeyword) {
+                  featureType = 'random';
+                  const queryForComplete = actualQuery.replace(/^(?:pwd|password|密码|uuid|random)\s*/i, '').trim();
+                  if (queryForComplete) {
+                    featureCompletions = await window.electron.random.complete(queryForComplete).catch(() => []);
+                  } else {
+                    featureHelp = await window.electron.random.help().catch(() => null);
+                  }
+                } else if (isEncodeKeyword) {
+                  featureType = 'encode';
+                  // 保留完整的查询用于补全，以便匹配 "url en" -> "url encode"
+                  const queryForComplete = actualQuery.trim();
+                  if (queryForComplete) {
+                    featureCompletions = await window.electron.encode.complete(queryForComplete).catch(() => []);
+                    console.log('🔍 [编码补全]', { queryForComplete, completions: featureCompletions });
+                  } else {
+                    featureHelp = await window.electron.encode.help().catch(() => null);
+                  }
+                } else if (isStringKeyword) {
+                  featureType = 'string';
+                  const queryForComplete = actualQuery.replace(/^(?:uppercase|lowercase|大写|小写|title|camel|snake|reverse|反转|trim|count|统计|replace|extract)\s*/i, '').trim();
+                  if (queryForComplete) {
+                    featureCompletions = await window.electron.string.complete(queryForComplete).catch(() => []);
+                  } else {
+                    featureHelp = await window.electron.string.help().catch(() => null);
+                  }
+                } else if (isVarnameKeyword) {
+                  featureType = 'varname';
+                  const queryForComplete = actualQuery.replace(/^(?:varname|变量名|camel|snake|pascal)\s*/i, '').trim();
+                  if (queryForComplete) {
+                    featureCompletions = await window.electron.varname.complete(queryForComplete).catch(() => []);
+                  } else {
+                    featureHelp = await window.electron.varname.help().catch(() => null);
+                  }
+                } else if (isTimeKeyword) {
+                  featureType = 'time';
+                  const queryForComplete = actualQuery.replace(/^(?:time|时间|timestamp|date|日期)\s*/i, '').trim();
+                  if (queryForComplete) {
+                    featureCompletions = await window.electron.time.complete(queryForComplete).catch(() => []);
+                  } else {
+                    featureHelp = await window.electron.time.help().catch(() => null);
+                  }
+                }
+              } catch (error) {
+                console.error('功能补全失败:', error);
+              }
+            }
+            
             const [appsFromIPC, files, webResults, bookmarks, commands, clipboardResults] = await Promise.all([
               // 直接调用 IPC 搜索应用，而不是使用 useAppSearch hook 的结果（避免防抖延迟）
-              window.electron.app.search(query).catch(() => []),
+              isCommandMode ? Promise.resolve([]) : window.electron.app.search(actualQuery).catch(() => []),
               // 只在输入 "file + 空格 + 关键字" 时才搜索文件
               (isFileSearch && fileSearchEnabled && fileSearchQuery) 
                 ? window.electron.file.search(fileSearchQuery).catch(() => []) 
                 : Promise.resolve([]),
-              // 如果计算器返回 null，继续搜索网页
-              shouldSearchWeb ? window.electron.web.search(query).catch(() => []) : Promise.resolve([]),
-              window.electron.bookmark.search(query).catch(() => []),
-              window.electron.command.search(query).catch(() => []),
+              // 命令模式下不搜索网页
+              (isCommandMode || !shouldSearchWeb) ? Promise.resolve([]) : window.electron.web.search(actualQuery).catch(() => []),
+              isCommandMode ? Promise.resolve([]) : window.electron.bookmark.search(actualQuery).catch(() => []),
+              isCommandMode ? Promise.resolve([]) : window.electron.command.search(actualQuery).catch(() => []),
               // 剪贴板搜索
               isClipboardSearch 
                 ? (clipboardQuery 
@@ -424,6 +547,152 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             
             // 性能优化：直接构建数组，减少中间数组创建
             const combinedResults: SearchResultType[] = [];
+            
+            // 功能补全结果（只在没有实际计算结果时显示，优先级高于命令模式）
+            // 如果 calcResult 存在且成功，说明已经识别为计算/功能查询，不显示补全建议
+            const shouldShowFeatureCompletion = featureType && 
+                                               !isCommandMode && 
+                                               !isFileSearch && 
+                                               !urlCheck.isURL &&
+                                               (!calcResult || !calcResult.success);
+            
+            // 调试日志
+            if (featureType === 'encode') {
+              console.log('🔍 [功能补全显示]', { 
+                featureType, 
+                shouldShowFeatureCompletion, 
+                isCommandMode, 
+                isFileSearch, 
+                isURL: urlCheck.isURL,
+                calcResult: calcResult ? (calcResult.success ? 'success' : 'failed') : 'null',
+                featureCompletions: featureCompletions.length,
+                featureHelp: !!featureHelp
+              });
+            }
+            
+            if (shouldShowFeatureCompletion) {
+              // 显示功能帮助（如果有）
+              if (featureHelp) {
+                combinedResults.push({
+                  id: `feature-help-${featureType}`,
+                  type: 'command' as const,
+                  title: `📖 ${featureHelp.title}`,
+                  description: featureHelp.description,
+                  action: `feature:help:${featureType}`,
+                  score: 2600,
+                  priorityScore: 2600,
+                });
+                
+                // 显示功能格式示例
+                if (featureHelp.formats && featureHelp.formats.length > 0) {
+                  featureHelp.formats.slice(0, 3).forEach((format: any, index: number) => {
+                    combinedResults.push({
+                      id: `feature-format-${featureType}-${index}`,
+                      type: 'command' as const,
+                      title: format.format,
+                      description: `${format.description} - 示例: ${format.example}`,
+                      action: `feature:example:${featureType}:${format.example}`,
+                      score: 2500 - index,
+                      priorityScore: 2500 - index,
+                    });
+                  });
+                }
+              }
+              
+              // 显示功能补全建议（提高优先级，确保显示在最前面）
+              featureCompletions.forEach((suggestion: any, index: number) => {
+                combinedResults.push({
+                  id: `feature-complete-${featureType}-${index}`,
+                  type: 'command' as const,
+                  title: `💡 ${suggestion.format}`,
+                  description: suggestion.description,
+                  action: `feature:complete:${featureType}:${suggestion.example}`,
+                  score: 2700 - index, // 提高优先级，确保显示在网页搜索之前
+                  priorityScore: 2700 - index,
+                });
+              });
+              
+              // 如果没有补全建议且没有帮助，显示提示
+              if (featureCompletions.length === 0 && !featureHelp) {
+                combinedResults.push({
+                  id: `feature-no-suggestion-${featureType}`,
+                  type: 'command' as const,
+                  title: '继续输入以使用此功能',
+                  description: `输入完整命令或查看帮助`,
+                  action: `feature:continue:${featureType}`,
+                  score: 2000,
+                  priorityScore: 2000,
+                });
+              }
+            }
+            
+            // 命令补全结果（优先级最高）
+            if (isCommandMode) {
+              // 显示命令帮助（如果有）
+              if (commandHelp && commandHelp.command) {
+                combinedResults.push({
+                  id: `command-help-${commandHelp.command.id}`,
+                  type: 'command' as const,
+                  title: `📖 ${commandHelp.command.name}`,
+                  description: commandHelp.help,
+                  action: `command:help:${commandHelp.command.id}`,
+                  score: 2500,
+                  priorityScore: 2500,
+                });
+                
+                // 显示命令示例
+                if (commandHelp.examples && commandHelp.examples.length > 0) {
+                  commandHelp.examples.forEach((example: string, index: number) => {
+                    combinedResults.push({
+                      id: `command-example-${commandHelp.command.id}-${index}`,
+                      type: 'command' as const,
+                      title: example,
+                      description: `执行: ${commandHelp.command.description}`,
+                      action: `command:execute:${commandHelp.command.id}`,
+                      score: 2400 - index,
+                      priorityScore: 2400 - index,
+                    });
+                  });
+                }
+              }
+              
+              // 显示命令补全列表
+              commandCompletions.forEach((cmd: any, index: number) => {
+                // 如果已经显示了帮助，跳过第一个（因为帮助已经显示了）
+                if (commandHelp && commandHelp.command && cmd.id === commandHelp.command.id) {
+                  return;
+                }
+                
+                combinedResults.push({
+                  id: `command-complete-${cmd.id}`,
+                  type: 'command' as const,
+                  title: cmd.name,
+                  description: cmd.description || cmd.category,
+                  action: `command:execute:${cmd.id}`,
+                  score: 2000 - index,
+                  priorityScore: 2000 - index,
+                });
+              });
+              
+              // 如果没有匹配的命令，显示提示
+              if (commandCompletions.length === 0 && commandQuery) {
+                combinedResults.push({
+                  id: 'command-no-match',
+                  type: 'command' as const,
+                  title: '未找到匹配的命令',
+                  description: `输入 "> " 查看所有可用命令`,
+                  action: 'command:list',
+                  score: 1000,
+                  priorityScore: 1000,
+                });
+              }
+              
+              // 设置结果并返回（命令模式下只显示命令相关结果）
+              setResults(combinedResults);
+              setLoading(false);
+              setShowNoResult(combinedResults.length === 0);
+              return;
+            }
             
             // 设置检测结果（如果有）
             if (isSettingsQuery) {
@@ -941,7 +1210,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             }
 
             // 性能优化：使用排序函数，避免在 useMemo 中重复创建
-            const queryLower = query.toLowerCase();
+            const queryLowerForSort = query.toLowerCase();
             const sortFunction = (a: SearchResultType, b: SearchResultType) => {
               // 1. 优先级分数（priorityScore）优先 - 命令 > 应用 > 文件
               const aPriority = a.priorityScore || 0;
@@ -952,12 +1221,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               const aName = a.title.toLowerCase();
               const bName = b.title.toLowerCase();
               
-              if (aName === queryLower && bName !== queryLower) return -1;
-              if (bName === queryLower && aName !== queryLower) return 1;
+              if (aName === queryLowerForSort && bName !== queryLowerForSort) return -1;
+              if (bName === queryLowerForSort && aName !== queryLowerForSort) return 1;
               
               // 3. 开头匹配优先
-              const aStarts = aName.startsWith(queryLower);
-              const bStarts = bName.startsWith(queryLower);
+              const aStarts = aName.startsWith(queryLowerForSort);
+              const bStarts = bName.startsWith(queryLowerForSort);
               if (aStarts && !bStarts) return -1;
               if (bStarts && !aStarts) return 1;
               
@@ -1061,13 +1330,42 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
       }
       // 处理命令执行
       else if (result.action.startsWith('command:')) {
+        const actionParts = result.action.split(':');
+        if (actionParts.length >= 3 && actionParts[1] === 'execute') {
+          // 命令执行：command:execute:commandId
+          const commandId = actionParts.slice(2).join(':');
+          try {
+            const result = await window.electron.command.execute(commandId);
+            if (result.success) {
+              console.log('Command executed:', commandId);
+            } else {
+              console.error('Command execution failed:', result.error);
+            }
+            hideMainWindow();
+          } catch (error) {
+            console.error('Failed to execute command:', error);
+          }
+        } else if (actionParts.length >= 3 && actionParts[1] === 'help') {
+          // 命令帮助：command:help:commandId（不执行，只显示帮助）
+          // 帮助已经在结果中显示了，这里不需要额外操作
+          console.log('Command help requested:', actionParts[2]);
+        } else if (actionParts[1] === 'list') {
+          // 显示所有命令（清空输入，重新显示命令列表）
+          setQuery('> ');
+        } else {
+          // 兼容旧格式：command:commandId
         const commandId = result.action.replace('command:', '');
         try {
-          await window.electron.command.execute(commandId);
+            const result = await window.electron.command.execute(commandId);
+            if (result.success) {
           console.log('Command executed:', commandId);
+            } else {
+              console.error('Command execution failed:', result.error);
+            }
           hideMainWindow();
         } catch (error) {
           console.error('Failed to execute command:', error);
+          }
         }
       }
       // 处理书签打开
@@ -1103,6 +1401,25 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
           hideMainWindow();
         } catch (error) {
           console.error('Failed to paste clipboard item:', error);
+        }
+      }
+      // 处理功能补全
+      else if (result.action.startsWith('feature:')) {
+        const actionParts = result.action.split(':');
+        if (actionParts[1] === 'complete') {
+          // 功能补全：设置输入框为补全文本
+          const completeText = actionParts.slice(3).join(':');
+          setQuery(completeText);
+        } else if (actionParts[1] === 'example') {
+          // 功能示例：设置输入框为示例文本
+          const exampleText = actionParts.slice(3).join(':');
+          setQuery(exampleText);
+        } else if (actionParts[1] === 'help') {
+          // 功能帮助：不执行操作，帮助信息已显示
+          console.log('功能帮助已显示');
+        } else if (actionParts[1] === 'continue') {
+          // 继续输入：不执行操作
+          console.log('继续输入功能文本');
         }
       }
       // 处理计算器结果
