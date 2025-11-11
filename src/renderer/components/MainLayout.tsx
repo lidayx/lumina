@@ -302,8 +302,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               (/[\+\-*/().,π]/.test(queryTrimmed) && !/^[\d.,\s]+$/.test(queryTrimmed)) ||
               // 包含数学函数（使用单词边界，避免误匹配如 "weixin" 中的 "in"）
               /\b(sin|cos|tan|log|sqrt)\b/i.test(queryTrimmed) ||
-              // 包含单位转换关键字（单词边界），但排除时间/翻译/变量名相关的 to
-              (/\b(to|到)\b/i.test(queryTrimmed) && 
+              // 注意：单位换算功能已删除，不再检测单位换算模式
+              // 保留 to/到 的检测，但排除时间/翻译/变量名相关的 to
+              (/\b(to|到|in|=>)\b/i.test(queryTrimmed) && 
                !/^(?:translate|翻译|fanyi|fy|en|zh|cn)\s+/i.test(queryTrimmed) &&
                !/^(?:varname|变量名|camel|snake|pascal)\s+/i.test(queryTrimmed) &&
                !/^\d{4}[-\/]\d{2}[-\/]\d{2}/.test(queryTrimmed) &&
@@ -411,39 +412,46 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             let variableNameResult = null;
             
             if (!isFileSearch && !urlCheck.isURL) {
-              // 按优先级顺序尝试各个模块
-              encodeResult = await window.electron.encode.handleQuery(actualQuery).catch(() => null);
-              if (encodeResult) {
-                console.log('🔍 [模块检测] encodeResult 匹配:', actualQuery);
-              }
-              if (!encodeResult) {
-                stringResult = await window.electron.string.handleQuery(actualQuery).catch(() => null);
-                if (stringResult) {
-                  console.log('🔍 [模块检测] stringResult 匹配:', actualQuery);
+              // 先检查是否是数学函数表达式（如 log(100), sin(30)），如果是则跳过其他模块，直接使用计算器
+              const hasMathFunctions = /\b(sin|cos|tan|log|sqrt)\s*\(/i.test(actualQuery.trim());
+              if (hasMathFunctions) {
+                console.log('🔍 [模块检测] 检测到数学函数表达式，跳过其他模块:', actualQuery);
+              } else {
+                // 按优先级顺序尝试各个模块
+                encodeResult = await window.electron.encode.handleQuery(actualQuery).catch(() => null);
+                if (encodeResult) {
+                  console.log('🔍 [模块检测] encodeResult 匹配:', actualQuery);
                 }
-              }
-              if (!encodeResult && !stringResult) {
-                timeResult = await window.electron.time.handleQuery(actualQuery).catch(() => null);
-                if (timeResult) {
-                  console.log('🔍 [模块检测] timeResult 匹配:', actualQuery);
+                if (!encodeResult) {
+                  stringResult = await window.electron.string.handleQuery(actualQuery).catch(() => null);
+                  if (stringResult) {
+                    console.log('🔍 [模块检测] stringResult 匹配:', actualQuery);
+                  }
                 }
-              }
-              if (!encodeResult && !stringResult && !timeResult) {
-                randomResult = await window.electron.random.handleQuery(actualQuery).catch(() => null);
-                if (randomResult) {
-                  console.log('🔍 [模块检测] randomResult 匹配:', actualQuery);
+                if (!encodeResult && !stringResult) {
+                  timeResult = await window.electron.time.handleQuery(actualQuery).catch(() => null);
+                  if (timeResult) {
+                    console.log('🔍 [模块检测] timeResult 匹配:', actualQuery);
+                  }
                 }
-              }
-              if (!encodeResult && !stringResult && !timeResult && !randomResult) {
-                translateResult = await window.electron.translate.handleQuery(actualQuery).catch(() => null);
-                if (translateResult) {
-                  console.log('🔍 [模块检测] translateResult 匹配:', actualQuery);
+                if (!encodeResult && !stringResult && !timeResult) {
+                  randomResult = await window.electron.random.handleQuery(actualQuery).catch(() => null);
+                  if (randomResult) {
+                    console.log('🔍 [模块检测] randomResult 匹配:', actualQuery);
+                  }
+                }
+                if (!encodeResult && !stringResult && !timeResult && !randomResult) {
+                  translateResult = await window.electron.translate.handleQuery(actualQuery).catch(() => null);
+                  if (translateResult) {
+                    console.log('🔍 [模块检测] translateResult 匹配:', actualQuery);
+                  }
                 }
               }
               if (!encodeResult && !stringResult && !timeResult && !randomResult && !translateResult) {
-                // 先检查是否是数学表达式（简单或包含括号），如果是则跳过变量名生成
+                // 先检查是否是数学表达式（简单或包含括号）或数学函数，如果是则跳过变量名生成
                 const isMathExpression = /^\d+\s*[\+\-*/]\s*\d+$/.test(actualQuery.trim()) || // 简单数学表达式
-                                         /^[\d\s\+\-*/().,π]+$/.test(actualQuery.trim()) && /[\+\-*/().,π]/.test(actualQuery.trim()); // 包含运算符的数学表达式
+                                         /^[\d\s\+\-*/().,π]+$/.test(actualQuery.trim()) && /[\+\-*/().,π]/.test(actualQuery.trim()) || // 包含运算符的数学表达式
+                                         /\b(sin|cos|tan|log|sqrt)\s*\(/i.test(actualQuery.trim()); // 数学函数表达式
                 if (!isMathExpression) {
                   variableNameResult = await window.electron.varname.handleQuery(actualQuery).catch(() => null);
                   if (variableNameResult) {
@@ -1039,6 +1047,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             if (timeResult && timeResult.success) {
               // 将多行输出拆分成多条结果
               const outputLines = timeResult.output.split('\n').filter(line => line.trim());
+              console.log('🕐 [前端] 时间结果处理:', {
+                input: timeResult.input,
+                outputLength: timeResult.output.length,
+                outputLinesCount: outputLines.length,
+                outputPreview: timeResult.output.substring(0, 100),
+                hasNewline: timeResult.output.includes('\n'),
+              });
               if (outputLines.length > 1) {
                 // 多条结果，为每行创建一个选项
                 outputLines.forEach((line: string, index: number) => {
@@ -1089,7 +1104,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                 randomResult.outputs.forEach((output: string, index: number) => {
                   combinedResults.push({
                     id: `random-result-${index}`,
-                    type: 'command' as const,
+                type: 'command' as const,
                     title: output,
                     description: `随机数生成 ${index + 1}/${randomResult.outputs.length} - 点击复制`,
                     action: 'random:copy',
@@ -1201,7 +1216,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               });
             }
             
-            // 计算器结果（如果有，仅数学计算和单位换算）
+            // 计算器结果（如果有，仅数学计算）
             // 不显示计算器错误结果，让系统继续搜索网页等其他内容
             // 如果计算器返回错误，不添加到结果列表，继续执行其他搜索
             
@@ -1867,9 +1882,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             await navigator.clipboard.writeText(textToCopy);
             console.log('Time result copied:', textToCopy);
           }
-          hideMainWindow();
-        } catch (error) {
-          console.error('Failed to copy time result:', error);
+            hideMainWindow();
+          } catch (error) {
+            console.error('Failed to copy time result:', error);
         }
       }
       // 处理剪贴板粘贴

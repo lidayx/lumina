@@ -69,40 +69,40 @@ class TimeService {
         return this.getCurrentTimeResult();
       }
       
-      // 2. 检测时间戳转日期
+      // 2. 检测时间戳转日期（新格式：date <时间戳>）
       const timestampResult = this.convertTimestamp(trimmedQuery);
       if (timestampResult) {
         return timestampResult;
       }
       
-      // 3. 检测日期转时间戳
+      // 3. 检测日期转时间戳（新格式：ts <日期> 或 timestamp <日期>）
       const dateToTimestampResult = this.convertDateToTimestamp(trimmedQuery);
       if (dateToTimestampResult) {
         return dateToTimestampResult;
       }
       
-      // 4. 检测纯日期时间字符串（如：2024-01-15 14:30:45）
+      // 4. 检测时区转换（新格式：<时区> <日期>）- 优先于纯日期时间检测
+      const timezoneResult = this.convertTimezone(trimmedQuery);
+      if (timezoneResult) {
+        return timezoneResult;
+      }
+      
+      // 5. 检测纯日期时间字符串（如：2024-01-15 14:30:45）
       const pureDateResult = this.parsePureDateTime(trimmedQuery);
       if (pureDateResult) {
         return pureDateResult;
       }
       
-      // 5. 检测时间计算
+      // 6. 检测时间计算
       const timeCalcResult = this.calculateTimeDifference(trimmedQuery);
       if (timeCalcResult) {
         return timeCalcResult;
       }
       
-      // 6. 检测日期格式化
+      // 7. 检测日期格式化
       const formatResult = this.formatDate(trimmedQuery);
       if (formatResult) {
         return formatResult;
-      }
-      
-      // 7. 检测时区转换
-      const timezoneResult = this.convertTimezone(trimmedQuery);
-      if (timezoneResult) {
-        return timezoneResult;
       }
       
       return null;
@@ -134,15 +134,28 @@ class TimeService {
 
   /**
    * 获取当前时间结果
-   * 返回格式化的时间字符串（单行格式，用于单个选项显示）
+   * 返回格式化的时间字符串（多行格式，包含多种时间表示）
    */
   private getCurrentTimeResult(): TimeResult {
     const now = new Date();
     const defaultFormat = this.formatDateTime(now, 'YYYY-MM-DD HH:mm:ss');
+    const timestamp = Math.floor(now.getTime() / 1000); // 秒级时间戳
+    const timestampMs = now.getTime(); // 毫秒级时间戳
+    const isoFormat = now.toISOString();
+    const utcFormat = this.formatDateTime(now, 'YYYY-MM-DD HH:mm:ss UTC');
+    
+    // 返回多行结果，每行一个时间格式
+    const output = [
+      defaultFormat,
+      `时间戳: ${timestamp}`,
+      `毫秒时间戳: ${timestampMs}`,
+      `ISO格式: ${isoFormat}`,
+      `UTC时间: ${utcFormat}`,
+    ].join('\n');
     
     return {
       input: 'time',
-      output: defaultFormat,
+      output,
       success: true,
     };
   }
@@ -209,7 +222,9 @@ class TimeService {
     }
     
     // 如果包含日期模式，或者看起来像日期字符串，才尝试解析
-    if (hasDatePattern || /^\d{4}/.test(trimmedQuery)) {
+    // 但排除时区转换格式（如 "UTC 2025-11-11" 或 "EST 2025-11-11"）
+    const isTimezoneFormat = /^[a-z]+\s+\d{4}[-\/]\d{2}/i.test(trimmedQuery);
+    if ((hasDatePattern || /^\d{4}/.test(trimmedQuery)) && !isTimezoneFormat) {
       const tryDate = new Date(query);
       if (!isNaN(tryDate.getTime()) && query.length > 8) {
         // 确保不是纯数字（纯数字不应该被识别为日期）
@@ -305,17 +320,12 @@ class TimeService {
 
   /**
    * 转换时间戳为日期
+   * 格式：date <时间戳>
    */
   private convertTimestamp(query: string): TimeResult | null {
-    // 匹配: timestamp 1705312245 或 ts 1705312245
-    const timestampPattern = /^(?:timestamp|ts)\s+(\d{10,13})$/i;
-    let match = query.match(timestampPattern);
-    
-    if (!match) {
-      // 匹配: 1705312245 to date 或 1705312245 转日期
-      const toDatePattern = /^(\d{10,13})\s+(?:to|转)\s+date$/i;
-      match = query.match(toDatePattern);
-    }
+    // 匹配: date 1705312245
+    const datePattern = /^date\s+(\d{10,13})$/i;
+    const match = query.match(datePattern);
     
     if (!match) {
       return null;
@@ -329,11 +339,12 @@ class TimeService {
     const date = isSeconds ? new Date(timestamp * 1000) : new Date(timestamp);
     
     if (isNaN(date.getTime())) {
+      const errorMsg = '无效的时间戳';
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: '无效的时间戳',
+        error: errorMsg,
       };
     }
     
@@ -350,10 +361,11 @@ class TimeService {
 
   /**
    * 转换日期为时间戳
+   * 格式：ts <日期> 或 timestamp <日期>
    */
   private convertDateToTimestamp(query: string): TimeResult | null {
-    // 匹配: <日期> to timestamp 或 <日期> 转时间戳
-    const pattern = /^(.+?)\s+(?:to|转)\s+timestamp$/i;
+    // 匹配: ts <日期> 或 timestamp <日期>
+    const pattern = /^(?:ts|timestamp)\s+(.+)$/i;
     const match = query.match(pattern);
     
     if (!match) {
@@ -364,11 +376,12 @@ class TimeService {
     const date = this.parseDate(dateStr);
     
     if (!date || isNaN(date.getTime())) {
+      const errorMsg = '无法解析日期格式';
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: '无法解析日期格式',
+        error: errorMsg,
       };
     }
     
@@ -424,11 +437,12 @@ class TimeService {
       }
       
       if (!date1 || !date2 || isNaN(date1.getTime()) || isNaN(date2.getTime())) {
+        const errorMsg = '无法解析时间格式';
         return {
           input: query,
           output: errorMsg,
           success: false,
-          error: '无法解析时间格式',
+          error: errorMsg,
         };
       }
       
@@ -462,21 +476,23 @@ class TimeService {
       }
       
       if (!baseDate || isNaN(baseDate.getTime())) {
+        const errorMsg = '无法解析基准时间';
         return {
           input: query,
           output: errorMsg,
           success: false,
-          error: '无法解析基准时间',
+          error: errorMsg,
         };
       }
       
       const durationMs = this.parseDuration(durationStr);
       if (durationMs === null) {
+        const errorMsg = '无法解析时长格式';
         return {
           input: query,
           output: errorMsg,
           success: false,
-          error: '无法解析时长格式',
+          error: errorMsg,
         };
       }
       
@@ -527,11 +543,12 @@ class TimeService {
     }
     
     if (!date || isNaN(date.getTime())) {
+      const errorMsg = '无法解析日期格式';
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: '无法解析日期格式',
+        error: errorMsg,
       };
     }
     
@@ -548,146 +565,182 @@ class TimeService {
 
   /**
    * 转换时区
+   * 格式：<时区> <日期>（如：UTC 2024-01-15 或 EST 2024-01-15）
    */
   private convertTimezone(query: string): TimeResult | null {
-    // 首先匹配: <时间> <时区1> to <时区2>（三个部分）
-    const pattern2 = /^(.+?)\s+(.+?)\s+(?:to|到)\s+(.+?)$/i;
-    const match2 = query.match(pattern2);
-    
-    if (match2) {
-      const timeStr = match2[1].trim();
-      const fromZone = match2[2].trim();
-      const toZone = match2[3].trim();
-      
-      // 检查 fromZone 是否是时区
-      if (this.parseTimezone(fromZone) !== null || /^utc[+\-]\d+$/i.test(fromZone)) {
-        return this.convertTimezoneHelper(timeStr, fromZone, toZone);
-      }
-    }
-    
-    // 匹配: <时间> to <时区> 或 <时间> in <时区>
-    const pattern = /^(.+?)\s+(?:to|in|到)\s+(.+?)$/i;
+    // 格式：<时区> <日期>（如：UTC 2024-01-15 或 EST 2024-01-15）
+    const pattern = /^([a-z]+(?:[+\-]\d+)?)\s+(.+)$/i;
     const match = query.match(pattern);
     
     if (!match) {
       return null;
     }
     
-    const timeStr = match[1].trim();
-    const targetZone = match[2].trim();
+    const potentialZone = match[1].trim();
+    const timeStr = match[2].trim();
     
-    // 检查目标时区是否有效
-    if (!this.parseTimezone(targetZone) && !/^utc[+\-]\d+$/i.test(targetZone)) {
-      return null;
+    // 检查是否是有效的时区
+    const zoneOffset = this.parseTimezone(potentialZone);
+    if (zoneOffset !== null || /^utc[+\-]\d+$/i.test(potentialZone)) {
+      // 将输入时间视为目标时区的时间，然后转换显示
+      // 例如：EST 2024-01-15 00:00:00 表示 EST 时区的 2024-01-15 00:00:00
+      return this.convertTimezoneHelper(timeStr, potentialZone, null);
     }
     
-    // 如果时间字符串包含时区信息，提取它
-    const timeWithZonePattern = /^(.+?)\s+(.+?)$/;
-    const timeMatch = timeStr.match(timeWithZonePattern);
-    
-    if (timeMatch && this.parseTimezone(timeMatch[2]) !== null) {
-      // 格式: <时间> <时区1> to <时区2>
-      return this.convertTimezoneHelper(timeMatch[1], timeMatch[2], targetZone);
-    }
-    
-    // 默认从本地时间转换到目标时区
-    return this.convertTimezoneHelper(timeStr, null, targetZone);
+    return null;
   }
 
   /**
    * 时区转换辅助方法
+   * @param timeStr 时间字符串
+   * @param fromZone 源时区（如果为 null，表示从本地时间解析）
+   * @param toZone 目标时区（如果为 null，表示显示为本地时间）
    */
   private convertTimezoneHelper(
     timeStr: string, 
     fromZone: string | null, 
-    toZone: string
+    toZone: string | null
   ): TimeResult | null {
     let date: Date;
     
-    if (fromZone) {
-      // 从指定时区解析时间
-      const fromOffset = this.parseTimezone(fromZone);
-      if (fromOffset === null) {
-        return {
-          input: timeStr,
-          output: errorMsg,
-          success: false,
-          error: `无法识别源时区: ${fromZone}`,
-        };
-      }
-      
-      let parsedDate = this.parseDate(timeStr);
-      if (!parsedDate || isNaN(parsedDate.getTime())) {
-        // 尝试使用 parseDateTimeString 解析
-        parsedDate = this.parseDateTimeString(timeStr);
-      }
-      
-      if (!parsedDate || isNaN(parsedDate.getTime())) {
-        return {
-          input: timeStr,
-          output: errorMsg,
-          success: false,
-          error: '无法解析时间格式',
-        };
-      }
-      
-      // 将本地时间转换为 UTC，然后加上源时区偏移
-      const utcTime = parsedDate.getTime() - (parsedDate.getTimezoneOffset() * 60000);
-      date = new Date(utcTime - (fromOffset * 3600000));
-    } else {
-      // 从本地时间解析
-      date = this.parseDate(timeStr);
-      if (!date || isNaN(date.getTime())) {
-        // 尝试使用 parseDateTimeString 解析
-        date = this.parseDateTimeString(timeStr);
-      }
-      
-      if (!date || isNaN(date.getTime())) {
-        return {
-          input: timeStr,
-          output: errorMsg,
-          success: false,
-          error: '无法解析时间格式',
-        };
-      }
+    // 解析时间字符串
+    let parsedDate = this.parseDate(timeStr);
+    if (!parsedDate || isNaN(parsedDate.getTime())) {
+      // 尝试使用 parseDateTimeString 解析
+      parsedDate = this.parseDateTimeString(timeStr);
     }
     
-    const toOffset = this.parseTimezone(toZone);
-    if (toOffset === null) {
-      // 尝试解析 UTC 偏移量格式，如 UTC+8
-      const utcPattern = /^utc([+\-]\d+)$/i;
-      const utcMatch = toZone.match(utcPattern);
-      if (utcMatch) {
-        const offset = parseInt(utcMatch[1], 10);
-        const utcTime = date.getTime() - (date.getTimezoneOffset() * 60000);
-        const targetTime = new Date(utcTime + (offset * 3600000));
-        const formatted = this.formatDateTime(targetTime, 'YYYY-MM-DD HH:mm:ss');
-        
-        return {
-          input: timeStr,
-          output: `${formatted} (UTC${offset >= 0 ? '+' : ''}${offset})`,
-          success: true,
-        };
-      }
-      
+    if (!parsedDate || isNaN(parsedDate.getTime())) {
+      const errorMsg = '无法解析时间格式';
       return {
         input: timeStr,
         output: errorMsg,
         success: false,
-        error: `无法识别目标时区: ${toZone}`,
+        error: errorMsg,
       };
     }
     
-    // 转换时区
-    const utcTime = date.getTime() - (date.getTimezoneOffset() * 60000);
-    const targetTime = new Date(utcTime + (toOffset * 3600000));
-    const formatted = this.formatDateTime(targetTime, 'YYYY-MM-DD HH:mm:ss');
+    if (fromZone) {
+      // 从指定时区解析时间
+      // 需要将指定时区的时间转换为本地时间显示
+      let fromOffset: number | null = null;
+      
+      // 尝试解析时区偏移
+      fromOffset = this.parseTimezone(fromZone);
+      if (fromOffset === null) {
+        // 尝试解析 UTC 偏移量格式，如 UTC+8
+        const utcPattern = /^utc([+\-]\d+)$/i;
+        const utcMatch = fromZone.match(utcPattern);
+        if (utcMatch) {
+          fromOffset = parseInt(utcMatch[1], 10);
+        } else {
+          const errorMsg = `无法识别源时区: ${fromZone}`;
+          return {
+            input: timeStr,
+            output: errorMsg,
+            success: false,
+            error: errorMsg,
+          };
+        }
+      }
+      
+      // 解析日期时间的各个部分
+      const dateTimeMatch = timeStr.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
+      if (!dateTimeMatch) {
+        const errorMsg = '无法解析时间格式';
+        return {
+          input: timeStr,
+          output: errorMsg,
+          success: false,
+          error: errorMsg,
+        };
+      }
+      
+      const year = parseInt(dateTimeMatch[1], 10);
+      const month = parseInt(dateTimeMatch[2], 10) - 1; // 月份从 0 开始
+      const day = parseInt(dateTimeMatch[3], 10);
+      const hours = dateTimeMatch[4] ? parseInt(dateTimeMatch[4], 10) : 0;
+      const minutes = dateTimeMatch[5] ? parseInt(dateTimeMatch[5], 10) : 0;
+      const seconds = dateTimeMatch[6] ? parseInt(dateTimeMatch[6], 10) : 0;
+      
+      // 创建指定时区的时间（视为 UTC+fromOffset）
+      // 先创建一个 UTC 时间，然后减去时区偏移
+      const utcDate = new Date(Date.UTC(year, month, day, hours, minutes, seconds));
+      // 减去时区偏移，得到指定时区的时间对应的 UTC 时间
+      const sourceUtcTime = utcDate.getTime() - (fromOffset * 3600000);
+      date = new Date(sourceUtcTime);
+    } else {
+      // 从本地时间解析
+      date = parsedDate;
+    }
     
-    return {
-      input: timeStr,
-      output: `${formatted} (${toZone.toUpperCase()})`,
-      success: true,
-    };
+    if (toZone) {
+      // 转换到目标时区
+      const toOffset = this.parseTimezone(toZone);
+      if (toOffset === null) {
+        // 尝试解析 UTC 偏移量格式，如 UTC+8
+        const utcPattern = /^utc([+\-]\d+)$/i;
+        const utcMatch = toZone.match(utcPattern);
+        if (utcMatch) {
+          const offset = parseInt(utcMatch[1], 10);
+          const utcTime = date.getTime() - (date.getTimezoneOffset() * 60000);
+          const targetTime = new Date(utcTime + (offset * 3600000));
+          const formatted = this.formatDateTime(targetTime, 'YYYY-MM-DD HH:mm:ss');
+          
+          return {
+            input: timeStr,
+            output: `${formatted} (UTC${offset >= 0 ? '+' : ''}${offset})`,
+            success: true,
+          };
+        }
+        
+        const errorMsg = `无法识别目标时区: ${toZone}`;
+        return {
+          input: timeStr,
+          output: errorMsg,
+          success: false,
+          error: errorMsg,
+        };
+      }
+      
+      // 转换时区
+      const utcTime = date.getTime() - (date.getTimezoneOffset() * 60000);
+      const targetTime = new Date(utcTime + (toOffset * 3600000));
+      const formatted = this.formatDateTime(targetTime, 'YYYY-MM-DD HH:mm:ss');
+      
+      return {
+        input: timeStr,
+        output: `${formatted} (${toZone.toUpperCase()})`,
+        success: true,
+      };
+    } else {
+      // 显示为本地时间（多种格式）
+      const formatted = this.formatDateTime(date, 'YYYY-MM-DD HH:mm:ss');
+      const chineseFormatted = this.formatDateTime(date, 'YYYY年MM月DD日 HH:mm:ss');
+      const isoFormatted = date.toISOString();
+      const timestamp = Math.floor(date.getTime() / 1000);
+      const timestampMs = date.getTime();
+      
+      const output = [
+        formatted,
+        chineseFormatted,
+        `ISO: ${isoFormatted}`,
+        `时间戳(秒): ${timestamp}`,
+        `时间戳(毫秒): ${timestampMs}`,
+      ].join('\n');
+      
+      console.log(`🕐 [时间服务] 时区转换结果 (${fromZone}):`, {
+        input: timeStr,
+        outputLines: output.split('\n').length,
+        output: output.substring(0, 100) + '...',
+      });
+      
+      return {
+        input: timeStr,
+        output,
+        success: true,
+      };
+    }
   }
 
   // ========== 辅助方法 ==========
@@ -896,11 +949,12 @@ class TimeService {
     const formats = [
       { format: 'time', description: '显示当前时间', example: 'time', keywords: ['time', '时间'] },
       { format: '时间', description: '显示当前时间（中文）', example: '时间', keywords: ['时间', 'time'] },
-      { format: 'timestamp', description: '时间戳转日期', example: 'timestamp 1705312245', keywords: ['timestamp', '时间戳'] },
-      { format: 'to timestamp', description: '日期转时间戳', example: '2024-01-15 to timestamp', keywords: ['to', '到', 'timestamp', '时间戳'] },
+      { format: 'date', description: '时间戳转日期', example: 'date 1705312245', keywords: ['date', '日期'] },
+      { format: 'ts', description: '日期转时间戳', example: 'ts 2024-01-15', keywords: ['ts', 'timestamp', '时间戳'] },
+      { format: 'timestamp', description: '日期转时间戳', example: 'timestamp 2024-01-15', keywords: ['timestamp', '时间戳'] },
       { format: '时间差', description: '计算时间差', example: '2024-01-15 - 2024-01-10', keywords: ['时间差', 'difference', '-'] },
       { format: '时间加减', description: '时间加减', example: '2024-01-15 + 2 days', keywords: ['时间加减', 'add', 'subtract', '+', '-'] },
-      { format: '时区转换', description: '时区转换', example: '2024-01-15 to UTC', keywords: ['时区', 'timezone', 'to', '到'] },
+      { format: '时区转换', description: '时区转换', example: 'UTC 2024-01-15', keywords: ['时区', 'timezone', 'utc', 'est', 'cst'] },
     ];
 
     // 智能匹配：使用综合匹配算法
@@ -936,11 +990,12 @@ class TimeService {
       description: '支持时间查询、时间戳转换、时间计算、时区转换',
       formats: [
         { format: 'time', description: '显示当前时间（多种格式）', example: 'time 或 时间' },
-        { format: 'timestamp <时间戳>', description: '时间戳转日期', example: 'timestamp 1705312245' },
-        { format: '<日期> to timestamp', description: '日期转时间戳', example: '2024-01-15 to timestamp' },
+        { format: 'date <时间戳>', description: '时间戳转日期', example: 'date 1705312245' },
+        { format: 'ts <日期>', description: '日期转时间戳', example: 'ts 2024-01-15' },
+        { format: 'timestamp <日期>', description: '日期转时间戳', example: 'timestamp 2024-01-15' },
         { format: '<日期1> - <日期2>', description: '计算时间差', example: '2024-01-15 - 2024-01-10' },
         { format: '<日期> + <时长>', description: '时间加减', example: '2024-01-15 + 2 days' },
-        { format: '<日期> to <时区>', description: '时区转换', example: '2024-01-15 to UTC' },
+        { format: '<时区> <日期>', description: '时区转换', example: 'UTC 2024-01-15 或 EST 2024-01-15' },
       ],
     };
   }

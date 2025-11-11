@@ -1283,7 +1283,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                     <div className="flex items-center justify-between py-2">
                       <div>
                         <div className="font-medium text-gray-900">计算器</div>
-                        <div className="text-sm text-gray-500">数学计算、科学函数、单位换算</div>
+                        <div className="text-sm text-gray-500">数学计算、科学函数</div>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
@@ -2059,13 +2059,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                         <code className="px-2 py-1 bg-white rounded text-xs">log(100)</code>
                       </div>
                     </div>
-                    <div className="p-3 bg-gray-50 rounded-lg">
-                      <div className="font-medium text-gray-900 mb-2">单位换算</div>
-                      <div className="flex flex-wrap gap-2">
-                        <code className="px-2 py-1 bg-white rounded text-xs">100km to m</code>
-                        <code className="px-2 py-1 bg-white rounded text-xs">32f to c</code>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -2087,10 +2080,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="font-medium text-gray-900 mb-2">时间戳转换</div>
+                      <div className="text-xs text-gray-600 mb-2">时间戳转日期</div>
                       <div className="flex flex-wrap gap-2 mb-2">
-                        <code className="px-2 py-1 bg-white rounded text-xs">timestamp 1705312245</code>
-                        <code className="px-2 py-1 bg-white rounded text-xs">1705312245 to date</code>
-                        <code className="px-2 py-1 bg-white rounded text-xs">2024-01-15 to timestamp</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">date 1705312245</code>
+                      </div>
+                      <div className="text-xs text-gray-600 mb-2">日期转时间戳</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">ts 2024-01-15</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">timestamp 2024-01-15</code>
                       </div>
                       <p className="text-xs text-gray-600">时间戳与日期互转，支持秒级和毫秒级时间戳</p>
                     </div>
@@ -2105,8 +2102,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="font-medium text-gray-900 mb-2">时区转换</div>
                       <div className="flex flex-wrap gap-2 mb-2">
-                        <code className="px-2 py-1 bg-white rounded text-xs">2024-01-15 to UTC</code>
-                        <code className="px-2 py-1 bg-white rounded text-xs">2024-01-15 CST to EST</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">UTC 2024-01-15</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">EST 2024-01-15</code>
                       </div>
                       <p className="text-xs text-gray-600">支持 UTC、CST、EST、PST、JST 等时区转换</p>
                     </div>
