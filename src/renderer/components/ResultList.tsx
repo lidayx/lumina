@@ -16,6 +16,7 @@ export interface SearchResult {
     success: boolean;
     error?: string;
   }; // 计算器结果数据
+  suggestionData?: any; // 补全建议数据（用于Tab补全）
 }
 
 interface ResultListProps {
@@ -120,10 +121,11 @@ const ResultItem = React.memo<{
       onClick={onSelect}
       onMouseEnter={onHover}
       className={`
-        flex items-center px-4 py-2.5 rounded cursor-pointer transition-colors
+        flex items-center px-4 py-2.5 rounded cursor-pointer 
+        transition-all duration-150 ease-in-out
         ${
           isSelected
-            ? 'bg-gray-100 dark:bg-gray-700'
+            ? 'bg-gray-100 dark:bg-gray-700 transform scale-[1.02] shadow-sm'
             : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
         }
       `}

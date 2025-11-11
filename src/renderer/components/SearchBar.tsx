@@ -8,6 +8,7 @@ interface SearchBarProps {
   isLoading?: boolean;
   query?: string;
   onQueryChange?: (query: string) => void;
+  onTabComplete?: () => void; // Tab补全回调
 }
 
 export const SearchBar: React.FC<SearchBarProps> = ({
@@ -18,6 +19,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   isLoading = false,
   query: externalQuery,
   onQueryChange,
+  onTabComplete,
 }) => {
   const [internalQuery, setInternalQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -97,6 +99,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           onEscape();
         }
       }
+    } else if (e.key === 'Tab' && onTabComplete && !e.shiftKey) {
+      // Tab补全：如果当前有选中的补全建议，自动填充
+      e.preventDefault();
+      onTabComplete();
     }
   };
 

@@ -1,4 +1,6 @@
 import React from 'react';
+import { debounce } from '../../shared/utils/debounce';
+import { completionCache } from '../../shared/utils/completionCache';
 import { SearchBar } from './SearchBar';
 import { ResultList, SearchResult as SearchResultType } from './ResultList';
 
@@ -458,8 +460,17 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   // 保留完整的查询用于补全，以便匹配 "url en" -> "url encode"
                   const queryForComplete = actualQuery.trim();
                   if (queryForComplete) {
-                    featureCompletions = await window.electron.encode.complete(queryForComplete).catch(() => []);
-                    console.log('🔍 [编码补全]', { queryForComplete, completions: featureCompletions });
+                    // 尝试从缓存获取
+                    const cached = completionCache.get('encode', queryForComplete);
+                    if (cached) {
+                      featureCompletions = cached;
+                    } else {
+                      featureCompletions = await window.electron.encode.complete(queryForComplete).catch(() => []);
+                      console.log('🔍 [编码补全]', { queryForComplete, completions: featureCompletions });
+                      if (featureCompletions.length > 0) {
+                        completionCache.set('encode', queryForComplete, featureCompletions);
+                      }
+                    }
                   } else {
                     featureHelp = await window.electron.encode.help().catch(() => null);
                   }
@@ -467,7 +478,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   featureType = 'string';
                   const queryForComplete = actualQuery.replace(/^(?:uppercase|lowercase|大写|小写|title|camel|snake|reverse|反转|trim|count|统计|replace|extract)\s*/i, '').trim();
                   if (queryForComplete) {
-                    featureCompletions = await window.electron.string.complete(queryForComplete).catch(() => []);
+                    const cached = completionCache.get('string', queryForComplete);
+                    if (cached) {
+                      featureCompletions = cached;
+                    } else {
+                      featureCompletions = await window.electron.string.complete(queryForComplete).catch(() => []);
+                      if (featureCompletions.length > 0) {
+                        completionCache.set('string', queryForComplete, featureCompletions);
+                      }
+                    }
                   } else {
                     featureHelp = await window.electron.string.help().catch(() => null);
                   }
@@ -475,7 +494,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   featureType = 'varname';
                   const queryForComplete = actualQuery.replace(/^(?:varname|变量名|camel|snake|pascal)\s*/i, '').trim();
                   if (queryForComplete) {
-                    featureCompletions = await window.electron.varname.complete(queryForComplete).catch(() => []);
+                    const cached = completionCache.get('varname', queryForComplete);
+                    if (cached) {
+                      featureCompletions = cached;
+                    } else {
+                      featureCompletions = await window.electron.varname.complete(queryForComplete).catch(() => []);
+                      if (featureCompletions.length > 0) {
+                        completionCache.set('varname', queryForComplete, featureCompletions);
+                      }
+                    }
                   } else {
                     featureHelp = await window.electron.varname.help().catch(() => null);
                   }
@@ -483,7 +510,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   featureType = 'time';
                   const queryForComplete = actualQuery.replace(/^(?:time|时间|timestamp|date|日期)\s*/i, '').trim();
                   if (queryForComplete) {
-                    featureCompletions = await window.electron.time.complete(queryForComplete).catch(() => []);
+                    const cached = completionCache.get('time', queryForComplete);
+                    if (cached) {
+                      featureCompletions = cached;
+                    } else {
+                      featureCompletions = await window.electron.time.complete(queryForComplete).catch(() => []);
+                      if (featureCompletions.length > 0) {
+                        completionCache.set('time', queryForComplete, featureCompletions);
+                      }
+                    }
                   } else {
                     featureHelp = await window.electron.time.help().catch(() => null);
                   }
@@ -616,15 +651,34 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               
               // 显示功能补全建议（提高优先级，确保显示在最前面）
               featureCompletions.forEach((suggestion: any, index: number) => {
+                // 提取参数信息（如果有）
+                const formatParts = suggestion.format.split(' ');
+                const hasParams = formatParts.length > 2 || suggestion.format.includes('<');
+                
+                // 根据功能类型选择图标
+                const featureIcons: Record<string, string> = {
+                  'encode': '🔐',
+                  'translate': '🌐',
+                  'random': '🎲',
+                  'string': '📝',
+                  'varname': '🏷️',
+                  'time': '⏰',
+                };
+                const icon = featureIcons[featureType] || '💡';
+                
                 combinedResults.push({
                   id: `feature-complete-${featureType}-${index}`,
                   type: 'command' as const,
-                  title: `💡 ${suggestion.format}`,
-                  description: suggestion.description,
+                  title: `${icon} ${suggestion.format}`,
+                  description: hasParams 
+                    ? `${suggestion.description} | 示例: ${suggestion.example}` 
+                    : suggestion.description,
                   // 使用 format 而不是 example，这样选中后只填充命令格式，不填充示例内容
                   action: `feature:complete:${featureType}:${suggestion.format}`,
                   score: 2700 - index, // 提高优先级，确保显示在网页搜索之前
                   priorityScore: 2700 - index,
+                  // 保存完整建议信息，用于Tab补全和参数提示
+                  suggestionData: suggestion,
                 });
               });
               
@@ -1261,8 +1315,18 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
     };
 
     // 防抖搜索（统一防抖，所有搜索同时执行）
-    const timer = setTimeout(searchAll, 300);
-    return () => clearTimeout(timer);
+    // 补全查询使用较短延迟（150ms），普通搜索使用较长延迟（300ms）
+    const debounceDelay = query.trim().length > 0 && (
+      query.trim().startsWith('>') || // 命令模式
+      /^(?:translate|翻译|fanyi|fy|en|zh|cn|url|html|base64|md5|encode|decode|编码|解码|bianma|jiema|pwd|password|密码|uuid|random|time|时间|timestamp|date|日期|uppercase|lowercase|大写|小写|title|camel|snake|reverse|反转|trim|count|统计|replace|extract|varname|变量名)/i.test(query.trim())
+    ) ? 150 : 300;
+    
+    const timer = setTimeout(searchAll, debounceDelay);
+    return () => {
+      clearTimeout(timer);
+      // 定期清理过期缓存
+      completionCache.clearExpired();
+    };
   }, [query]); // 移除 appResults 依赖，直接通过 IPC 搜索
 
   // 处理鼠标悬停（只更新选中索引，不执行操作）
@@ -1515,11 +1579,21 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setSelectedIndex((prev) => Math.max(prev - 1, 0));
-      } else if (e.key === 'Tab' && !e.shiftKey && results.length > 0) {
-        // Tab 键：在结果类型间切换
+      } else if (e.key === 'Tab' && !e.shiftKey) {
+        // Tab 键：优先处理补全，如果没有补全建议则切换结果类型
         e.preventDefault();
         const currentResult = results[selectedIndex];
-        if (currentResult) {
+        if (currentResult && currentResult.action.startsWith('feature:complete:')) {
+          // 如果有补全建议，执行补全
+          const actionParts = currentResult.action.split(':');
+          if (actionParts[1] === 'complete') {
+            const completeText = actionParts.slice(3).join(':');
+            const formatText = completeText.replace(/<[^>]+>/g, '').trim();
+            setQuery(formatText + ' ');
+            setSelectedIndex(0);
+          }
+        } else if (results.length > 0 && currentResult) {
+          // 否则在结果类型间切换
           const nextType = getNextType(currentResult.type);
           if (nextType) {
             switchToType(nextType);
