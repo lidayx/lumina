@@ -4,7 +4,6 @@
  */
 
 import { timeService } from './timeService';
-import { stringService } from './stringService';
 import { randomService } from './randomService';
 import { translateService } from './translateService';
 import { variableNameService } from './variableNameService';
@@ -97,19 +96,7 @@ class CalculatorService {
       }
 
       // 注意：编码解码查询已移至独立的 encodeHandlers，不再通过计算器服务处理
-
-      // 尝试识别字符串工具查询
-      // 注意：stringService 内部已检查 featureStringTools 开关
-      const stringResult = stringService.handleStringQuery(expression);
-      if (stringResult && stringResult.success) {
-        // 将 StringResult 转换为 CalculationResult
-        return {
-          input: stringResult.input,
-          output: stringResult.output,
-          success: stringResult.success,
-          error: stringResult.error,
-        };
-      }
+      // 注意：字符串工具查询已移至独立的 stringHandlers，不再通过计算器服务处理
 
       // 尝试识别随机数生成查询
       // 注意：randomService 内部已检查各个随机数功能开关

@@ -96,50 +96,85 @@ class StringService {
    * 处理大小写转换
    */
   private handleCaseConversion(query: string): StringResult | null {
-    // 匹配: uppercase <字符串> 或 大写 <字符串>
-    let pattern = /^(?:uppercase|大写)\s+(.+)$/i;
-    let match = query.match(pattern);
-    let conversionType: 'uppercase' | 'lowercase' | 'title' | null = 'uppercase';
+    // 先检查是否匹配完整的命令格式（即使没有参数）
+    const uppercaseCommandPattern = /^(?:uppercase|大写)(?:\s+(.+))?$/i;
+    const lowercaseCommandPattern = /^(?:lowercase|小写)(?:\s+(.+))?$/i;
+    const titleCommandPattern = /^(?:title\s+case|标题)(?:\s+(.+))?$/i;
+    const uppercaseCommandReversePattern = /^(.+?)\s+(?:uppercase|大写)$/i;
+    const lowercaseCommandReversePattern = /^(.+?)\s+(?:lowercase|小写)$/i;
+    const titleCommandReversePattern = /^(.+?)\s+(?:title\s+case|标题)$/i;
+    
+    let match: RegExpMatchArray | null = null;
+    let conversionType: 'uppercase' | 'lowercase' | 'title' | null = null;
+    let text = '';
 
-    if (!match) {
-      // 匹配: <字符串> uppercase 或 <字符串> 大写
-      pattern = /^(.+?)\s+(?:uppercase|大写)$/i;
-      match = query.match(pattern);
+    // 检查正向格式: uppercase <字符串> 或 大写 <字符串>
+    match = query.match(uppercaseCommandPattern);
+    if (match) {
+      conversionType = 'uppercase';
+      text = match[1] ? match[1].trim() : '';
     }
 
+    // 检查正向格式: lowercase <字符串> 或 小写 <字符串>
     if (!match) {
-      // 匹配: lowercase <字符串> 或 小写 <字符串>
-      pattern = /^(?:lowercase|小写)\s+(.+)$/i;
-      match = query.match(pattern);
-      conversionType = 'lowercase';
+      match = query.match(lowercaseCommandPattern);
+      if (match) {
+        conversionType = 'lowercase';
+        text = match[1] ? match[1].trim() : '';
+      }
     }
 
+    // 检查正向格式: title case <字符串> 或 标题 <字符串>
     if (!match) {
-      // 匹配: <字符串> lowercase 或 <字符串> 小写
-      pattern = /^(.+?)\s+(?:lowercase|小写)$/i;
-      match = query.match(pattern);
-      conversionType = 'lowercase';
+      match = query.match(titleCommandPattern);
+      if (match) {
+        conversionType = 'title';
+        text = match[1] ? match[1].trim() : '';
+      }
     }
 
+    // 检查反向格式: <字符串> uppercase 或 <字符串> 大写
     if (!match) {
-      // 匹配: title case <字符串> 或 标题 <字符串>
-      pattern = /^(?:title\s+case|标题)\s+(.+)$/i;
-      match = query.match(pattern);
-      conversionType = 'title';
+      match = query.match(uppercaseCommandReversePattern);
+      if (match) {
+        conversionType = 'uppercase';
+        text = match[1] ? match[1].trim() : '';
+      }
     }
 
+    // 检查反向格式: <字符串> lowercase 或 <字符串> 小写
     if (!match) {
-      // 匹配: <字符串> title case 或 <字符串> 标题
-      pattern = /^(.+?)\s+(?:title\s+case|标题)$/i;
-      match = query.match(pattern);
-      conversionType = 'title';
+      match = query.match(lowercaseCommandReversePattern);
+      if (match) {
+        conversionType = 'lowercase';
+        text = match[1] ? match[1].trim() : '';
+      }
     }
 
+    // 检查反向格式: <字符串> title case 或 <字符串> 标题
+    if (!match) {
+      match = query.match(titleCommandReversePattern);
+      if (match) {
+        conversionType = 'title';
+        text = match[1] ? match[1].trim() : '';
+      }
+    }
+
+    // 如果没有匹配到任何格式，返回 null
     if (!match) {
       return null;
     }
 
-    const text = match[1].trim();
+    // 如果匹配到命令格式但没有参数，返回错误提示
+    if (!text) {
+      const operationName = conversionType === 'uppercase' ? '大写' : conversionType === 'lowercase' ? '小写' : '标题格式';
+      return {
+        input: query,
+        output: '',
+        success: false,
+        error: `请输入要转换为${operationName}的内容`,
+      };
+    }
 
     try {
       let result: string;
@@ -163,11 +198,12 @@ class StringService {
         success: true,
       };
     } catch (error: any) {
+      const errorMsg = `大小写转换失败: ${error.message}`;
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: `大小写转换失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }
@@ -187,36 +223,65 @@ class StringService {
    * 处理命名格式转换
    */
   private handleNamingConversion(query: string): StringResult | null {
-    // 匹配: camel case <字符串>
-    let pattern = /^camel\s+case\s+(.+)$/i;
-    let match = query.match(pattern);
-    let conversionType: 'camel' | 'snake' | null = 'camel';
+    // 先检查是否匹配完整的命令格式（即使没有参数）
+    const camelCommandPattern = /^camel\s+case(?:\s+(.+))?$/i;
+    const snakeCommandPattern = /^snake\s+case(?:\s+(.+))?$/i;
+    const camelCommandReversePattern = /^(.+?)\s+camel\s+case$/i;
+    const snakeCommandReversePattern = /^(.+?)\s+snake\s+case$/i;
+    
+    let match: RegExpMatchArray | null = null;
+    let conversionType: 'camel' | 'snake' | null = null;
+    let text = '';
 
-    if (!match) {
-      // 匹配: <字符串> camel case
-      pattern = /^(.+?)\s+camel\s+case$/i;
-      match = query.match(pattern);
+    // 检查正向格式: camel case <字符串>
+    match = query.match(camelCommandPattern);
+    if (match) {
+      conversionType = 'camel';
+      text = match[1] ? match[1].trim() : '';
     }
 
+    // 检查正向格式: snake case <字符串>
     if (!match) {
-      // 匹配: snake case <字符串>
-      pattern = /^snake\s+case\s+(.+)$/i;
-      match = query.match(pattern);
-      conversionType = 'snake';
+      match = query.match(snakeCommandPattern);
+      if (match) {
+        conversionType = 'snake';
+        text = match[1] ? match[1].trim() : '';
+      }
     }
 
+    // 检查反向格式: <字符串> camel case
     if (!match) {
-      // 匹配: <字符串> snake case
-      pattern = /^(.+?)\s+snake\s+case$/i;
-      match = query.match(pattern);
-      conversionType = 'snake';
+      match = query.match(camelCommandReversePattern);
+      if (match) {
+        conversionType = 'camel';
+        text = match[1] ? match[1].trim() : '';
+      }
     }
 
+    // 检查反向格式: <字符串> snake case
+    if (!match) {
+      match = query.match(snakeCommandReversePattern);
+      if (match) {
+        conversionType = 'snake';
+        text = match[1] ? match[1].trim() : '';
+      }
+    }
+
+    // 如果没有匹配到任何格式，返回 null
     if (!match) {
       return null;
     }
 
-    const text = match[1].trim();
+    // 如果匹配到命令格式但没有参数，返回错误提示
+    if (!text) {
+      const operationName = conversionType === 'camel' ? '驼峰命名' : '蛇形命名';
+      return {
+        input: query,
+        output: '',
+        success: false,
+        error: `请输入要转换为${operationName}的内容`,
+      };
+    }
 
     try {
       let result: string;
@@ -237,11 +302,12 @@ class StringService {
         success: true,
       };
     } catch (error: any) {
+      const errorMsg = `命名格式转换失败: ${error.message}`;
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: `命名格式转换失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }
@@ -278,21 +344,41 @@ class StringService {
    * 处理字符串反转
    */
   private handleReverse(query: string): StringResult | null {
-    // 匹配: reverse <字符串> 或 反转 <字符串>
-    let pattern = /^(?:reverse|反转)\s+(.+)$/i;
-    let match = query.match(pattern);
+    // 先检查是否匹配完整的命令格式（即使没有参数）
+    const reverseCommandPattern = /^(?:reverse|反转)(?:\s+(.+))?$/i;
+    const reverseCommandReversePattern = /^(.+?)\s+(?:reverse|反转)$/i;
+    
+    let match: RegExpMatchArray | null = null;
+    let text = '';
 
-    if (!match) {
-      // 匹配: <字符串> reverse 或 <字符串> 反转
-      pattern = /^(.+?)\s+(?:reverse|反转)$/i;
-      match = query.match(pattern);
+    // 检查正向格式: reverse <字符串> 或 反转 <字符串>
+    match = query.match(reverseCommandPattern);
+    if (match) {
+      text = match[1] ? match[1].trim() : '';
     }
 
+    // 检查反向格式: <字符串> reverse 或 <字符串> 反转
+    if (!match) {
+      match = query.match(reverseCommandReversePattern);
+      if (match) {
+        text = match[1] ? match[1].trim() : '';
+      }
+    }
+
+    // 如果没有匹配到任何格式，返回 null
     if (!match) {
       return null;
     }
 
-    const text = match[1].trim();
+    // 如果匹配到命令格式但没有参数，返回错误提示
+    if (!text) {
+      return {
+        input: query,
+        output: '',
+        success: false,
+        error: '请输入要反转的内容',
+      };
+    }
 
     try {
       const reversed = text.split('').reverse().join('');
@@ -302,11 +388,12 @@ class StringService {
         success: true,
       };
     } catch (error: any) {
+      const errorMsg = `字符串反转失败: ${error.message}`;
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: `字符串反转失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }
@@ -317,38 +404,64 @@ class StringService {
    * 处理去除空格
    */
   private handleTrim(query: string): StringResult | null {
-    // 先匹配 trim all（更具体的模式）
-    // 匹配: trim all <字符串>
-    let pattern = /^trim\s+all\s+(.+)$/i;
-    let match = query.match(pattern);
-    let trimType: 'trim' | 'trimAll' = 'trimAll';
+    // 先检查是否匹配完整的命令格式（即使没有参数）
+    const trimAllCommandPattern = /^trim\s+all(?:\s+(.+))?$/i;
+    const trimCommandPattern = /^trim(?:\s+(.+))?$/i;
+    const trimAllCommandReversePattern = /^(.+?)\s+trim\s+all$/i;
+    const trimCommandReversePattern = /^(.+?)\s+trim$/i;
+    
+    let match: RegExpMatchArray | null = null;
+    let trimType: 'trim' | 'trimAll' = 'trim';
+    let text = '';
 
-    if (!match) {
-      // 匹配: <字符串> trim all
-      pattern = /^(.+?)\s+trim\s+all$/i;
-      match = query.match(pattern);
+    // 检查正向格式: trim all <字符串>
+    match = query.match(trimAllCommandPattern);
+    if (match) {
       trimType = 'trimAll';
+      text = match[1] ? match[1].trim() : '';
     }
 
+    // 检查正向格式: trim <字符串>
     if (!match) {
-      // 匹配: trim <字符串>（普通 trim）
-      pattern = /^trim\s+(.+)$/i;
-      match = query.match(pattern);
-      trimType = 'trim';
+      match = query.match(trimCommandPattern);
+      if (match) {
+        trimType = 'trim';
+        text = match[1] ? match[1].trim() : '';
+      }
     }
 
+    // 检查反向格式: <字符串> trim all
     if (!match) {
-      // 匹配: <字符串> trim
-      pattern = /^(.+?)\s+trim$/i;
-      match = query.match(pattern);
-      trimType = 'trim';
+      match = query.match(trimAllCommandReversePattern);
+      if (match) {
+        trimType = 'trimAll';
+        text = match[1] ? match[1].trim() : '';
+      }
     }
 
+    // 检查反向格式: <字符串> trim
+    if (!match) {
+      match = query.match(trimCommandReversePattern);
+      if (match) {
+        trimType = 'trim';
+        text = match[1] ? match[1].trim() : '';
+      }
+    }
+
+    // 如果没有匹配到任何格式，返回 null
     if (!match) {
       return null;
     }
 
-    const text = match[1].trim();
+    // 如果匹配到命令格式但没有参数，返回错误提示
+    if (!text) {
+      return {
+        input: query,
+        output: '',
+        success: false,
+        error: '请输入要去除空格的内容',
+      };
+    }
 
     try {
       let result: string;
@@ -364,11 +477,12 @@ class StringService {
         success: true,
       };
     } catch (error: any) {
+      const errorMsg = `去除空格失败: ${error.message}`;
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: `去除空格失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }
@@ -379,34 +493,59 @@ class StringService {
    * 处理文本统计
    */
   private handleCount(query: string): StringResult | null {
-    // 先匹配 word count（更具体的模式）
-    // 匹配: word count <字符串>
-    let pattern = /^word\s+count\s+(.+)$/i;
-    let match = query.match(pattern);
+    // 先检查是否匹配完整的命令格式（即使没有参数）
+    const wordCountCommandPattern = /^word\s+count(?:\s+(.+))?$/i;
+    const countCommandPattern = /^(?:count|统计)(?:\s+(.+))?$/i;
+    const wordCountCommandReversePattern = /^(.+?)\s+word\s+count$/i;
+    const countCommandReversePattern = /^(.+?)\s+(?:count|统计)$/i;
+    
+    let match: RegExpMatchArray | null = null;
+    let text = '';
 
-    if (!match) {
-      // 匹配: <字符串> word count
-      pattern = /^(.+?)\s+word\s+count$/i;
-      match = query.match(pattern);
+    // 检查正向格式: word count <字符串>
+    match = query.match(wordCountCommandPattern);
+    if (match) {
+      text = match[1] ? match[1].trim() : '';
     }
 
+    // 检查正向格式: count <字符串> 或 统计 <字符串>
     if (!match) {
-      // 匹配: count <字符串> 或 统计 <字符串>
-      pattern = /^(?:count|统计)\s+(.+)$/i;
-      match = query.match(pattern);
+      match = query.match(countCommandPattern);
+      if (match) {
+        text = match[1] ? match[1].trim() : '';
+      }
     }
 
+    // 检查反向格式: <字符串> word count
     if (!match) {
-      // 匹配: <字符串> count 或 <字符串> 统计
-      pattern = /^(.+?)\s+(?:count|统计)$/i;
-      match = query.match(pattern);
+      match = query.match(wordCountCommandReversePattern);
+      if (match) {
+        text = match[1] ? match[1].trim() : '';
+      }
     }
 
+    // 检查反向格式: <字符串> count 或 <字符串> 统计
+    if (!match) {
+      match = query.match(countCommandReversePattern);
+      if (match) {
+        text = match[1] ? match[1].trim() : '';
+      }
+    }
+
+    // 如果没有匹配到任何格式，返回 null
     if (!match) {
       return null;
     }
 
-    const text = match[1].trim();
+    // 如果匹配到命令格式但没有参数，返回错误提示
+    if (!text) {
+      return {
+        input: query,
+        output: '',
+        success: false,
+        error: '请输入要统计的内容',
+      };
+    }
 
     try {
       const stats = this.getTextStats(text);
@@ -416,11 +555,12 @@ class StringService {
         success: true,
       };
     } catch (error: any) {
+      const errorMsg = `文本统计失败: ${error.message}`;
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: `文本统计失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }
@@ -465,11 +605,12 @@ class StringService {
         success: true,
       };
     } catch (error: any) {
+      const errorMsg = `字符串替换失败: ${error.message}`;
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: `字符串替换失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }
@@ -515,11 +656,12 @@ class StringService {
           }
         }
       } catch (e) {
+        const errorMsg = `无效的正则表达式: ${regexStr}`;
         return {
           input: query,
           output: errorMsg,
           success: false,
-          error: `无效的正则表达式: ${regexStr}`,
+          error: errorMsg,
         };
       }
 
@@ -539,11 +681,12 @@ class StringService {
         };
       }
     } catch (error: any) {
+      const errorMsg = `正则提取失败: ${error.message}`;
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: `正则提取失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }
@@ -560,15 +703,15 @@ class StringService {
     const suggestions: Array<{ format: string; description: string; example: string; score: number }> = [];
 
     const formats = [
-      { format: 'uppercase', description: '转换为大写', example: 'uppercase hello world', keywords: ['uppercase', '大写'] },
-      { format: 'lowercase', description: '转换为小写', example: 'lowercase HELLO WORLD', keywords: ['lowercase', '小写'] },
-      { format: 'title case', description: '转换为标题格式', example: 'title case hello world', keywords: ['title', '标题'] },
-      { format: 'camel case', description: '转换为驼峰命名', example: 'camel case hello world', keywords: ['camel', '驼峰'] },
-      { format: 'snake case', description: '转换为蛇形命名', example: 'snake case hello world', keywords: ['snake', '蛇形'] },
-      { format: 'reverse', description: '反转字符串', example: 'reverse hello', keywords: ['reverse', '反转'] },
-      { format: 'trim', description: '去除空格', example: 'trim  hello  ', keywords: ['trim', '去除'] },
-      { format: 'count', description: '统计字符数', example: 'count hello world', keywords: ['count', '统计'] },
-      { format: 'replace', description: '替换字符串', example: 'replace hello world hello hi', keywords: ['replace', '替换'] },
+      { format: 'uppercase', description: '转换为大写', example: 'uppercase hello world', keywords: ['uppercase', 'upper', '大写', 'daxie', 'dx'] },
+      { format: 'lowercase', description: '转换为小写', example: 'lowercase HELLO WORLD', keywords: ['lowercase', 'lower', '小写', 'xiaoxie', 'xx'] },
+      { format: 'title case', description: '转换为标题格式', example: 'title case hello world', keywords: ['title', 'tit', '标题', 'biaoti', 'bt'] },
+      { format: 'camel case', description: '转换为驼峰命名', example: 'camel case hello world', keywords: ['camel', 'cam', '驼峰', 'tuofeng', 'tf'] },
+      { format: 'snake case', description: '转换为蛇形命名', example: 'snake case hello world', keywords: ['snake', 'sna', '蛇形', 'shexing', 'sx'] },
+      { format: 'reverse', description: '反转字符串', example: 'reverse hello', keywords: ['reverse', 'rev', '反转', 'fanzhuan', 'fz'] },
+      { format: 'trim', description: '去除空格', example: 'trim  hello  ', keywords: ['trim', 'tri', '去除', 'quchu', 'qc'] },
+      { format: 'count', description: '统计字符数', example: 'count hello world', keywords: ['count', 'cou', '统计', 'tongji', 'tj'] },
+      { format: 'replace', description: '替换字符串', example: 'replace hello world hello hi', keywords: ['replace', 'rep', '替换', 'tihuan', 'th'] },
     ];
 
     // 智能匹配：使用综合匹配算法

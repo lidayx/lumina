@@ -16,6 +16,7 @@ import { registerShortcutHandlers } from './handlers/shortcutHandlers';
 import { registerAliasHandlers } from './handlers/aliasHandlers';
 import { registerFeatureCompletionHandlers } from './handlers/featureCompletionHandlers';
 import { registerEncodeHandlers } from './handlers/encodeHandlers';
+import { registerStringHandlers } from './handlers/stringHandlers';
 import { indexService } from './services/indexService';
 import { appService } from './services/appService';
 import { fileService } from './services/fileService';
@@ -268,6 +269,7 @@ registerCommandHandlers();
     registerAliasHandlers();
     registerFeatureCompletionHandlers();
     registerEncodeHandlers();
+    registerStringHandlers();
 
 // 初始化服务
 app.on('ready', async () => {

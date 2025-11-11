@@ -373,12 +373,17 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             // 并行搜索所有类型（统一防抖，确保结果同时返回以便正确排序）
             // 先尝试编码解码模块（独立模块，优先级高于计算器）
             let encodeResult = null;
+            let stringResult = null;
             if (!isFileSearch && !urlCheck.isURL) {
               encodeResult = await window.electron.encode.handleQuery(actualQuery).catch(() => null);
+              // 如果编码解码模块没有处理，再尝试字符串工具
+              if (!encodeResult) {
+                stringResult = await window.electron.string.handleQuery(actualQuery).catch(() => null);
+              }
             }
             
-            // 如果编码解码模块没有处理，再尝试计算器
-            const calcResult = (!encodeResult && finalIsCalculation) 
+            // 如果编码解码和字符串工具模块都没有处理，再尝试计算器
+            const calcResult = (!encodeResult && !stringResult && finalIsCalculation)
               ? await window.electron.calculator.calculate(actualQuery).catch((err) => {
                   console.error('计算器计算失败:', err);
                   return null;
@@ -410,8 +415,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                 test3: /^(?:bianma|jiema|jiami|jiemi|bm|jm)/i.test(queryLower)
               });
             }
+            // 字符串工具关键词检测：支持部分匹配（如 "upper" 匹配 "uppercase"）
             const isStringKeyword = /^(?:uppercase|lowercase|大写|小写|title|camel|snake|reverse|反转|trim|count|统计|replace|extract)(\s|$)/i.test(queryLower) ||
-                                   /^(?:uppercase|lowercase|大写|小写|title|camel|snake|reverse|反转|trim|count|统计|replace|extract)\s+\w/i.test(queryLower);
+                                   /^(?:uppercase|lowercase|大写|小写|title|camel|snake|reverse|反转|trim|count|统计|replace|extract)\s+\w/i.test(queryLower) ||
+                                   /^(?:upper|lower|tit|cam|sna|rev|tri|cou|rep|ext|大写|小写|反转|统计|替换|提取)/i.test(queryLower);
             const isVarnameKeyword = /^(?:varname|变量名|camel|snake|pascal)(\s|$)/i.test(queryLower) ||
                                     /^(?:varname|变量名|camel|snake|pascal)\s+\w/i.test(queryLower);
             const isTimeKeyword = /^(?:time|时间|timestamp|date|日期)(\s|$)/i.test(queryLower) ||
@@ -482,13 +489,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   }
                 } else if (isStringKeyword) {
                   featureType = 'string';
-                  const queryForComplete = actualQuery.replace(/^(?:uppercase|lowercase|大写|小写|title|camel|snake|reverse|反转|trim|count|统计|replace|extract)\s*/i, '').trim();
+                  // 保留完整查询以便补全功能能够更好地匹配部分关键词（如 "upper" 匹配 "uppercase"）
+                  const queryForComplete = actualQuery.trim();
                   if (queryForComplete) {
                     const cached = completionCache.get('string', queryForComplete);
                     if (cached) {
                       featureCompletions = cached;
                     } else {
                       featureCompletions = await window.electron.string.complete(queryForComplete).catch(() => []);
+                      console.log('🔍 [字符串补全]', { queryForComplete, completions: featureCompletions });
                       if (featureCompletions.length > 0) {
                         completionCache.set('string', queryForComplete, featureCompletions);
                       }
@@ -610,14 +619,16 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               /^md5$/i.test(actualQuery.trim())
             );
             
-            // 如果有编码解码结果（无论成功还是失败），不显示补全建议
+            // 如果有编码解码或字符串工具结果（无论成功还是失败），不显示补全建议
             const hasEncodeResult = encodeResult !== null;
+            const hasStringResult = stringResult !== null;
             
             const shouldShowFeatureCompletion = featureType && 
                                                !isCommandMode && 
                                                !isFileSearch && 
                                                !urlCheck.isURL &&
                                                !hasEncodeResult && // 如果有编码解码结果（包括错误），不显示补全
+                                               !hasStringResult && // 如果有字符串工具结果（包括错误），不显示补全
                                                (isOnlyKeyword || !calcResult || !calcResult.success);
             
             // 调试日志
@@ -883,6 +894,31 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                 score: 1000,
                 priorityScore: 1000,
                 encodeData: encodeResult,
+              });
+            }
+            
+            // 字符串工具结果（如果有）
+            if (stringResult && stringResult.success) {
+              combinedResults.push({
+                id: 'string-result',
+                type: 'string' as const,
+                title: stringResult.output.trim(),
+                description: `字符串处理：${stringResult.input}`,
+                action: 'string:copy',
+                score: 2000,
+                priorityScore: 2000,
+                stringData: stringResult,
+              });
+            } else if (stringResult && !stringResult.success && stringResult.error) {
+              combinedResults.push({
+                id: 'string-error',
+                type: 'string' as const,
+                title: stringResult.error, // 不显示"错误:"前缀
+                description: `字符串处理：${stringResult.input || query}`,
+                action: 'string:copy',
+                score: 1000,
+                priorityScore: 1000,
+                stringData: stringResult,
               });
             }
             
@@ -1607,6 +1643,20 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
           hideMainWindow();
         } catch (error) {
           console.error('Failed to copy encode result:', error);
+        }
+      }
+      // 处理字符串工具结果
+      else if (result.action === 'string:copy') {
+        // 将字符串工具结果复制到剪贴板
+        try {
+          const stringData = (result as any).stringData;
+          if (stringData && stringData.output) {
+            await navigator.clipboard.writeText(stringData.output);
+            console.log('String result copied:', stringData.output);
+          }
+          hideMainWindow();
+        } catch (error) {
+          console.error('Failed to copy string result:', error);
         }
       }
       // 处理计算器结果

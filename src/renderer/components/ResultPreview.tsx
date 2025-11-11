@@ -924,16 +924,16 @@ const EncodePreview: React.FC<{ result: SearchResult }> = ({ result }) => {
           <p className="text-sm text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed whitespace-pre-wrap">{encodeData.input || '(空)'}</p>
         </div>
         {encodeData.success ? (
-          <div className="max-w-full overflow-x-hidden">
-            <div className="mb-1">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{operationType}结果</span>
-            </div>
+        <div className="max-w-full overflow-x-hidden">
+          <div className="mb-1">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{operationType}结果</span>
+          </div>
             <p className="text-lg font-bold text-gray-900 dark:text-gray-100 font-mono break-words break-all leading-relaxed whitespace-pre-wrap">
               {encodeData.output.includes(' → ') 
                 ? encodeData.output.split(' → ')[1] 
                 : encodeData.output || '(无结果)'}
             </p>
-          </div>
+        </div>
         ) : encodeData.error ? (
           <div className="max-w-full overflow-x-hidden">
             <div className="mb-1">

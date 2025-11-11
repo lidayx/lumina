@@ -119,7 +119,7 @@ class EncodeService {
     if (!match) {
       match = query.match(decodeCommandReversePattern);
       if (match) {
-        isEncode = false;
+      isEncode = false;
         text = match[1] ? match[1].trim() : '';
       }
     }
@@ -211,7 +211,7 @@ class EncodeService {
     if (!match) {
       match = query.match(decodeCommandReversePattern);
       if (match) {
-        isEncode = false;
+      isEncode = false;
         text = match[1] ? match[1].trim() : '';
       }
     }
@@ -331,7 +331,7 @@ class EncodeService {
     if (!match) {
       match = query.match(decodeCommandReversePattern);
       if (match) {
-        isEncode = false;
+      isEncode = false;
         text = match[1] ? match[1].trim() : '';
       }
     }
