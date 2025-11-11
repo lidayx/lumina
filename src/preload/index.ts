@@ -95,28 +95,39 @@ contextBridge.exposeInMainWorld('electron', {
         help: () => ipcRenderer.invoke('time-help'),
       },
       
-      // 功能补全相关
-      translate: {
-        complete: (partial: string) => ipcRenderer.invoke('translate-complete', partial),
-        help: () => ipcRenderer.invoke('translate-help'),
-      },
+      // 随机数相关
       random: {
+        handleQuery: (query: string) => ipcRenderer.invoke('random-handle-query', query),
         complete: (partial: string) => ipcRenderer.invoke('random-complete', partial),
         help: () => ipcRenderer.invoke('random-help'),
       },
+      
+      // 翻译相关
+      translate: {
+        handleQuery: (query: string) => ipcRenderer.invoke('translate-handle-query', query),
+        complete: (partial: string) => ipcRenderer.invoke('translate-complete', partial),
+        help: () => ipcRenderer.invoke('translate-help'),
+      },
+      
+      // 变量名相关
+      varname: {
+        handleQuery: (query: string) => ipcRenderer.invoke('varname-handle-query', query),
+        complete: (partial: string) => ipcRenderer.invoke('varname-complete', partial),
+        help: () => ipcRenderer.invoke('varname-help'),
+      },
+      
+      // 编码解码相关
       encode: {
         handleQuery: (query: string) => ipcRenderer.invoke('encode-handle-query', query),
         complete: (partial: string) => ipcRenderer.invoke('encode-complete', partial),
         help: () => ipcRenderer.invoke('encode-help'),
       },
+      
+      // 字符串工具相关
       string: {
         handleQuery: (query: string) => ipcRenderer.invoke('string-handle-query', query),
         complete: (partial: string) => ipcRenderer.invoke('string-complete', partial),
         help: () => ipcRenderer.invoke('string-help'),
-      },
-      varname: {
-        complete: (partial: string) => ipcRenderer.invoke('varname-complete', partial),
-        help: () => ipcRenderer.invoke('varname-help'),
       },
       
       // 书签相关

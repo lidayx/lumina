@@ -371,19 +371,36 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             console.log('🔍 [文件搜索] 设置:', { fileSearchEnabled });
 
             // 并行搜索所有类型（统一防抖，确保结果同时返回以便正确排序）
-            // 先尝试编码解码模块（独立模块，优先级高于计算器）
+            // 先尝试独立的功能模块（优先级高于计算器）
             let encodeResult = null;
             let stringResult = null;
+            let timeResult = null;
+            let randomResult = null;
+            let translateResult = null;
+            let variableNameResult = null;
+            
             if (!isFileSearch && !urlCheck.isURL) {
+              // 按优先级顺序尝试各个模块
               encodeResult = await window.electron.encode.handleQuery(actualQuery).catch(() => null);
-              // 如果编码解码模块没有处理，再尝试字符串工具
               if (!encodeResult) {
                 stringResult = await window.electron.string.handleQuery(actualQuery).catch(() => null);
               }
+              if (!encodeResult && !stringResult) {
+                timeResult = await window.electron.time.handleQuery(actualQuery).catch(() => null);
+              }
+              if (!encodeResult && !stringResult && !timeResult) {
+                randomResult = await window.electron.random.handleQuery(actualQuery).catch(() => null);
+              }
+              if (!encodeResult && !stringResult && !timeResult && !randomResult) {
+                translateResult = await window.electron.translate.handleQuery(actualQuery).catch(() => null);
+              }
+              if (!encodeResult && !stringResult && !timeResult && !randomResult && !translateResult) {
+                variableNameResult = await window.electron.varname.handleQuery(actualQuery).catch(() => null);
+              }
             }
             
-            // 如果编码解码和字符串工具模块都没有处理，再尝试计算器
-            const calcResult = (!encodeResult && !stringResult && finalIsCalculation)
+            // 如果所有独立模块都没有处理，再尝试计算器
+            const calcResult = (!encodeResult && !stringResult && !timeResult && !randomResult && !translateResult && !variableNameResult && finalIsCalculation)
               ? await window.electron.calculator.calculate(actualQuery).catch((err) => {
                   console.error('计算器计算失败:', err);
                   return null;
@@ -619,9 +636,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               /^md5$/i.test(actualQuery.trim())
             );
             
-            // 如果有编码解码或字符串工具结果（无论成功还是失败），不显示补全建议
+            // 如果有任何功能模块结果（无论成功还是失败），不显示补全建议
             const hasEncodeResult = encodeResult !== null;
             const hasStringResult = stringResult !== null;
+            const hasTimeResult = timeResult !== null;
+            const hasRandomResult = randomResult !== null;
+            const hasTranslateResult = translateResult !== null;
+            const hasVariableNameResult = variableNameResult !== null;
             
             const shouldShowFeatureCompletion = featureType && 
                                                !isCommandMode && 
@@ -629,6 +650,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                                                !urlCheck.isURL &&
                                                !hasEncodeResult && // 如果有编码解码结果（包括错误），不显示补全
                                                !hasStringResult && // 如果有字符串工具结果（包括错误），不显示补全
+                                               !hasTimeResult && // 如果有时间工具结果（包括错误），不显示补全
+                                               !hasRandomResult && // 如果有随机数生成结果（包括错误），不显示补全
+                                               !hasTranslateResult && // 如果有翻译结果（包括错误），不显示补全
+                                               !hasVariableNameResult && // 如果有变量名生成结果（包括错误），不显示补全
                                                (isOnlyKeyword || !calcResult || !calcResult.success);
             
             // 调试日志
@@ -922,7 +947,151 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               });
             }
             
-            // 计算器结果（如果有，包括时间查询结果）
+            // 时间工具结果（如果有）
+            if (timeResult && timeResult.success) {
+              combinedResults.push({
+                id: 'time-result',
+                type: 'time' as const,
+                title: timeResult.output.trim(),
+                description: `时间工具：${timeResult.input}`,
+                action: 'time:copy',
+                score: 2000,
+                priorityScore: 2000,
+                timeData: timeResult,
+              });
+            } else if (timeResult && !timeResult.success && timeResult.error) {
+              combinedResults.push({
+                id: 'time-error',
+                type: 'time' as const,
+                title: timeResult.error, // 不显示"错误:"前缀
+                description: `时间工具：${timeResult.input || query}`,
+                action: 'time:copy',
+                score: 1000,
+                priorityScore: 1000,
+                timeData: timeResult,
+              });
+            }
+            
+            // 随机数生成结果（如果有）
+            if (randomResult && randomResult.success) {
+              // 如果是多个结果（如多个密码），为每个结果创建一个选项
+              if (randomResult.outputs && randomResult.outputs.length > 0) {
+                randomResult.outputs.forEach((output: string, index: number) => {
+                  combinedResults.push({
+                    id: `random-result-${index}`,
+                    type: 'command' as const,
+                    title: output,
+                    description: `随机数生成 ${index + 1}/${randomResult.outputs.length} - 点击复制`,
+                    action: 'random:copy',
+                    score: 2000 - index,
+                    priorityScore: 2000 - index,
+                    calcData: {
+                      input: randomResult.input,
+                      output: output,
+                      success: true,
+                    },
+                  });
+                });
+              } else {
+                // 单个结果
+                combinedResults.push({
+                  id: 'random-result',
+                  type: 'command' as const,
+                  title: randomResult.output.trim(),
+                  description: `随机数生成：${randomResult.input}`,
+                  action: 'random:copy',
+                  score: 2000,
+                  priorityScore: 2000,
+                  calcData: {
+                    input: randomResult.input,
+                    output: randomResult.output,
+                    success: true,
+                  },
+                });
+              }
+            } else if (randomResult && !randomResult.success && randomResult.error) {
+              combinedResults.push({
+                id: 'random-error',
+                type: 'command' as const,
+                title: randomResult.error, // 不显示"错误:"前缀
+                description: `随机数生成：${randomResult.input || query}`,
+                action: 'random:copy',
+                score: 1000,
+                priorityScore: 1000,
+                calcData: randomResult,
+              });
+            }
+            
+            // 翻译结果（如果有）
+            if (translateResult && translateResult.success) {
+              combinedResults.push({
+                id: 'translate-result',
+                type: 'command' as const,
+                title: translateResult.output.trim(),
+                description: `翻译：${translateResult.input}`,
+                action: 'translate:copy',
+                score: 2000,
+                priorityScore: 2000,
+                calcData: {
+                  input: translateResult.input,
+                  output: translateResult.output,
+                  success: true,
+                },
+              });
+            } else if (translateResult && !translateResult.success && translateResult.error) {
+              combinedResults.push({
+                id: 'translate-error',
+                type: 'command' as const,
+                title: translateResult.error, // 不显示"错误:"前缀
+                description: `翻译：${translateResult.input || query}`,
+                action: 'translate:copy',
+                score: 1000,
+                priorityScore: 1000,
+                calcData: translateResult,
+              });
+            }
+            
+            // 变量名生成结果（如果有）
+            if (variableNameResult && variableNameResult.success) {
+              // 变量名生成可能返回多个格式，需要解析输出
+              const outputLines = variableNameResult.output.split('\n');
+              outputLines.forEach((line: string, index: number) => {
+                const colonIndex = line.indexOf(':');
+                // 只处理包含变量名格式的行
+                if (colonIndex > 0 && /^(camelCase|snake_case|PascalCase|CONSTANT|kebab-case):/i.test(line.trim())) {
+                  const variableName = line.substring(colonIndex + 1).trim();
+                  const styleName = line.substring(0, colonIndex).trim();
+                  
+                  combinedResults.push({
+                    id: `varname-result-${index}`,
+                    type: 'command' as const,
+                    title: variableName,
+                    description: styleName,
+                    action: 'varname:copy',
+                    score: 2000 - index,
+                    priorityScore: 2000 - index,
+                    calcData: {
+                      input: variableNameResult.input,
+                      output: variableName,
+                      success: true,
+                    },
+                  });
+                }
+              });
+            } else if (variableNameResult && !variableNameResult.success && variableNameResult.error) {
+              combinedResults.push({
+                id: 'varname-error',
+                type: 'command' as const,
+                title: variableNameResult.error, // 不显示"错误:"前缀
+                description: `变量名生成：${variableNameResult.input || query}`,
+                action: 'varname:copy',
+                score: 1000,
+                priorityScore: 1000,
+                calcData: variableNameResult,
+              });
+            }
+            
+            // 计算器结果（如果有，仅数学计算和单位换算）
             // 处理错误结果（如果检测到 URL，不显示计算器错误）
             if (calcResult && !calcResult.success && calcResult.error && !urlCheck.isURL) {
               combinedResults.push({
@@ -1390,8 +1559,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   action: `web:${web.searchUrl}`,
                   score: 50,
                   priorityScore: 50,
-                  // 搜索引擎结果：始终使用搜索引擎自身图标
-                  icon: web.icon,
+                  // 使用统一的 SVG 图标风格，不传递 icon 属性
                 });
               }
             }
@@ -1578,15 +1746,25 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
       }
       // 处理时间查询结果
       else if (result.action === 'time:copy') {
-        if (result.calcData) {
-          try {
-            // 复制时间结果到剪贴板
-            await navigator.clipboard.writeText(result.calcData.output);
-            console.log('Time result copied:', result.calcData.output);
-            hideMainWindow();
-          } catch (error) {
-            console.error('Failed to copy time result:', error);
+        // 将时间工具结果复制到剪贴板（支持 timeData 和 calcData）
+        try {
+          const timeData = (result as any).timeData;
+          const calcData = (result as any).calcData;
+          let textToCopy = '';
+          
+          if (timeData && timeData.output) {
+            textToCopy = timeData.output;
+          } else if (calcData && calcData.output) {
+            textToCopy = calcData.output;
           }
+          
+          if (textToCopy) {
+            await navigator.clipboard.writeText(textToCopy);
+            console.log('Time result copied:', textToCopy);
+          }
+          hideMainWindow();
+        } catch (error) {
+          console.error('Failed to copy time result:', error);
         }
       }
       // 处理剪贴板粘贴

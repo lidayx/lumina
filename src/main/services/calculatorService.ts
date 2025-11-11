@@ -3,10 +3,6 @@
  * 支持基本数学运算、科学计算、单位换算和表达式解析
  */
 
-import { timeService } from './timeService';
-import { randomService } from './randomService';
-import { translateService } from './translateService';
-import { variableNameService } from './variableNameService';
 import { settingsService } from './settingsService';
 
 // ========== 类型定义 ==========
@@ -97,40 +93,10 @@ class CalculatorService {
 
       // 注意：编码解码查询已移至独立的 encodeHandlers，不再通过计算器服务处理
       // 注意：字符串工具查询已移至独立的 stringHandlers，不再通过计算器服务处理
-
-      // 尝试识别随机数生成查询
-      // 注意：randomService 内部已检查各个随机数功能开关
-      const randomResult = randomService.handleRandomQuery(expression);
-      if (randomResult && randomResult.success) {
-        // 将 RandomResult 转换为 CalculationResult
-        // 保留 outputs 和 isMultiple 标志，用于前端处理多个密码
-        const result: any = {
-          input: randomResult.input,
-          output: randomResult.output,
-          success: randomResult.success,
-          error: randomResult.error,
-        };
-        if (randomResult.outputs) {
-          result.outputs = randomResult.outputs;
-        }
-        if (randomResult.isMultiple) {
-          result.isMultiple = randomResult.isMultiple;
-        }
-        return result;
-      }
-
-      // 尝试识别时间查询（在单位换算之前）
-      // 注意：timeService 内部已检查 featureTimeTools 开关
-      const timeResult = timeService.handleTimeQuery(expression);
-      if (timeResult && timeResult.success) {
-        // 将 TimeResult 转换为 CalculationResult
-        return {
-          input: timeResult.input,
-          output: timeResult.output,
-          success: timeResult.success,
-          error: timeResult.error,
-        };
-      }
+      // 注意：时间工具查询已移至独立的 timeHandlers，不再通过计算器服务处理
+      // 注意：随机数生成查询已移至独立的 randomHandlers，不再通过计算器服务处理
+      // 注意：翻译查询已移至独立的 translateHandlers，不再通过计算器服务处理
+      // 注意：变量名生成查询已移至独立的 variableNameHandlers，不再通过计算器服务处理
 
       // 尝试识别单位换算
       const unitConvertResult = this.tryUnitConversion(expression);

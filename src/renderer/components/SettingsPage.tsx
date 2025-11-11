@@ -39,7 +39,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
   const [editingEngine, setEditingEngine] = useState<any>(null);
   const [newEngineName, setNewEngineName] = useState('');
   const [newEngineUrl, setNewEngineUrl] = useState('');
-  const [newEngineIcon, setNewEngineIcon] = useState('');
   const [appSettings, setAppSettings] = useState<any>({});
   const [fileSearchPaths, setFileSearchPaths] = useState<string[]>([]);
   const [newFilePath, setNewFilePath] = useState('');
@@ -234,7 +233,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     setEditingEngine(engine);
     setNewEngineName(engine.name);
     setNewEngineUrl(engine.url);
-    setNewEngineIcon(engine.icon || '');
     setIsAddingEngine(true);
   };
 
@@ -264,14 +262,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         await window.electron.invoke('web-update-engine', editingEngine.name, {
           name: newEngineName,
           url: newEngineUrl,
-          icon: newEngineIcon || undefined,
         });
       } else {
         // 添加新引擎
         await window.electron.invoke('web-add-engine', {
           name: newEngineName,
           url: newEngineUrl,
-          icon: newEngineIcon || undefined,
           default: false,
         });
       }
@@ -281,7 +277,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setEditingEngine(null);
       setNewEngineName('');
       setNewEngineUrl('');
-      setNewEngineIcon('');
       await loadSearchEngines();
     } catch (error) {
       console.error('保存搜索引擎失败:', error);
@@ -293,24 +288,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     setEditingEngine(null);
     setNewEngineName('');
     setNewEngineUrl('');
-    setNewEngineIcon('');
   };
 
-  // 处理图片选择并转换为 base64
-  const handleIconSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      setNewEngineIcon(base64String);
-    };
-    reader.onerror = () => {
-      alert('读取图片失败');
-    };
-    reader.readAsDataURL(file);
-  };
 
   const loadBrowsers = async () => {
     try {
@@ -834,38 +813,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
                         <p className="mt-1 text-xs text-gray-500">使用 {`{query}`} 作为查询关键词占位符</p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          图标（可选）
-                        </label>
-                        <div className="flex items-center space-x-3">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleIconSelect}
-                            className="hidden"
-                            id="icon-upload"
-                          />
-                          <label
-                            htmlFor="icon-upload"
-                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer text-sm text-gray-700"
-                          >
-                            选择图标
-                          </label>
-                          {newEngineIcon && (
-                            <div className="flex items-center space-x-2">
-                              <img src={newEngineIcon} alt="预览" className="w-8 h-8 rounded" />
-                              <button
-                                onClick={() => setNewEngineIcon('')}
-                                className="text-xs text-red-600 hover:text-red-700"
-                              >
-                                清除
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        <p className="mt-1 text-xs text-gray-500">支持 PNG、JPG、SVG 格式，建议尺寸 24x24 或 48x48</p>
                       </div>
                       <div className="flex space-x-3">
                         <button

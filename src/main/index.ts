@@ -17,6 +17,9 @@ import { registerAliasHandlers } from './handlers/aliasHandlers';
 import { registerFeatureCompletionHandlers } from './handlers/featureCompletionHandlers';
 import { registerEncodeHandlers } from './handlers/encodeHandlers';
 import { registerStringHandlers } from './handlers/stringHandlers';
+import { registerRandomHandlers } from './handlers/randomHandlers';
+import { registerTranslateHandlers } from './handlers/translateHandlers';
+import { registerVariableNameHandlers } from './handlers/variableNameHandlers';
 import { indexService } from './services/indexService';
 import { appService } from './services/appService';
 import { fileService } from './services/fileService';
@@ -270,6 +273,9 @@ registerCommandHandlers();
     registerFeatureCompletionHandlers();
     registerEncodeHandlers();
     registerStringHandlers();
+    registerRandomHandlers();
+    registerTranslateHandlers();
+    registerVariableNameHandlers();
 
 // 初始化服务
 app.on('ready', async () => {
