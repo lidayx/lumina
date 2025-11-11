@@ -3,6 +3,8 @@
  * 支持时间查询、时间戳转换、时间计算、日期格式化、时区转换
  */
 
+import { settingsService } from './settingsService';
+
 // ========== 类型定义 ==========
 
 export interface TimeResult {
@@ -39,6 +41,12 @@ class TimeService {
    * 返回 TimeResult 如果识别为时间查询，否则返回 null
    */
   public handleTimeQuery(query: string): TimeResult | null {
+    // 检查功能开关
+    const settings = settingsService.getSettings();
+    if (settings.featureTimeTools === false) {
+      return null;
+    }
+
     try {
       const trimmedQuery = query.trim();
       

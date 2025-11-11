@@ -9,6 +9,7 @@ import { stringService } from './stringService';
 import { randomService } from './randomService';
 import { translateService } from './translateService';
 import { variableNameService } from './variableNameService';
+import { settingsService } from './settingsService';
 
 // ========== 类型定义 ==========
 
@@ -68,10 +69,19 @@ class CalculatorService {
 
   /**
    * 计算表达式
+   * 如果无法识别为计算查询，返回 null，让系统继续尝试其他搜索方式
    */
-  public calculate(expression: string): CalculationResult {
+  public calculate(expression: string): CalculationResult | null {
     try {
       console.log(`🧮 [计算器] 计算表达式: ${expression}`);
+
+      // 检查计算器功能开关
+      const settings = settingsService.getSettings();
+      if (settings.featureCalculator === false) {
+        // 功能关闭时返回 null，让系统继续尝试其他搜索方式
+        console.log(`ℹ️ [计算器] 功能已关闭，返回 null: ${expression}`);
+        return null;
+      }
 
       // 去除空格
       expression = expression.trim();
@@ -88,6 +98,7 @@ class CalculatorService {
       }
 
       // 尝试识别编码解码查询（在时间查询之前，因为编码解码匹配更精确）
+      // 注意：encodeService 内部已检查 featureEncodeDecode 开关
       const encodeResult = encodeService.handleEncodeQuery(expression);
       if (encodeResult && encodeResult.success) {
         // 将 EncodeResult 转换为 CalculationResult
@@ -100,6 +111,7 @@ class CalculatorService {
       }
 
       // 尝试识别字符串工具查询
+      // 注意：stringService 内部已检查 featureStringTools 开关
       const stringResult = stringService.handleStringQuery(expression);
       if (stringResult && stringResult.success) {
         // 将 StringResult 转换为 CalculationResult
@@ -112,6 +124,7 @@ class CalculatorService {
       }
 
       // 尝试识别随机数生成查询
+      // 注意：randomService 内部已检查各个随机数功能开关
       const randomResult = randomService.handleRandomQuery(expression);
       if (randomResult && randomResult.success) {
         // 将 RandomResult 转换为 CalculationResult
@@ -132,6 +145,7 @@ class CalculatorService {
       }
 
       // 尝试识别时间查询（在单位换算之前）
+      // 注意：timeService 内部已检查 featureTimeTools 开关
       const timeResult = timeService.handleTimeQuery(expression);
       if (timeResult && timeResult.success) {
         // 将 TimeResult 转换为 CalculationResult
@@ -149,6 +163,16 @@ class CalculatorService {
         return unitConvertResult;
       }
 
+      // 如果所有功能都返回 null，且不是纯数字，也不尝试计算数学表达式
+      // 这样可以避免在功能关闭时显示"表达式格式错误"，而是继续显示其他搜索结果
+      // 检查是否包含数学运算符或函数，如果没有，则不尝试计算
+      const hasMathOperators = /[\+\-*/().,π]/.test(expression) || /\b(sin|cos|tan|log|sqrt)\b/i.test(expression);
+      if (!hasMathOperators) {
+        // 没有数学运算符，返回 null，让系统继续尝试其他搜索方式
+        console.log(`ℹ️ [计算器] 未识别为计算查询，返回 null: ${expression}`);
+        return null as any; // 返回 null，让前端继续显示其他搜索结果
+      }
+
       // 解析和计算数学表达式
       const result = this.evaluateExpression(expression);
       
@@ -161,6 +185,13 @@ class CalculatorService {
       };
     } catch (error: any) {
       console.error(`❌ [计算器] 计算失败: ${error.message}`);
+      // 如果计算失败，且不是明显的数学表达式，返回 null 而不是错误
+      // 这样可以避免在功能关闭时显示错误，而是继续显示其他搜索结果
+      const hasMathOperators = /[\+\-*/().,π]/.test(expression) || /\b(sin|cos|tan|log|sqrt)\b/i.test(expression);
+      if (!hasMathOperators) {
+        console.log(`ℹ️ [计算器] 计算失败但无数学运算符，返回 null: ${expression}`);
+        return null as any; // 返回 null，让前端继续显示其他搜索结果
+      }
       const errorMsg = error.message || '计算错误';
       return {
         input: expression,

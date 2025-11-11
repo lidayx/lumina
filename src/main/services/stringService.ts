@@ -3,6 +3,8 @@
  * 支持字符串转换、反转、去除空格、文本统计、字符串操作
  */
 
+import { settingsService } from './settingsService';
+
 // ========== 类型定义 ==========
 
 export interface StringResult {
@@ -23,6 +25,12 @@ class StringService {
    * 返回 StringResult 如果识别为字符串工具查询，否则返回 null
    */
   public handleStringQuery(query: string): StringResult | null {
+    // 检查功能开关
+    const settings = settingsService.getSettings();
+    if (settings.featureStringTools === false) {
+      return null;
+    }
+
     try {
       const trimmedQuery = query.trim();
 

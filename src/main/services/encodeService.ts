@@ -4,6 +4,7 @@
  */
 
 import { createHash } from 'crypto';
+import { settingsService } from './settingsService';
 
 // ========== 类型定义 ==========
 
@@ -25,6 +26,12 @@ class EncodeService {
    * 返回 EncodeResult 如果识别为编码解码查询，否则返回 null
    */
   public handleEncodeQuery(query: string): EncodeResult | null {
+    // 检查功能开关
+    const settings = settingsService.getSettings();
+    if (settings.featureEncodeDecode === false) {
+      return null;
+    }
+
     try {
       const trimmedQuery = query.trim();
 

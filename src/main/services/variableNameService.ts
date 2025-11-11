@@ -36,6 +36,13 @@ class VariableNameService {
    * 返回 VariableNameResult 如果识别为变量名生成查询，否则返回 null
    */
   public async handleVariableNameQuery(query: string): Promise<VariableNameResult | null> {
+    // 检查功能开关
+    const { default: settingsService } = await import('./settingsService');
+    const settings = settingsService.getSettings();
+    if (settings.featureVariableName === false) {
+      return null;
+    }
+
     try {
       const trimmedQuery = query.trim();
 

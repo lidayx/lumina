@@ -30,35 +30,46 @@ class RandomService {
   public handleRandomQuery(query: string): RandomResult | null {
     try {
       const trimmedQuery = query.trim();
+      const settings = settingsService.getSettings();
 
       // 1. 检测密码生成（pwd/password/密码）- 优先检测，因为更常用
-      const passwordResult = this.handlePasswordGeneration(trimmedQuery);
-      if (passwordResult) {
-        return passwordResult;
+      if (settings.featurePasswordGeneration !== false) {
+        const passwordResult = this.handlePasswordGeneration(trimmedQuery);
+        if (passwordResult) {
+          return passwordResult;
+        }
       }
 
       // 2. 检测 UUID 生成
-      const uuidResult = this.handleUuid(trimmedQuery);
-      if (uuidResult) {
-        return uuidResult;
+      if (settings.featureUuidGeneration !== false) {
+        const uuidResult = this.handleUuid(trimmedQuery);
+        if (uuidResult) {
+          return uuidResult;
+        }
       }
 
       // 3. 检测随机字符串
-      const randomStringResult = this.handleRandomString(trimmedQuery);
-      if (randomStringResult) {
-        return randomStringResult;
+      if (settings.featureRandomString !== false) {
+        const randomStringResult = this.handleRandomString(trimmedQuery);
+        if (randomStringResult) {
+          return randomStringResult;
+        }
       }
 
       // 4. 检测随机密码（旧格式：random password）
-      const randomPasswordResult = this.handleRandomPassword(trimmedQuery);
-      if (randomPasswordResult) {
-        return randomPasswordResult;
+      if (settings.featureRandomPassword !== false) {
+        const randomPasswordResult = this.handleRandomPassword(trimmedQuery);
+        if (randomPasswordResult) {
+          return randomPasswordResult;
+        }
       }
 
       // 5. 检测随机数字
-      const randomNumberResult = this.handleRandomNumber(trimmedQuery);
-      if (randomNumberResult) {
-        return randomNumberResult;
+      if (settings.featureRandomNumber !== false) {
+        const randomNumberResult = this.handleRandomNumber(trimmedQuery);
+        if (randomNumberResult) {
+          return randomNumberResult;
+        }
       }
 
       return null;

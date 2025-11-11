@@ -42,6 +42,19 @@ export interface AppSettings {
   passwordIncludeUppercase: boolean; // 包含大写字母（默认 true）
   passwordIncludeNumbers: boolean; // 包含数字（默认 true）
   passwordIncludeSpecial: boolean; // 包含特殊字符（默认 true）
+  
+  // 功能开关设置
+  featurePasswordGeneration: boolean; // 密码生成功能（pwd/password/密码）（默认 true）
+  featureUuidGeneration: boolean; // UUID 生成功能（默认 true）
+  featureRandomString: boolean; // 随机字符串功能（默认 true）
+  featureRandomPassword: boolean; // 随机密码功能（旧格式）（默认 true）
+  featureRandomNumber: boolean; // 随机数字功能（默认 true）
+  featureEncodeDecode: boolean; // 编码解码功能（URL、HTML、Base64、MD5）（默认 true）
+  featureStringTools: boolean; // 字符串工具功能（默认 true）
+  featureTimeTools: boolean; // 时间工具功能（默认 true）
+  featureTranslation: boolean; // 翻译功能（默认 true）
+  featureVariableName: boolean; // 变量名生成功能（默认 true）
+  featureCalculator: boolean; // 计算器功能（默认 true）
 }
 
 /**
@@ -71,6 +84,17 @@ class SettingsService {
     passwordIncludeUppercase: true, // 默认包含大写字母
     passwordIncludeNumbers: true, // 默认包含数字
     passwordIncludeSpecial: true, // 默认包含特殊字符
+    featurePasswordGeneration: true, // 默认启用密码生成功能
+    featureUuidGeneration: true, // 默认启用 UUID 生成功能
+    featureRandomString: true, // 默认启用随机字符串功能
+    featureRandomPassword: true, // 默认启用随机密码功能
+    featureRandomNumber: true, // 默认启用随机数字功能
+    featureEncodeDecode: true, // 默认启用编码解码功能
+    featureStringTools: true, // 默认启用字符串工具功能
+    featureTimeTools: true, // 默认启用时间工具功能
+    featureTranslation: true, // 默认启用翻译功能
+    featureVariableName: true, // 默认启用变量名生成功能
+    featureCalculator: true, // 默认启用计算器功能
   };
 
   // ========== 私有属性 ==========

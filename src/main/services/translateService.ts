@@ -326,6 +326,13 @@ class TranslateService {
    * 返回 TranslateResult 如果识别为翻译查询，否则返回 null
    */
   public async handleTranslateQuery(query: string): Promise<TranslateResult | null> {
+    // 检查功能开关
+    const { default: settingsService } = await import('./settingsService');
+    const settings = settingsService.getSettings();
+    if (settings.featureTranslation === false) {
+      return null;
+    }
+
     try {
       const trimmedQuery = query.trim();
       console.log(`🌐 [翻译服务] 处理查询: "${trimmedQuery}"`);

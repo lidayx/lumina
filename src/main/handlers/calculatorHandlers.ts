@@ -41,7 +41,9 @@ export function registerCalculatorHandlers() {
       }
 
       // 最后尝试其他计算功能（同步）
-      return calculatorService.calculate(expression);
+      const calcResult = calculatorService.calculate(expression);
+      // 如果返回 null，表示无法识别为计算查询，返回 null 让前端继续显示其他搜索结果
+      return calcResult;
     } catch (error) {
       console.error('计算失败:', error);
       throw error;

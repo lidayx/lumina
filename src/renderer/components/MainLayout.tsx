@@ -351,21 +351,28 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             console.log('🔍 [文件搜索] 设置:', { fileSearchEnabled });
 
             // 并行搜索所有类型（统一防抖，确保结果同时返回以便正确排序）
-            const [appsFromIPC, files, webResults, bookmarks, commands, calcResult, clipboardResults] = await Promise.all([
+            // 先获取计算结果，以便决定是否搜索网页
+            const calcResult = finalIsCalculation 
+              ? await window.electron.calculator.calculate(query).catch((err) => {
+                  console.error('计算器计算失败:', err);
+                  return null;
+                })
+              : null;
+            
+            // 如果计算器返回 null（功能关闭或无法识别），继续搜索网页和其他内容
+            const shouldSearchWeb = !isFileSearch && (!finalIsCalculation || calcResult === null);
+            
+            const [appsFromIPC, files, webResults, bookmarks, commands, clipboardResults] = await Promise.all([
               // 直接调用 IPC 搜索应用，而不是使用 useAppSearch hook 的结果（避免防抖延迟）
               window.electron.app.search(query).catch(() => []),
               // 只在输入 "file + 空格 + 关键字" 时才搜索文件
               (isFileSearch && fileSearchEnabled && fileSearchQuery) 
                 ? window.electron.file.search(fileSearchQuery).catch(() => []) 
                 : Promise.resolve([]),
-              // 如果是计算/翻译查询或文件搜索，不搜索网页（避免显示网页搜索结果）
-              (finalIsCalculation || isFileSearch) ? Promise.resolve([]) : window.electron.web.search(query).catch(() => []),
+              // 如果计算器返回 null，继续搜索网页
+              shouldSearchWeb ? window.electron.web.search(query).catch(() => []) : Promise.resolve([]),
               window.electron.bookmark.search(query).catch(() => []),
               window.electron.command.search(query).catch(() => []),
-              finalIsCalculation ? window.electron.calculator.calculate(query).catch((err) => {
-                console.error('计算器计算失败:', err);
-                return null;
-              }) : Promise.resolve(null),
               // 剪贴板搜索
               isClipboardSearch 
                 ? (clipboardQuery 

@@ -86,7 +86,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
   const updateSetting = async (key: string, value: any) => {
     try {
       await window.electron.settings.update({ [key]: value });
-      setAppSettings({ ...appSettings, [key]: value });
+      const newSettings = { ...appSettings, [key]: value };
+      setAppSettings(newSettings);
+      
+      // 如果关闭了密码生成功能，且当前在密码设置页面，切换到通用设置
+      if (key === 'featurePasswordGeneration' && value === false && activeTab === 'password') {
+        setActiveTab('general');
+      }
+      
+      // 如果关闭了翻译功能，且当前在翻译设置页面，切换到通用设置
+      if (key === 'featureTranslation' && value === false && activeTab === 'translate') {
+        setActiveTab('general');
+      }
     } catch (error) {
       console.error('更新设置失败:', error);
       alert('更新设置失败');
@@ -391,21 +402,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
               </div>
             </button>
             
-            <button
-              onClick={() => setActiveTab('translate')}
-              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                activeTab === 'translate'
-                  ? 'bg-blue-50 text-blue-700 font-medium'
-                  : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <div className="flex items-center">
-                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                </svg>
-                翻译设置
-              </div>
-            </button>
+            {appSettings.featureTranslation !== false && (
+              <button
+                onClick={() => setActiveTab('translate')}
+                className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                  activeTab === 'translate'
+                    ? 'bg-blue-50 text-blue-700 font-medium'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                  </svg>
+                  翻译设置
+                </div>
+              </button>
+            )}
             
             <button
               onClick={() => setActiveTab('clipboard')}
@@ -423,21 +436,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
               </div>
             </button>
             
-            <button
-              onClick={() => setActiveTab('password')}
-              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                activeTab === 'password'
-                  ? 'bg-blue-50 text-blue-700 font-medium'
-                  : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <div className="flex items-center">
-                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                密码生成设置
-              </div>
-            </button>
+            {appSettings.featurePasswordGeneration !== false && (
+              <button
+                onClick={() => setActiveTab('password')}
+                className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                  activeTab === 'password'
+                    ? 'bg-blue-50 text-blue-700 font-medium'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  密码生成设置
+                </div>
+              </button>
+            )}
             
             <button
               onClick={() => setActiveTab('help')}
@@ -1006,6 +1021,214 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 </div>
               </div>
 
+              {/* 功能开关设置 */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                <div className="p-6">
+                  <h3 className="text-lg font-medium mb-4">功能开关</h3>
+                  <p className="text-sm text-gray-500 mb-4">控制各个功能的启用或关闭</p>
+                  <div className="space-y-4">
+                    {/* 密码生成功能 */}
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <div>
+                        <div className="font-medium text-gray-900">密码生成（pwd/password/密码）</div>
+                        <div className="text-sm text-gray-500">快速生成多个安全密码</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={appSettings.featurePasswordGeneration !== false}
+                          onChange={(e) => updateSetting('featurePasswordGeneration', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    {/* UUID 生成功能 */}
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <div>
+                        <div className="font-medium text-gray-900">UUID 生成</div>
+                        <div className="text-sm text-gray-500">生成 UUID v1 或 v4</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={appSettings.featureUuidGeneration !== false}
+                          onChange={(e) => updateSetting('featureUuidGeneration', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    {/* 随机字符串功能 */}
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <div>
+                        <div className="font-medium text-gray-900">随机字符串</div>
+                        <div className="text-sm text-gray-500">生成指定长度的随机字符串</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={appSettings.featureRandomString !== false}
+                          onChange={(e) => updateSetting('featureRandomString', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    {/* 随机密码功能（旧格式） */}
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <div>
+                        <div className="font-medium text-gray-900">随机密码（旧格式）</div>
+                        <div className="text-sm text-gray-500">random password 格式的密码生成</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={appSettings.featureRandomPassword !== false}
+                          onChange={(e) => updateSetting('featureRandomPassword', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    {/* 随机数字功能 */}
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <div>
+                        <div className="font-medium text-gray-900">随机数字</div>
+                        <div className="text-sm text-gray-500">生成指定范围内的随机整数</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={appSettings.featureRandomNumber !== false}
+                          onChange={(e) => updateSetting('featureRandomNumber', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    {/* 编码解码功能 */}
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <div>
+                        <div className="font-medium text-gray-900">编码解码</div>
+                        <div className="text-sm text-gray-500">URL、HTML、Base64 编码/解码，MD5 加密</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={appSettings.featureEncodeDecode !== false}
+                          onChange={(e) => updateSetting('featureEncodeDecode', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    {/* 字符串工具功能 */}
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <div>
+                        <div className="font-medium text-gray-900">字符串工具</div>
+                        <div className="text-sm text-gray-500">大小写转换、命名格式转换、反转、统计等</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={appSettings.featureStringTools !== false}
+                          onChange={(e) => updateSetting('featureStringTools', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    {/* 时间工具功能 */}
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <div>
+                        <div className="font-medium text-gray-900">时间工具</div>
+                        <div className="text-sm text-gray-500">时间查询、时间戳转换、时间计算、时区转换</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={appSettings.featureTimeTools !== false}
+                          onChange={(e) => updateSetting('featureTimeTools', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    {/* 翻译功能 */}
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <div>
+                        <div className="font-medium text-gray-900">翻译功能</div>
+                        <div className="text-sm text-gray-500">多语言翻译（需要配置百度翻译 API）</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={appSettings.featureTranslation !== false}
+                          onChange={(e) => updateSetting('featureTranslation', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    {/* 变量名生成功能 */}
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <div>
+                        <div className="font-medium text-gray-900">变量名生成</div>
+                        <div className="text-sm text-gray-500">根据描述生成多种命名风格的变量名</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={appSettings.featureVariableName !== false}
+                          onChange={(e) => updateSetting('featureVariableName', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    {/* 计算器功能 */}
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <div className="font-medium text-gray-900">计算器</div>
+                        <div className="text-sm text-gray-500">数学计算、科学函数、单位换算</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={appSettings.featureCalculator !== false}
+                          onChange={(e) => updateSetting('featureCalculator', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    {/* 使用说明 */}
+                    <div className="pt-4 border-t border-gray-200">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h3 className="text-sm font-medium text-blue-900 mb-2">使用说明</h3>
+                        <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                          <li>关闭某个功能后，该功能将不再响应相关查询</li>
+                          <li>关闭功能可以减少不必要的处理，提高搜索速度</li>
+                          <li>所有功能默认启用，可根据需要关闭不需要的功能</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* 重置设置 */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
                 <div className="p-6">
@@ -1060,7 +1283,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
             </div>
           )}
 
-          {activeTab === 'translate' && (
+          {activeTab === 'translate' && appSettings.featureTranslation !== false && (
             <div>
               <h2 className="text-2xl font-bold mb-2">翻译设置</h2>
               <p className="text-gray-600 mb-6">配置百度翻译 API 的 AppID 和 Secret Key</p>
@@ -1192,7 +1415,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
             </div>
           )}
 
-          {activeTab === 'password' && (
+          {activeTab === 'password' && appSettings.featurePasswordGeneration !== false && (
             <div>
               <h2 className="text-2xl font-bold mb-2">密码生成设置</h2>
               <p className="text-gray-600 mb-6">配置密码生成的默认规则</p>
