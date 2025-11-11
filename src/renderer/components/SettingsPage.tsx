@@ -506,21 +506,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
             </button>
             
             {appSettings.featureTranslation !== false && (
-              <button
-                onClick={() => setActiveTab('translate')}
-                className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                  activeTab === 'translate'
-                    ? 'bg-blue-50 text-blue-700 font-medium'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                  </svg>
-                  翻译设置
-                </div>
-              </button>
+            <button
+              onClick={() => setActiveTab('translate')}
+              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                activeTab === 'translate'
+                  ? 'bg-blue-50 text-blue-700 font-medium'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center">
+                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                </svg>
+                翻译设置
+              </div>
+            </button>
             )}
             
             <button
@@ -1407,7 +1407,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
                 <div className="p-6">
                   <h3 className="text-lg font-medium mb-4">全局快捷键</h3>
-                  <div className="space-y-4">
+                <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         打开搜索窗口
@@ -1528,7 +1528,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                         >
                           查看当前
                         </button>
-                      </div>
+                    </div>
                       <p className="mt-2 text-sm text-gray-500">
                         💡 提示：点击输入框后直接按下快捷键即可自动设置，或手动输入格式（例如: Shift+Space, Ctrl+Shift+K）
                       </p>

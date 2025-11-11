@@ -221,7 +221,7 @@ ipcMain.handle('window-hide', (_event, windowType: string) => {
   if (windowType === 'main') {
     // 使用动态导入以避免打包后的模块解析问题
     import('./windows/previewWindow').then(({ hidePreviewWindow }) => {
-      hidePreviewWindow();
+    hidePreviewWindow();
     }).catch((error) => {
       console.error('Error hiding preview window:', error);
     });

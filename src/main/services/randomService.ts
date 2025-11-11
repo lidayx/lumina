@@ -5,6 +5,7 @@
 
 import { randomBytes, randomInt } from 'crypto';
 import { settingsService } from './settingsService';
+import { calculateMatchScore } from '../../shared/utils/matchUtils';
 
 // ========== 类型定义 ==========
 
@@ -639,40 +640,19 @@ class RandomService {
       { format: 'random number', description: '生成随机数字', example: 'random number 1-100', keywords: ['random', 'number', '数字'] },
     ];
 
-    // 智能匹配：支持部分输入匹配
+    // 智能匹配：使用综合匹配算法
     for (const format of formats) {
-      let score = 0;
-      const formatLower = format.format.toLowerCase();
-      const queryWords = query.split(/\s+/).filter(w => w.length > 0);
+      // 移除格式中的占位符（如 <长度>）进行匹配
+      const formatForMatch = format.format.replace(/<[^>]+>/g, '').trim();
+      const matchResult = calculateMatchScore(query, formatForMatch, format.keywords);
       
-      // 完全匹配（最高优先级）
-      if (formatLower === query || formatLower.replace(/<[^>]+>/g, '').trim() === query) {
-        score = 1000;
-      }
-      // 开头匹配
-      else if (formatLower.startsWith(query) || formatLower.replace(/<[^>]+>/g, '').trim().startsWith(query)) {
-        score = 500;
-      }
-      // 包含匹配
-      else if (formatLower.includes(query)) {
-        score = 200;
-      }
-      // 关键词匹配
-      else if (queryWords.length > 0) {
-        const matchedKeywords = queryWords.filter(word => 
-          format.keywords.some(kw => kw.toLowerCase().includes(word) || word.includes(kw.toLowerCase()))
-        );
-        if (matchedKeywords.length > 0) {
-          score = 300 + matchedKeywords.length * 50;
-        }
-      }
-      // 描述匹配
+      // 如果描述包含查询，额外加分
       if (format.description.includes(query)) {
-        score = Math.max(score, 100);
+        matchResult.score = Math.max(matchResult.score, 100);
       }
-
-      if (score > 0) {
-        suggestions.push({ ...format, score });
+      
+      if (matchResult.score > 0) {
+        suggestions.push({ ...format, score: matchResult.score });
       }
     }
 

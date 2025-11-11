@@ -4,6 +4,7 @@
  */
 
 import { settingsService } from './settingsService';
+import { calculateMatchScore } from '../../shared/utils/matchUtils';
 
 // ========== 类型定义 ==========
 
@@ -570,40 +571,17 @@ class StringService {
       { format: 'replace', description: '替换字符串', example: 'replace hello world hello hi', keywords: ['replace', '替换'] },
     ];
 
-    // 智能匹配：支持部分输入匹配
+    // 智能匹配：使用综合匹配算法
     for (const format of formats) {
-      let score = 0;
-      const formatLower = format.format.toLowerCase();
-      const queryWords = query.split(/\s+/).filter(w => w.length > 0);
+      const matchResult = calculateMatchScore(query, format.format, format.keywords);
       
-      // 完全匹配（最高优先级）
-      if (formatLower === query) {
-        score = 1000;
-      }
-      // 开头匹配
-      else if (formatLower.startsWith(query)) {
-        score = 500;
-      }
-      // 包含匹配
-      else if (formatLower.includes(query)) {
-        score = 200;
-      }
-      // 关键词匹配
-      else if (queryWords.length > 0) {
-        const matchedKeywords = queryWords.filter(word => 
-          format.keywords.some(kw => kw.toLowerCase().includes(word) || word.includes(kw.toLowerCase()))
-        );
-        if (matchedKeywords.length > 0) {
-          score = 300 + matchedKeywords.length * 50;
-        }
-      }
-      // 描述匹配
+      // 如果描述包含查询，额外加分
       if (format.description.includes(query)) {
-        score = Math.max(score, 100);
+        matchResult.score = Math.max(matchResult.score, 100);
       }
-
-      if (score > 0) {
-        suggestions.push({ ...format, score });
+      
+      if (matchResult.score > 0) {
+        suggestions.push({ ...format, score: matchResult.score });
       }
     }
 

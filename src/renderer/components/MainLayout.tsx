@@ -388,11 +388,19 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                                       /^(?:translate|翻译|fanyi|fy|en|zh|cn)\s+\w/i.test(queryLower);
             const isRandomKeyword = /^(?:pwd|password|密码|uuid|random)(\s|$)/i.test(queryLower) ||
                                    /^(?:pwd|password|密码|uuid|random)\s+\w/i.test(queryLower);
-            const isEncodeKeyword = /^(?:url|html|base64|md5|encode|decode|编码|解码)(\s|$)/i.test(queryLower) ||
-                                   /^(?:url|html|base64|md5|encode|decode|编码|解码)\s+\w/i.test(queryLower);
+            // 编码关键词检测：支持拼音输入（bianma, jiema, jiami, jiemi）
+            const isEncodeKeyword = /^(?:url|html|base64|md5|encode|decode|编码|解码|bianma|jiema|jiami|jiemi|bm|jm)(\s|$)/i.test(queryLower) ||
+                                   /^(?:url|html|base64|md5|encode|decode|编码|解码|bianma|jiema|jiami|jiemi|bm|jm)\s+\w/i.test(queryLower) ||
+                                   /^(?:bianma|jiema|jiami|jiemi|bm|jm)/i.test(queryLower);
             // 调试日志
-            if (queryLower.startsWith('url') || queryLower.startsWith('html') || queryLower.startsWith('base64')) {
-              console.log('🔍 [编码关键词检测]', { queryLower, isEncodeKeyword, test1: /^(?:url|html|base64|md5|encode|decode|编码|解码)(\s|$)/i.test(queryLower), test2: /^(?:url|html|base64|md5|encode|decode|编码|解码)\s+\w/i.test(queryLower) });
+            if (queryLower.startsWith('url') || queryLower.startsWith('html') || queryLower.startsWith('base64') || queryLower.startsWith('bianma') || queryLower.startsWith('jiema')) {
+              console.log('🔍 [编码关键词检测]', { 
+                queryLower, 
+                isEncodeKeyword, 
+                test1: /^(?:url|html|base64|md5|encode|decode|编码|解码|bianma|jiema|jiami|jiemi|bm|jm)(\s|$)/i.test(queryLower), 
+                test2: /^(?:url|html|base64|md5|encode|decode|编码|解码|bianma|jiema|jiami|jiemi|bm|jm)\s+\w/i.test(queryLower),
+                test3: /^(?:bianma|jiema|jiami|jiemi|bm|jm)/i.test(queryLower)
+              });
             }
             const isStringKeyword = /^(?:uppercase|lowercase|大写|小写|title|camel|snake|reverse|反转|trim|count|统计|replace|extract)(\s|$)/i.test(queryLower) ||
                                    /^(?:uppercase|lowercase|大写|小写|title|camel|snake|reverse|反转|trim|count|统计|replace|extract)\s+\w/i.test(queryLower);
@@ -550,23 +558,30 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             
             // 功能补全结果（只在没有实际计算结果时显示，优先级高于命令模式）
             // 如果 calcResult 存在且成功，说明已经识别为计算/功能查询，不显示补全建议
+            // 但是，如果只是输入了关键词（如 "bianma"），即使 calcResult 为 null，也应该显示补全
+            const isOnlyKeyword = featureType && actualQuery.trim().toLowerCase() === queryLower && 
+                                 (/^(?:bianma|jiema|jiami|jiemi|bm|jm|url|html|base64|md5|encode|decode|编码|解码)$/i.test(queryLower));
+            
             const shouldShowFeatureCompletion = featureType && 
                                                !isCommandMode && 
                                                !isFileSearch && 
                                                !urlCheck.isURL &&
-                                               (!calcResult || !calcResult.success);
+                                               (isOnlyKeyword || !calcResult || !calcResult.success);
             
             // 调试日志
-            if (featureType === 'encode') {
+            if (featureType === 'encode' || queryLower.startsWith('bianma') || queryLower.startsWith('jiema')) {
               console.log('🔍 [功能补全显示]', { 
                 featureType, 
                 shouldShowFeatureCompletion, 
                 isCommandMode, 
                 isFileSearch, 
                 isURL: urlCheck.isURL,
+                isOnlyKeyword,
                 calcResult: calcResult ? (calcResult.success ? 'success' : 'failed') : 'null',
                 featureCompletions: featureCompletions.length,
-                featureHelp: !!featureHelp
+                featureHelp: !!featureHelp,
+                actualQuery: actualQuery.trim(),
+                queryLower
               });
             }
             
@@ -606,7 +621,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   type: 'command' as const,
                   title: `💡 ${suggestion.format}`,
                   description: suggestion.description,
-                  action: `feature:complete:${featureType}:${suggestion.example}`,
+                  // 使用 format 而不是 example，这样选中后只填充命令格式，不填充示例内容
+                  action: `feature:complete:${featureType}:${suggestion.format}`,
                   score: 2700 - index, // 提高优先级，确保显示在网页搜索之前
                   priorityScore: 2700 - index,
                 });
@@ -1407,9 +1423,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
       else if (result.action.startsWith('feature:')) {
         const actionParts = result.action.split(':');
         if (actionParts[1] === 'complete') {
-          // 功能补全：设置输入框为补全文本
+          // 功能补全：设置输入框为补全文本，并在末尾添加空格以便用户继续输入
           const completeText = actionParts.slice(3).join(':');
-          setQuery(completeText);
+          // 如果格式不包含占位符（如 <长度>），则在末尾添加空格
+          const formatText = completeText.replace(/<[^>]+>/g, '').trim();
+          setQuery(formatText + ' ');
         } else if (actionParts[1] === 'example') {
           // 功能示例：设置输入框为示例文本
           const exampleText = actionParts.slice(3).join(':');
