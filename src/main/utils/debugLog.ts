@@ -2,6 +2,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
 
+// 常量定义
+const LOG_FILE_NAME = 'run_debug.log';
+const FALLBACK_LOG_FILE_NAME = 'run_debug.log';
+const LOG_PREFIX = '[DebugLog]';
+const START_MARKER = '==========';
+const END_MARKER = '==========';
+
 /**
  * Debug 日志记录工具
  */
@@ -17,16 +24,16 @@ class DebugLog {
   /**
    * 初始化文件路径
    */
-  private initializePath() {
+  private initializePath(): void {
     if (!this.logFile) {
       try {
         const userDataPath = app.getPath('userData');
-        this.logFile = path.join(userDataPath, 'run_debug.log');
-        console.log(`📁 [DebugLog] 日志文件路径: ${this.logFile}`);
+        this.logFile = path.join(userDataPath, LOG_FILE_NAME);
+        console.log(`📁 ${LOG_PREFIX} 日志文件路径: ${this.logFile}`);
       } catch (error) {
-        console.error('❌ [DebugLog] 获取用户数据路径失败:', error);
+        console.error(`❌ ${LOG_PREFIX} 获取用户数据路径失败:`, error);
         // 使用临时路径作为后备
-        this.logFile = path.join(__dirname, 'run_debug.log');
+        this.logFile = path.join(__dirname, FALLBACK_LOG_FILE_NAME);
       }
     }
   }
@@ -34,7 +41,7 @@ class DebugLog {
   /**
    * 初始化（在设置服务加载后调用）
    */
-  public async init() {
+  public async init(): Promise<void> {
     try {
       const { settingsService } = await import('../services/settingsService');
       const settings = settingsService.getSettings();
@@ -44,14 +51,14 @@ class DebugLog {
         this.openStream();
       }
     } catch (error) {
-      console.error('检查开发者模式状态失败:', error);
+      console.error(`${LOG_PREFIX} 检查开发者模式状态失败:`, error);
     }
   }
 
   /**
    * 设置启用状态
    */
-  public setEnabled(enabled: boolean) {
+  public setEnabled(enabled: boolean): void {
     if (enabled === this.enabled) {
       return;
     }
@@ -68,9 +75,36 @@ class DebugLog {
   }
 
   /**
+   * 获取当前时间戳
+   */
+  private getTimestamp(): string {
+    return new Date().toISOString();
+  }
+
+  /**
+   * 写入日志标记
+   */
+  private writeMarker(message: string): void {
+    if (this.stream && !this.stream.closed) {
+      const timestamp = this.getTimestamp();
+      this.stream.write(`${START_MARKER} ${timestamp} - ${message} ${END_MARKER}\n`);
+    }
+  }
+
+  /**
+   * 检查并确保流可用
+   */
+  private ensureStream(): boolean {
+    if (!this.stream || this.stream.closed) {
+      this.openStream();
+    }
+    return this.stream !== null && !this.stream.closed;
+  }
+
+  /**
    * 打开日志流
    */
-  private openStream() {
+  private openStream(): void {
     try {
       this.initializePath();
       
@@ -83,94 +117,99 @@ class DebugLog {
       this.stream = fs.createWriteStream(this.logFile, { flags: 'a' });
       
       // 写入启动标记
-      const timestamp = new Date().toISOString();
-      this.stream.write(`\n\n========== ${timestamp} - 应用启动 ==========\n`);
+      this.writeMarker('应用启动');
       
-      console.log(`✅ [DebugLog] 日志文件已创建: ${this.logFile}`);
+      console.log(`✅ ${LOG_PREFIX} 日志文件已创建: ${this.logFile}`);
     } catch (error) {
-      console.error('❌ [DebugLog] 打开日志文件失败:', error);
+      console.error(`❌ ${LOG_PREFIX} 打开日志文件失败:`, error);
     }
   }
 
   /**
    * 关闭日志流
    */
-  private closeStream() {
+  private closeStream(): void {
     if (this.stream && !this.stream.closed) {
-      const timestamp = new Date().toISOString();
-      this.stream.write(`========== ${timestamp} - 应用关闭 ==========\n\n`);
+      this.writeMarker('应用关闭');
       this.stream.close();
       this.stream = null;
     }
   }
 
   /**
+   * 格式化日志参数
+   */
+  private formatArgs(args: any[]): string {
+    return args.map(arg => {
+      if (typeof arg === 'object') {
+        try {
+          return JSON.stringify(arg, null, 2);
+        } catch {
+          return String(arg);
+        }
+      }
+      return String(arg);
+    }).join(' ');
+  }
+
+  /**
    * 记录日志
    */
-  public log(...args: any[]) {
+  public log(...args: any[]): void {
     if (!this.enabled) {
       return;
     }
     
     try {
-      if (!this.stream || this.stream.closed) {
-        this.openStream();
+      if (!this.ensureStream()) {
+        return;
       }
       
-      const timestamp = new Date().toISOString();
-      const message = args.map(arg => {
-        if (typeof arg === 'object') {
-          try {
-            return JSON.stringify(arg, null, 2);
-          } catch {
-            return String(arg);
-          }
-        }
-        return String(arg);
-      }).join(' ');
-      
+      const timestamp = this.getTimestamp();
+      const message = this.formatArgs(args);
       const logLine = `[${timestamp}] ${message}\n`;
       
       if (this.stream && !this.stream.closed) {
         this.stream.write(logLine);
       }
     } catch (error) {
-      console.error('写入日志失败:', error);
+      console.error(`${LOG_PREFIX} 写入日志失败:`, error);
     }
   }
 
   /**
    * 记录错误日志
    */
-  public error(...args: any[]) {
+  public error(...args: any[]): void {
     this.log('[ERROR]', ...args);
   }
 
   /**
    * 记录警告日志
    */
-  public warn(...args: any[]) {
+  public warn(...args: any[]): void {
     this.log('[WARN]', ...args);
   }
 
   /**
    * 记录信息日志
    */
-  public info(...args: any[]) {
+  public info(...args: any[]): void {
     this.log('[INFO]', ...args);
   }
 
   /**
    * 清理日志文件
    */
-  public clear() {
+  public clear(): void {
     try {
+      this.initializePath();
       if (fs.existsSync(this.logFile)) {
         fs.writeFileSync(this.logFile, '');
         this.log('[Debug] 日志已清理');
       }
     } catch (error) {
-      console.error('清理日志文件失败:', error);
+      console.error(`${LOG_PREFIX} 清理日志文件失败:`, error);
     }
   }
 
@@ -185,7 +224,7 @@ class DebugLog {
   /**
    * 应用退出时关闭流
    */
-  public cleanup() {
+  public cleanup(): void {
     this.closeStream();
   }
 }

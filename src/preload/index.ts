@@ -1,5 +1,19 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+/**
+ * 创建 IPC 调用函数
+ */
+function createInvoke(channel: string) {
+  return (...args: any[]) => ipcRenderer.invoke(channel, ...args);
+}
+
+/**
+ * 创建事件监听器包装函数
+ */
+function createEventListener(callback: (...args: any[]) => void) {
+  return (_event: any, ...args: any[]) => callback(...args);
+}
+
 // 暴露受保护的方法给渲染进程
 contextBridge.exposeInMainWorld('electron', {
   // 调用主进程方法
@@ -9,8 +23,7 @@ contextBridge.exposeInMainWorld('electron', {
 
   // 监听主进程事件
   on: (channel: string, callback: (...args: any[]) => void) => {
-    const wrappedCallback = (_event: any, ...args: any[]) => callback(...args);
-    ipcRenderer.on(channel, wrappedCallback);
+    ipcRenderer.on(channel, createEventListener(callback));
   },
 
   // 移除事件监听器
@@ -25,174 +38,173 @@ contextBridge.exposeInMainWorld('electron', {
 
   // 应用相关
   app: {
-    getAll: () => ipcRenderer.invoke('app-get-all'),
-    search: (query: string) => ipcRenderer.invoke('app-search', query),
-    launch: (appId: string) => ipcRenderer.invoke('app-launch', appId),
-    index: () => ipcRenderer.invoke('app-index'),
-    revealFolder: (appId: string) => ipcRenderer.invoke('app-reveal-folder', appId),
-    getInfo: (appId: string) => ipcRenderer.invoke('app-get-info', appId),
+    getAll: createInvoke('app-get-all'),
+    search: createInvoke('app-search'),
+    launch: createInvoke('app-launch'),
+    index: createInvoke('app-index'),
+    revealFolder: createInvoke('app-reveal-folder'),
+    getInfo: createInvoke('app-get-info'),
   },
   
-      // 文件相关
-      file: {
-        getAll: () => ipcRenderer.invoke('file-get-all'),
-        search: (query: string) => ipcRenderer.invoke('file-search', query),
-        open: (filePath: string) => ipcRenderer.invoke('file-open', filePath),
-        revealFolder: (filePath: string) => ipcRenderer.invoke('file-reveal-folder', filePath),
-        getInfo: (filePath: string) => ipcRenderer.invoke('file-get-info', filePath),
-        getImageSize: (filePath: string) => ipcRenderer.invoke('file-get-image-size', filePath),
-        getVideoInfo: (filePath: string) => ipcRenderer.invoke('file-get-video-info', filePath),
-        index: (paths?: string[]) => ipcRenderer.invoke('file-index', paths),
-      },
-      
-      // 网页搜索相关
-      web: {
-        getEngines: () => ipcRenderer.invoke('web-get-engines'),
-        search: (query: string, engineName?: string) => ipcRenderer.invoke('web-search', query, engineName),
-        open: (url: string) => ipcRenderer.invoke('web-open', url),
-        getHistory: (limit?: number) => ipcRenderer.invoke('web-get-history', limit),
-        clearHistory: () => ipcRenderer.invoke('web-clear-history'),
-        getCommonSites: () => ipcRenderer.invoke('web-get-common-sites'),
-        addEngine: (engine: any) => ipcRenderer.invoke('web-add-engine', engine),
-        updateEngine: (name: string, updates: any) => ipcRenderer.invoke('web-update-engine', name, updates),
-        deleteEngine: (name: string) => ipcRenderer.invoke('web-delete-engine', name),
-        setDefaultEngine: (name: string) => ipcRenderer.invoke('web-set-default-engine', name),
-      },
-      
-      // 浏览器设置相关
-      browser: {
-        getAll: () => ipcRenderer.invoke('browser-get-all'),
-        add: (browser: any) => ipcRenderer.invoke('browser-add', browser),
-        update: (id: string, updates: any) => ipcRenderer.invoke('browser-update', id, updates),
-        delete: (id: string) => ipcRenderer.invoke('browser-delete', id),
-        setDefault: (id: string) => ipcRenderer.invoke('browser-set-default', id),
-        getDefault: () => ipcRenderer.invoke('browser-get-default'),
-        openUrl: (url: string) => ipcRenderer.invoke('browser-open-url', url),
-      },
-      
-      // 命令执行相关
-      command: {
-        getAll: () => ipcRenderer.invoke('command-get-all'),
-        search: (query: string) => ipcRenderer.invoke('command-search', query),
-        execute: (commandId: string) => ipcRenderer.invoke('command-execute', commandId),
-        executeRaw: (command: string) => ipcRenderer.invoke('command-execute-raw', command),
-        getHistory: (limit?: number) => ipcRenderer.invoke('command-get-history', limit),
-        clearHistory: () => ipcRenderer.invoke('command-clear-history'),
-        complete: (partial: string) => ipcRenderer.invoke('command-complete', partial),
-        help: (commandId: string) => ipcRenderer.invoke('command-help', commandId),
-      },
-      
-      // 计算器相关
-      calculator: {
-        calculate: (expression: string) => ipcRenderer.invoke('calculator-calculate', expression),
-      },
-      
-      // 时间相关
-      time: {
-        getAllFormats: (dateISOString?: string) => ipcRenderer.invoke('time-get-all-formats', dateISOString),
-        handleQuery: (query: string) => ipcRenderer.invoke('time-handle-query', query),
-        complete: (partial: string) => ipcRenderer.invoke('time-complete', partial),
-        help: () => ipcRenderer.invoke('time-help'),
-      },
-      
-      // TODO 相关
-      todo: {
-        handleQuery: (query: string, executeOnly?: boolean) => ipcRenderer.invoke('todo-handle-query', query, executeOnly),
-        complete: (partial: string) => ipcRenderer.invoke('todo-complete', partial),
-        help: () => ipcRenderer.invoke('todo-help'),
-      },
-      
-      // 随机数相关
-      random: {
-        handleQuery: (query: string) => ipcRenderer.invoke('random-handle-query', query),
-        complete: (partial: string) => ipcRenderer.invoke('random-complete', partial),
-        help: () => ipcRenderer.invoke('random-help'),
-      },
-      
-      // 翻译相关
-      translate: {
-        handleQuery: (query: string) => ipcRenderer.invoke('translate-handle-query', query),
-        complete: (partial: string) => ipcRenderer.invoke('translate-complete', partial),
-        help: () => ipcRenderer.invoke('translate-help'),
-      },
-      
-      // 变量名相关
-      varname: {
-        handleQuery: (query: string) => ipcRenderer.invoke('varname-handle-query', query),
-        complete: (partial: string) => ipcRenderer.invoke('varname-complete', partial),
-        help: () => ipcRenderer.invoke('varname-help'),
-      },
-      
-      // 编码解码相关
-      encode: {
-        handleQuery: (query: string) => ipcRenderer.invoke('encode-handle-query', query),
-        complete: (partial: string) => ipcRenderer.invoke('encode-complete', partial),
-        help: () => ipcRenderer.invoke('encode-help'),
-      },
-      
-      // 字符串工具相关
-      string: {
-        handleQuery: (query: string) => ipcRenderer.invoke('string-handle-query', query),
-        complete: (partial: string) => ipcRenderer.invoke('string-complete', partial),
-        help: () => ipcRenderer.invoke('string-help'),
-      },
-      
-      // 书签相关
-      bookmark: {
-        getAll: () => ipcRenderer.invoke('bookmark-get-all'),
-        search: (query: string) => ipcRenderer.invoke('bookmark-search', query),
-        reload: () => ipcRenderer.invoke('bookmark-reload'),
-        getInfo: (url: string) => ipcRenderer.invoke('bookmark-get-info', url),
-      },
-      
-      // 应用设置相关
-      settings: {
-        getAll: () => ipcRenderer.invoke('settings-get-all'),
-        update: (updates: any) => ipcRenderer.invoke('settings-update', updates),
-        reset: () => ipcRenderer.invoke('settings-reset'),
-        getLogFile: () => ipcRenderer.invoke('settings-get-log-file'),
-      },
-      
-      // 快捷键相关
-      shortcut: {
-        getCurrent: () => ipcRenderer.invoke('shortcut-get-current'),
-        set: (shortcut: string) => ipcRenderer.invoke('shortcut-set', shortcut),
-        checkAvailable: (shortcut: string) => ipcRenderer.invoke('shortcut-check-available', shortcut),
-        format: (shortcut: string) => ipcRenderer.invoke('shortcut-format', shortcut),
-      },
-      
-      // 别名相关
-      alias: {
-        getAll: () => ipcRenderer.invoke('alias-get-all'),
-        add: (name: string, command: string, type: string, description?: string) => ipcRenderer.invoke('alias-add', name, command, type, description),
-        remove: (name: string) => ipcRenderer.invoke('alias-remove', name),
-        update: (name: string, updates: any) => ipcRenderer.invoke('alias-update', name, updates),
-        get: (name: string) => ipcRenderer.invoke('alias-get', name),
-        resolve: (input: string) => ipcRenderer.invoke('alias-resolve', input),
-      },
-      
-      // 剪贴板相关
-      clipboard: {
-        getHistory: (limit?: number) => ipcRenderer.invoke('clipboard-get-history', limit),
-        search: (query: string, limit?: number) => ipcRenderer.invoke('clipboard-search', query, limit),
-        delete: (id: string) => ipcRenderer.invoke('clipboard-delete', id),
-        clear: () => ipcRenderer.invoke('clipboard-clear'),
-        paste: (id: string) => ipcRenderer.invoke('clipboard-paste', id),
-      },
-      
-      // 窗口相关
-      windowResize: (width: number, height: number) => 
-        ipcRenderer.invoke('window-resize', width, height),
-      windowHide: (windowType: string) =>
-        ipcRenderer.invoke('window-hide', windowType),
-      
-      // 预览窗口相关
-      preview: {
-        show: () => ipcRenderer.invoke('preview-show'),
-        hide: () => ipcRenderer.invoke('preview-hide'),
-        update: (result: any, query: string) => ipcRenderer.invoke('preview-update', result, query).then(() => undefined),
-        close: () => ipcRenderer.invoke('preview-close'),
-      },
+  // 文件相关
+  file: {
+    getAll: createInvoke('file-get-all'),
+    search: createInvoke('file-search'),
+    open: createInvoke('file-open'),
+    revealFolder: createInvoke('file-reveal-folder'),
+    getInfo: createInvoke('file-get-info'),
+    getImageSize: createInvoke('file-get-image-size'),
+    getVideoInfo: createInvoke('file-get-video-info'),
+    index: createInvoke('file-index'),
+  },
+  
+  // 网页搜索相关
+  web: {
+    getEngines: createInvoke('web-get-engines'),
+    search: createInvoke('web-search'),
+    open: createInvoke('web-open'),
+    getHistory: createInvoke('web-get-history'),
+    clearHistory: createInvoke('web-clear-history'),
+    getCommonSites: createInvoke('web-get-common-sites'),
+    addEngine: createInvoke('web-add-engine'),
+    updateEngine: createInvoke('web-update-engine'),
+    deleteEngine: createInvoke('web-delete-engine'),
+    setDefaultEngine: createInvoke('web-set-default-engine'),
+  },
+  
+  // 浏览器设置相关
+  browser: {
+    getAll: createInvoke('browser-get-all'),
+    add: createInvoke('browser-add'),
+    update: createInvoke('browser-update'),
+    delete: createInvoke('browser-delete'),
+    setDefault: createInvoke('browser-set-default'),
+    getDefault: createInvoke('browser-get-default'),
+    openUrl: createInvoke('browser-open-url'),
+  },
+  
+  // 命令执行相关
+  command: {
+    getAll: createInvoke('command-get-all'),
+    search: createInvoke('command-search'),
+    execute: createInvoke('command-execute'),
+    executeRaw: createInvoke('command-execute-raw'),
+    getHistory: createInvoke('command-get-history'),
+    clearHistory: createInvoke('command-clear-history'),
+    complete: createInvoke('command-complete'),
+    help: createInvoke('command-help'),
+  },
+  
+  // 计算器相关
+  calculator: {
+    calculate: createInvoke('calculator-calculate'),
+  },
+  
+  // 时间相关
+  time: {
+    getAllFormats: createInvoke('time-get-all-formats'),
+    handleQuery: createInvoke('time-handle-query'),
+    complete: createInvoke('time-complete'),
+    help: createInvoke('time-help'),
+  },
+  
+  // TODO 相关
+  todo: {
+    handleQuery: createInvoke('todo-handle-query'),
+    complete: createInvoke('todo-complete'),
+    help: createInvoke('todo-help'),
+  },
+  
+  // 随机数相关
+  random: {
+    handleQuery: createInvoke('random-handle-query'),
+    complete: createInvoke('random-complete'),
+    help: createInvoke('random-help'),
+  },
+  
+  // 翻译相关
+  translate: {
+    handleQuery: createInvoke('translate-handle-query'),
+    complete: createInvoke('translate-complete'),
+    help: createInvoke('translate-help'),
+  },
+  
+  // 变量名相关
+  varname: {
+    handleQuery: createInvoke('varname-handle-query'),
+    complete: createInvoke('varname-complete'),
+    help: createInvoke('varname-help'),
+  },
+  
+  // 编码解码相关
+  encode: {
+    handleQuery: createInvoke('encode-handle-query'),
+    complete: createInvoke('encode-complete'),
+    help: createInvoke('encode-help'),
+  },
+  
+  // 字符串工具相关
+  string: {
+    handleQuery: createInvoke('string-handle-query'),
+    complete: createInvoke('string-complete'),
+    help: createInvoke('string-help'),
+  },
+  
+  // 书签相关
+  bookmark: {
+    getAll: createInvoke('bookmark-get-all'),
+    search: createInvoke('bookmark-search'),
+    reload: createInvoke('bookmark-reload'),
+    getInfo: createInvoke('bookmark-get-info'),
+  },
+  
+  // 应用设置相关
+  settings: {
+    getAll: createInvoke('settings-get-all'),
+    update: createInvoke('settings-update'),
+    reset: createInvoke('settings-reset'),
+    getLogFile: createInvoke('settings-get-log-file'),
+  },
+  
+  // 快捷键相关
+  shortcut: {
+    getCurrent: createInvoke('shortcut-get-current'),
+    set: createInvoke('shortcut-set'),
+    checkAvailable: createInvoke('shortcut-check-available'),
+    format: createInvoke('shortcut-format'),
+  },
+  
+  // 别名相关
+  alias: {
+    getAll: createInvoke('alias-get-all'),
+    add: createInvoke('alias-add'),
+    remove: createInvoke('alias-remove'),
+    update: createInvoke('alias-update'),
+    get: createInvoke('alias-get'),
+    resolve: createInvoke('alias-resolve'),
+  },
+  
+  // 剪贴板相关
+  clipboard: {
+    getHistory: createInvoke('clipboard-get-history'),
+    search: createInvoke('clipboard-search'),
+    delete: createInvoke('clipboard-delete'),
+    clear: createInvoke('clipboard-clear'),
+    paste: createInvoke('clipboard-paste'),
+  },
+  
+  // 窗口相关
+  windowResize: createInvoke('window-resize'),
+  windowHide: createInvoke('window-hide'),
+  
+  // 预览窗口相关
+  preview: {
+    show: createInvoke('preview-show'),
+    hide: createInvoke('preview-hide'),
+    update: (result: any, query: string) => 
+      ipcRenderer.invoke('preview-update', result, query).then(() => undefined),
+    close: createInvoke('preview-close'),
+  },
 });
 
   // 类型定义

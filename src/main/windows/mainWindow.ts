@@ -18,10 +18,10 @@ export function showMainWindow() {
 
 /**
  * 隐藏主窗口
+ * 同时隐藏预览窗口以保持界面一致性
  */
 export function hideMainWindow() {
   windowManager.hideWindow('main');
-  // 隐藏主窗口时，同时隐藏预览窗口
   hidePreviewWindow();
 }
 

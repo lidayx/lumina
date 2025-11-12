@@ -1,5 +1,26 @@
 import { windowManager } from './windowManager';
 import { WINDOW_CONFIGS } from '../../shared/utils/window';
+import { BrowserWindow } from 'electron';
+
+// 常量定义
+const MESSAGE_SEND_DELAY = 100; // 发送消息的延迟时间（确保 React 组件已挂载）
+
+/**
+ * 等待窗口准备就绪后发送消息
+ */
+function sendMessageWhenReady(window: BrowserWindow, channel: string, data?: any): void {
+  const sendMessage = () => {
+    window.webContents.send(channel, data);
+  };
+  
+  if (window.webContents.isLoading()) {
+    window.webContents.once('did-finish-load', () => {
+      setTimeout(sendMessage, MESSAGE_SEND_DELAY);
+    });
+  } else {
+    setTimeout(sendMessage, MESSAGE_SEND_DELAY);
+  }
+}
 
 /**
  * 创建或获取设置窗口
@@ -18,20 +39,7 @@ export function openSettingsWindow(tab?: string) {
   
   // 如果指定了标签，发送消息给设置页面
   if (tab) {
-    const sendTabMessage = () => {
-      window.webContents.send('settings-switch-tab', tab);
-    };
-    
-    // 如果窗口已经加载完成，立即发送消息
-    if (!window.webContents.isLoading()) {
-      // 使用 setTimeout 确保 React 组件已经挂载
-      setTimeout(sendTabMessage, 100);
-    } else {
-      // 等待窗口加载完成后再发送消息
-      window.webContents.once('did-finish-load', () => {
-        setTimeout(sendTabMessage, 100);
-      });
-    }
+    sendMessageWhenReady(window, 'settings-switch-tab', tab);
   }
 }
 

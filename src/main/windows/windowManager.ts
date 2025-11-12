@@ -4,6 +4,12 @@ import { getWindowUrl } from '../../shared/utils/window';
 import * as path from 'path';
 import * as fs from 'fs';
 
+// 常量定义
+const MIN_WINDOW_WIDTH = 400;
+const MIN_WINDOW_HEIGHT = 300;
+const MAIN_WINDOW_TOP_MARGIN = 20;
+const HIDDEN_TRAFFIC_LIGHT_POSITION = { x: -100, y: -100 };
+
 class WindowManager {
   private windows: Map<WindowType, BrowserWindow> = new Map();
 
@@ -25,51 +31,73 @@ class WindowManager {
   }
 
   /**
-   * 创建新窗口
+   * 构建窗口的基础配置
    */
-  public createWindow(config: WindowConfig): BrowserWindow {
-    // 计算窗口位置（主窗口在屏幕上1/4位置，其他窗口居中）
-    let windowOptions: any = {
+  private buildBaseWindowOptions(config: WindowConfig): Electron.BrowserWindowConstructorOptions {
+    const isMain = config.type === 'main';
+    const isPreview = config.type === 'preview';
+    const isDarwin = process.platform === 'darwin';
+
+    return {
       width: config.width,
       height: config.height,
-      minWidth: config.minWidth || 400,
-      minHeight: config.minHeight || 300,
+      minWidth: config.minWidth || MIN_WINDOW_WIDTH,
+      minHeight: config.minHeight || MIN_WINDOW_HEIGHT,
       maximizable: config.maximizable !== false,
       minimizable: config.minimizable !== false,
       resizable: config.resizable !== false,
-      // 无边框窗口（仅主窗口和预览窗口）
-      frame: config.type !== 'main' && config.type !== 'preview',
-      transparent: config.type === 'main', // 透明背景（仅主窗口）
-      titleBarStyle: config.type === 'main' ? 'hidden' : (config.type === 'preview' ? 'hidden' : 'default'),
-      // 预览窗口：无边框，不可聚焦
-      ...(config.type === 'preview' && {
-        autoHideMenuBar: true,
-        focusable: false, // 预览窗口不可聚焦，保持主窗口焦点
-        skipTaskbar: true, // 不在任务栏显示
-        alwaysOnTop: false, // 不总是置顶，跟随主窗口
-        // macOS 特定设置：隐藏窗口控制按钮
-        ...(process.platform === 'darwin' && {
-          trafficLightPosition: { x: -100, y: -100 }, // 隐藏 macOS 窗口控制按钮
-        }),
-      }),
-      // macOS 特定设置
-      ...(config.type === 'main' && process.platform === 'darwin' && {
-        titleBarStyle: 'hidden',
-        trafficLightPosition: { x: -100, y: -100 }, // 隐藏 macOS 窗口控制按钮
-      }),
-      ...(config.type === 'main' && process.platform !== 'darwin' && {
-        autoHideMenuBar: true,
-      }),
+      frame: !isMain && !isPreview,
+      transparent: isMain,
+      titleBarStyle: isMain || isPreview ? 'hidden' : 'default',
+      show: !isPreview,
+      icon: this.getAppIcon(),
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,
         nodeIntegration: false,
       },
-      show: config.type !== 'preview', // 预览窗口初始不显示
-      icon: this.getAppIcon(),
     };
+  }
 
-    // 设置窗口位置
+  /**
+   * 构建预览窗口的特殊配置
+   */
+  private buildPreviewWindowOptions(): Partial<Electron.BrowserWindowConstructorOptions> {
+    const isDarwin = process.platform === 'darwin';
+    
+    return {
+      autoHideMenuBar: true,
+      focusable: false,
+      skipTaskbar: true,
+      alwaysOnTop: false,
+      ...(isDarwin && {
+        trafficLightPosition: HIDDEN_TRAFFIC_LIGHT_POSITION,
+      }),
+    };
+  }
+
+  /**
+   * 构建主窗口的平台特定配置
+   */
+  private buildMainWindowOptions(): Partial<Electron.BrowserWindowConstructorOptions> {
+    const isDarwin = process.platform === 'darwin';
+    
+    if (isDarwin) {
+      return {
+        titleBarStyle: 'hidden',
+        trafficLightPosition: HIDDEN_TRAFFIC_LIGHT_POSITION,
+      };
+    }
+    
+    return {
+      autoHideMenuBar: true,
+    };
+  }
+
+  /**
+   * 计算窗口位置
+   */
+  private calculateWindowPosition(config: WindowConfig): { x: number; y: number } {
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
     
@@ -77,32 +105,31 @@ class WindowManager {
       // 主窗口：屏幕上方 1/4 位置，水平居中
       const x = Math.floor((screenWidth - config.width) / 2);
       const y = Math.floor(screenHeight / 4) - Math.floor(config.height / 2);
-      windowOptions.x = x;
-      windowOptions.y = Math.max(20, y); // 至少距顶部 20px
-    } else if (config.type === 'preview') {
-      // 预览窗口：默认位置在主窗口右侧（位置会在 showPreviewWindow 中设置）
-      windowOptions.x = Math.floor((screenWidth - config.width) / 2);
-      windowOptions.y = Math.floor((screenHeight - config.height) / 2);
-    } else {
-      // 其他窗口：屏幕居中
-      windowOptions.x = Math.floor((screenWidth - config.width) / 2);
-      windowOptions.y = Math.floor((screenHeight - config.height) / 2);
+      return {
+        x,
+        y: Math.max(MAIN_WINDOW_TOP_MARGIN, y),
+      };
     }
+    
+    if (config.type === 'preview') {
+      // 预览窗口：默认位置在主窗口右侧（位置会在 showPreviewWindow 中设置）
+      return {
+        x: Math.floor((screenWidth - config.width) / 2),
+        y: Math.floor((screenHeight - config.height) / 2),
+      };
+    }
+    
+    // 其他窗口：屏幕居中
+    return {
+      x: Math.floor((screenWidth - config.width) / 2),
+      y: Math.floor((screenHeight - config.height) / 2),
+    };
+  }
 
-    const window = new BrowserWindow(windowOptions);
-
-    // 加载窗口内容
-    window.loadURL(getWindowUrl(config.type)).then(() => {
-      // 内容加载完成后显示窗口
-      if (config.type === 'preview') {
-        // 预览窗口不自动显示，等待内容准备好后再显示
-        // window.showInactive(); // 移除自动显示
-      } else {
-        window.show();
-        window.focus();
-      }
-    });
-
+  /**
+   * 设置窗口事件监听器
+   */
+  private setupWindowEventListeners(window: BrowserWindow, config: WindowConfig): void {
     // 监听窗口关闭事件
     window.on('closed', () => {
       this.windows.delete(config.type);
@@ -125,13 +152,43 @@ class WindowManager {
     // 预览窗口：监听焦点事件，确保不会获取焦点
     if (config.type === 'preview') {
       window.on('focus', () => {
-        // 如果预览窗口意外获取焦点，立即将焦点还给主窗口
         const mainWindow = this.windows.get('main');
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.focus();
         }
       });
     }
+  }
+
+  /**
+   * 创建新窗口
+   */
+  public createWindow(config: WindowConfig): BrowserWindow {
+    // 构建窗口配置
+    const baseOptions = this.buildBaseWindowOptions(config);
+    const position = this.calculateWindowPosition(config);
+    
+    // 合并特殊配置
+    const windowOptions: Electron.BrowserWindowConstructorOptions = {
+      ...baseOptions,
+      ...position,
+      ...(config.type === 'preview' && this.buildPreviewWindowOptions()),
+      ...(config.type === 'main' && this.buildMainWindowOptions()),
+    };
+
+    const window = new BrowserWindow(windowOptions);
+
+    // 加载窗口内容
+    window.loadURL(getWindowUrl(config.type)).then(() => {
+      // 内容加载完成后显示窗口（预览窗口除外）
+      if (config.type !== 'preview') {
+        window.show();
+        window.focus();
+      }
+    });
+
+    // 设置事件监听器
+    this.setupWindowEventListeners(window, config);
 
     this.windows.set(config.type, window);
     return window;
@@ -235,26 +292,39 @@ class WindowManager {
   }
 
   /**
-   * 获取应用图标
+   * 获取应用图标路径
+   * 优先使用生产环境的图标，如果不存在则使用开发环境的图标
    */
   private getAppIcon(): string | undefined {
-    const iconName = process.platform === 'win32' ? 'icon.ico' : 
-                     process.platform === 'darwin' ? 'icon.icns' : 'icon.png';
+    const iconName = this.getIconNameForPlatform();
     
-    // 生产环境：使用打包后的图标
+    // 优先尝试生产环境的图标路径
     const productionIcon = path.join(process.resourcesPath, iconName);
     if (fs.existsSync(productionIcon)) {
       return productionIcon;
     }
     
-    // 开发环境：查找 build 目录
+    // 如果生产环境不存在，尝试开发环境的图标路径
     const devIcon = path.join(__dirname, '../../build', iconName);
     if (fs.existsSync(devIcon)) {
       return devIcon;
     }
     
-    // 如果都没有，返回 undefined（使用默认 Electron 图标）
+    // 如果都不存在，返回 undefined（使用默认 Electron 图标）
     return undefined;
+  }
+
+  /**
+   * 根据平台获取图标文件名
+   */
+  private getIconNameForPlatform(): string {
+    if (process.platform === 'win32') {
+      return 'icon.ico';
+    }
+    if (process.platform === 'darwin') {
+      return 'icon.icns';
+    }
+    return 'icon.png';
   }
 }
 
