@@ -604,22 +604,22 @@ class TimeService {
     let date: Date;
     
     // 解析时间字符串
-    let parsedDate = this.parseDate(timeStr);
-    if (!parsedDate || isNaN(parsedDate.getTime())) {
-      // 尝试使用 parseDateTimeString 解析
-      parsedDate = this.parseDateTimeString(timeStr);
-    }
-    
-    if (!parsedDate || isNaN(parsedDate.getTime())) {
+      let parsedDate = this.parseDate(timeStr);
+      if (!parsedDate || isNaN(parsedDate.getTime())) {
+        // 尝试使用 parseDateTimeString 解析
+        parsedDate = this.parseDateTimeString(timeStr);
+      }
+      
+      if (!parsedDate || isNaN(parsedDate.getTime())) {
       const errorMsg = '无法解析时间格式';
-      return {
-        input: timeStr,
-        output: errorMsg,
-        success: false,
+        return {
+          input: timeStr,
+          output: errorMsg,
+          success: false,
         error: errorMsg,
-      };
-    }
-    
+        };
+      }
+      
     if (fromZone) {
       // 从指定时区解析时间
       // 需要将指定时区的时间转换为本地时间显示
@@ -633,7 +633,7 @@ class TimeService {
         const utcMatch = fromZone.match(utcPattern);
         if (utcMatch) {
           fromOffset = parseInt(utcMatch[1], 10);
-        } else {
+    } else {
           const errorMsg = `无法识别源时区: ${fromZone}`;
           return {
             input: timeStr,
@@ -676,43 +676,43 @@ class TimeService {
     
     if (toZone) {
       // 转换到目标时区
-      const toOffset = this.parseTimezone(toZone);
-      if (toOffset === null) {
-        // 尝试解析 UTC 偏移量格式，如 UTC+8
-        const utcPattern = /^utc([+\-]\d+)$/i;
-        const utcMatch = toZone.match(utcPattern);
-        if (utcMatch) {
-          const offset = parseInt(utcMatch[1], 10);
-          const utcTime = date.getTime() - (date.getTimezoneOffset() * 60000);
-          const targetTime = new Date(utcTime + (offset * 3600000));
-          const formatted = this.formatDateTime(targetTime, 'YYYY-MM-DD HH:mm:ss');
-          
-          return {
-            input: timeStr,
-            output: `${formatted} (UTC${offset >= 0 ? '+' : ''}${offset})`,
-            success: true,
-          };
-        }
+    const toOffset = this.parseTimezone(toZone);
+    if (toOffset === null) {
+      // 尝试解析 UTC 偏移量格式，如 UTC+8
+      const utcPattern = /^utc([+\-]\d+)$/i;
+      const utcMatch = toZone.match(utcPattern);
+      if (utcMatch) {
+        const offset = parseInt(utcMatch[1], 10);
+        const utcTime = date.getTime() - (date.getTimezoneOffset() * 60000);
+        const targetTime = new Date(utcTime + (offset * 3600000));
+        const formatted = this.formatDateTime(targetTime, 'YYYY-MM-DD HH:mm:ss');
         
-        const errorMsg = `无法识别目标时区: ${toZone}`;
         return {
           input: timeStr,
-          output: errorMsg,
-          success: false,
-          error: errorMsg,
+          output: `${formatted} (UTC${offset >= 0 ? '+' : ''}${offset})`,
+          success: true,
         };
       }
       
-      // 转换时区
-      const utcTime = date.getTime() - (date.getTimezoneOffset() * 60000);
-      const targetTime = new Date(utcTime + (toOffset * 3600000));
-      const formatted = this.formatDateTime(targetTime, 'YYYY-MM-DD HH:mm:ss');
-      
+        const errorMsg = `无法识别目标时区: ${toZone}`;
       return {
         input: timeStr,
-        output: `${formatted} (${toZone.toUpperCase()})`,
-        success: true,
+        output: errorMsg,
+        success: false,
+          error: errorMsg,
       };
+    }
+    
+    // 转换时区
+    const utcTime = date.getTime() - (date.getTimezoneOffset() * 60000);
+    const targetTime = new Date(utcTime + (toOffset * 3600000));
+    const formatted = this.formatDateTime(targetTime, 'YYYY-MM-DD HH:mm:ss');
+    
+    return {
+      input: timeStr,
+      output: `${formatted} (${toZone.toUpperCase()})`,
+      success: true,
+    };
     } else {
       // 显示为本地时间（多种格式）
       const formatted = this.formatDateTime(date, 'YYYY-MM-DD HH:mm:ss');

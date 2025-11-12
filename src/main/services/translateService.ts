@@ -485,10 +485,10 @@ class TranslateService {
       // 检查是否是有效的语言代码（在 LANGUAGE_MAP 中）
       const validLangCodes = ['zh', 'zh-cn', '中文', 'chinese', 'cn', 'en', 'en-us', '英文', 'english', '英', 'ja', '日语', 'japanese', 'ko', '韩语', 'korean', 'fr', '法语', 'french', 'de', '德语', 'german', 'es', '西班牙语', 'spanish'];
       if (validLangCodes.includes(potentialLang)) {
-        return {
+      return {
           text,
           to: this.normalizeLanguageCode(potentialLang),
-        };
+      };
       }
       // 如果不是有效的语言代码，不匹配
       return null;

@@ -20,6 +20,7 @@ import { registerStringHandlers } from './handlers/stringHandlers';
 import { registerRandomHandlers } from './handlers/randomHandlers';
 import { registerTranslateHandlers } from './handlers/translateHandlers';
 import { registerVariableNameHandlers } from './handlers/variableNameHandlers';
+import { registerTodoHandlers } from './handlers/todoHandlers';
 import { indexService } from './services/indexService';
 import { appService } from './services/appService';
 import { fileService } from './services/fileService';
@@ -263,11 +264,11 @@ registerWebHandlers();
 registerBrowserHandlers();
 registerWindowHandlers();
 registerCommandHandlers();
-    registerCalculatorHandlers();
-    registerTimeHandlers();
-    registerBookmarkHandlers();
-    registerSettingsHandlers();
-    registerClipboardHandlers();
+registerCalculatorHandlers();
+registerTimeHandlers();
+registerBookmarkHandlers();
+registerSettingsHandlers();
+registerClipboardHandlers();
     registerShortcutHandlers();
     registerAliasHandlers();
     registerFeatureCompletionHandlers();
@@ -276,6 +277,7 @@ registerCommandHandlers();
     registerRandomHandlers();
     registerTranslateHandlers();
     registerVariableNameHandlers();
+    registerTodoHandlers();
 
 // 初始化服务
 app.on('ready', async () => {

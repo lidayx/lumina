@@ -1079,6 +1079,281 @@ const TimePreview: React.FC<{ result: SearchResult }> = ({ result }) => {
   );
 };
 
+/**
+ * TODO 任务预览组件
+ */
+const TodoPreview: React.FC<{ result: SearchResult }> = ({ result }) => {
+  if (!result.todoData) return null;
+
+  const [todo, setTodo] = React.useState(result.todoData);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [isCompleting, setIsCompleting] = React.useState(false);
+  const [isChangingPriority, setIsChangingPriority] = React.useState(false);
+
+  // 当 result.todoData 更新时，同步更新本地状态
+  React.useEffect(() => {
+    if (result.todoData) {
+      setTodo(result.todoData);
+    }
+  }, [result.todoData]);
+
+  // 重新加载任务数据
+  const reloadTodo = async () => {
+    try {
+      // 通过查询所有任务并过滤来获取单个任务
+      const query = `todo all`;
+      const result = await window.electron.todo.handleQuery(query, false);
+      if (result && result.todos && result.todos.length > 0) {
+        const updatedTodo = result.todos.find((t: any) => t.id === todo.id);
+        if (updatedTodo) {
+          setTodo(updatedTodo);
+        }
+      }
+    } catch (error) {
+      console.error('重新加载任务失败:', error);
+    }
+  };
+
+  const formatDate = (timestamp: number): string => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`确定要删除任务 "${todo.content}" 吗？`)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const query = `todo delete ${todo.id}`;
+      const result = await window.electron.todo.handleQuery(query, true);
+      if (result && result.success) {
+        // 关闭预览窗口
+        window.electron.preview.hide();
+        // 通知主窗口刷新搜索结果
+        if (window.electron && window.electron.invoke) {
+          window.electron.invoke('main-window-refresh-search').catch(() => {
+            // 如果主窗口不支持刷新，忽略错误
+          });
+        }
+      } else {
+        alert(result?.error || '删除失败');
+        setIsDeleting(false);
+      }
+    } catch (error) {
+      console.error('删除任务失败:', error);
+      alert('删除任务失败');
+      setIsDeleting(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    setIsCompleting(true);
+    try {
+      const query = `todo done ${todo.id}`;
+      const result = await window.electron.todo.handleQuery(query, true);
+      if (result && result.success) {
+        // 重新加载任务数据
+        await reloadTodo();
+        setIsCompleting(false);
+        // 通知主窗口刷新搜索结果
+        if (window.electron && window.electron.invoke) {
+          window.electron.invoke('main-window-refresh-search').catch(() => {
+            // 如果主窗口不支持刷新，忽略错误
+          });
+        }
+      } else {
+        alert(result?.error || '操作失败');
+        setIsCompleting(false);
+      }
+    } catch (error) {
+      console.error('完成任务失败:', error);
+      alert('完成任务失败');
+      setIsCompleting(false);
+    }
+  };
+
+  const handleChangePriority = async (priority: 'high' | 'medium' | 'low') => {
+    if (priority === todo.priority) return;
+
+    setIsChangingPriority(true);
+    try {
+      // 使用 --priority 参数单独传递优先级，保持任务内容不变
+      const query = `todo edit ${todo.id} ${todo.content} --priority ${priority}`;
+      const result = await window.electron.todo.handleQuery(query, true);
+      if (result && result.success) {
+        // 重新加载任务数据
+        await reloadTodo();
+        setIsChangingPriority(false);
+        // 通知主窗口刷新搜索结果
+        if (window.electron && window.electron.invoke) {
+          window.electron.invoke('main-window-refresh-search').catch(() => {
+            // 如果主窗口不支持刷新，忽略错误
+          });
+        }
+      } else {
+        alert(result?.error || '修改优先级失败');
+        setIsChangingPriority(false);
+      }
+    } catch (error) {
+      console.error('修改优先级失败:', error);
+      alert('修改优先级失败');
+      setIsChangingPriority(false);
+    }
+  };
+
+  const priorityLabel = todo.priority === 'high' ? '高' : todo.priority === 'low' ? '低' : '中';
+  const statusLabel = todo.status === 'done' ? '已完成' : '待办';
+
+  return (
+    <div className="p-4 border-b border-gray-200 dark:border-gray-700 max-w-full overflow-x-hidden">
+      <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">任务详情</h3>
+      <div className="space-y-4">
+        {/* 任务ID */}
+        <div>
+          <div className="mb-1">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">任务 ID</span>
+          </div>
+          <p className="text-sm text-gray-900 dark:text-gray-100 font-mono">#{todo.id}</p>
+        </div>
+
+        {/* 任务内容 */}
+        <div>
+          <div className="mb-1">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">任务内容</span>
+          </div>
+          <p className="text-sm text-gray-900 dark:text-gray-100 break-words leading-relaxed">{todo.content}</p>
+        </div>
+
+        {/* 优先级 */}
+        <div>
+          <div className="mb-1">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">优先级</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded ${
+              todo.priority === 'high' ? 'bg-red-100 dark:bg-red-900/30' :
+              todo.priority === 'low' ? 'bg-green-100 dark:bg-green-900/30' :
+              'bg-yellow-100 dark:bg-yellow-900/30'
+            }`}>
+              {todo.priority === 'high' ? (
+                <svg className="w-5 h-5" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="7" fill="#DC2626" stroke="#991B1B" strokeWidth="0.5"/>
+                  <circle cx="8" cy="8" r="4" fill="#FEE2E2" opacity="0.3"/>
+                </svg>
+              ) : todo.priority === 'low' ? (
+                <svg className="w-5 h-5" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="7" fill="#059669" stroke="#047857" strokeWidth="0.5"/>
+                  <circle cx="8" cy="8" r="4" fill="#D1FAE5" opacity="0.3"/>
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="7" fill="#D97706" stroke="#92400E" strokeWidth="0.5"/>
+                  <circle cx="8" cy="8" r="4" fill="#FEF3C7" opacity="0.3"/>
+                </svg>
+              )}
+              <span className={`text-xs font-medium ${
+                todo.priority === 'high' ? 'text-red-800 dark:text-red-200' :
+                todo.priority === 'low' ? 'text-green-800 dark:text-green-200' :
+                'text-yellow-800 dark:text-yellow-200'
+              }`}>
+                {priorityLabel}
+              </span>
+            </div>
+            {!isChangingPriority && (
+              <div className="flex gap-1">
+                {(['high', 'medium', 'low'] as const).map((priority) => (
+                  priority !== todo.priority && (
+                    <button
+                      key={priority}
+                      onClick={() => handleChangePriority(priority)}
+                      className="px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline transition-colors"
+                    >
+                      设为{priority === 'high' ? '高' : priority === 'low' ? '低' : '中'}
+                    </button>
+                  )
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 状态 */}
+        <div>
+          <div className="mb-1">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">状态</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-1 text-xs font-medium rounded ${
+              todo.status === 'done' 
+                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+            }`}>
+              {statusLabel}
+            </span>
+            {todo.status === 'pending' && !isCompleting && (
+              <button
+                onClick={handleComplete}
+                className="px-2 py-1 text-xs font-medium text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 hover:underline transition-colors"
+              >
+                标记为已完成
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 创建时间 */}
+        <div>
+          <div className="mb-1">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">创建时间</span>
+          </div>
+          <p className="text-sm text-gray-900 dark:text-gray-100">{formatDate(todo.createdAt)}</p>
+        </div>
+
+        {/* 完成时间 */}
+        {todo.completedAt && (
+          <div>
+            <div className="mb-1">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">完成时间</span>
+            </div>
+            <p className="text-sm text-gray-900 dark:text-gray-100">{formatDate(todo.completedAt)}</p>
+          </div>
+        )}
+
+        {/* 操作按钮 */}
+        <div className="pt-2 border-t border-gray-200 dark:border-gray-700 space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {todo.status === 'pending' && (
+              <button
+                onClick={handleComplete}
+                disabled={isCompleting}
+                className="px-3 py-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 hover:underline transition-colors disabled:opacity-50"
+              >
+                {isCompleting ? '处理中...' : '完成'}
+              </button>
+            )}
+            <button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:underline transition-colors disabled:opacity-50"
+            >
+              {isDeleting ? '删除中...' : '删除'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DefaultPreview: React.FC<{ result: SearchResult }> = ({ result }) => {
   return (
     <div className="p-4 border-b border-gray-200 dark:border-gray-700">
@@ -1152,6 +1427,15 @@ export const ResultPreview: React.FC<ResultPreviewProps> = ({ result, query }) =
     return (
       <div className="w-full max-w-full overflow-x-hidden">
         <TimePreview result={result} />
+      </div>
+    );
+  }
+
+  // 如果有 TODO 数据，显示 TODO 预览
+  if (result.todoData) {
+    return (
+      <div className="w-full max-w-full overflow-x-hidden">
+        <TodoPreview result={result} />
       </div>
     );
   }

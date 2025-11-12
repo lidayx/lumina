@@ -1280,7 +1280,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                     </div>
                     
                     {/* 计算器功能 */}
-                    <div className="flex items-center justify-between py-2">
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
                       <div>
                         <div className="font-medium text-gray-900">计算器</div>
                         <div className="text-sm text-gray-500">数学计算、科学函数</div>
@@ -1290,6 +1290,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                           type="checkbox"
                           checked={appSettings.featureCalculator !== false}
                           onChange={(e) => updateSetting('featureCalculator', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    {/* TODO 管理功能 */}
+                    <div className="flex items-center justify-between py-2">
+                      <div>
+                        <div className="font-medium text-gray-900">TODO 管理</div>
+                        <div className="text-sm text-gray-500">任务创建、查询、完成、删除、编辑和搜索</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={appSettings.featureTodo !== false}
+                          onChange={(e) => updateSetting('featureTodo', e.target.checked)}
                           className="sr-only peer"
                         />
                         <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -2279,7 +2296,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
               </div>
 
               {/* 随机数生成 */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
                 <div className="p-6">
                   <h3 className="text-lg font-medium mb-4">随机数生成</h3>
                   <div className="space-y-3 text-sm">
@@ -2329,6 +2346,112 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                         <code className="px-2 py-1 bg-white rounded text-xs">random number 100</code>
                       </div>
                       <p className="text-xs text-gray-600">生成指定范围内的随机整数（如：1-100 或 0-100）</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* TODO 管理 */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                <div className="p-6">
+                  <h3 className="text-lg font-medium mb-4">TODO 管理</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">创建任务</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">todo 完成项目文档</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">待办 明天开会准备材料</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">todo 修复bug #high</code>
+                      </div>
+                      <p className="text-xs text-gray-600 mb-2">快速创建待办事项，支持设置优先级</p>
+                      <p className="text-xs text-gray-500">• 使用 <code className="px-1 py-0.5 bg-white rounded text-xs">#high</code>、<code className="px-1 py-0.5 bg-white rounded text-xs">#medium</code>、<code className="px-1 py-0.5 bg-white rounded text-xs">#low</code> 标记优先级</p>
+                      <p className="text-xs text-gray-500">• 优先级通过红绿灯图标显示：🔴 高优先级、🟡 中优先级、🟢 低优先级</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">查询任务</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">todo</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">todo all</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">todo done</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">todo search 项目</code>
+                      </div>
+                      <p className="text-xs text-gray-600 mb-2">查看任务列表，支持筛选和搜索</p>
+                      <p className="text-xs text-gray-500">• <code className="px-1 py-0.5 bg-white rounded text-xs">todo</code> 查看所有未完成任务</p>
+                      <p className="text-xs text-gray-500">• <code className="px-1 py-0.5 bg-white rounded text-xs">todo all</code> 查看所有任务（包括已完成）</p>
+                      <p className="text-xs text-gray-500">• <code className="px-1 py-0.5 bg-white rounded text-xs">todo done</code> 查看已完成任务</p>
+                      <p className="text-xs text-gray-500">• <code className="px-1 py-0.5 bg-white rounded text-xs">todo search 关键词</code> 搜索任务</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">完成任务</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">todo done 1</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">todo complete 1</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">done 1</code>
+                      </div>
+                      <p className="text-xs text-gray-600">标记任务为已完成，记录完成时间</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">删除任务</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">todo delete 1</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">todo remove 1</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">todo del 1</code>
+                      </div>
+                      <p className="text-xs text-gray-600">删除不需要的任务，删除前会提示确认</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">编辑任务</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">todo edit 1 新内容</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">todo edit 1 内容 --priority high</code>
+                      </div>
+                      <p className="text-xs text-gray-600 mb-2">修改任务内容和优先级</p>
+                      <p className="text-xs text-gray-500">• 使用 <code className="px-1 py-0.5 bg-white rounded text-xs">--priority high|medium|low</code> 参数修改优先级</p>
+                      <p className="text-xs text-gray-500">• 优先级作为独立参数，不会混入任务内容</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">预览窗口快速操作</div>
+                      <p className="text-xs text-gray-600 mb-2">选择任务后，在右侧预览窗口可以：</p>
+                      <p className="text-xs text-gray-500">• 快速修改优先级：点击"设为高/中/低"按钮</p>
+                      <p className="text-xs text-gray-500">• 标记完成：点击"标记为已完成"或"完成"按钮</p>
+                      <p className="text-xs text-gray-500">• 删除任务：点击"删除"按钮（会提示确认）</p>
+                      <p className="text-xs text-gray-500">• 查看详细信息：任务 ID、内容、优先级、状态、创建时间、完成时间</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">智能补全</div>
+                      <p className="text-xs text-gray-600 mb-2">输入过程中自动显示命令提示和任务模板建议</p>
+                      <p className="text-xs text-gray-500">• 输入 <code className="px-1 py-0.5 bg-white rounded text-xs">todo</code> 显示所有可用命令</p>
+                      <p className="text-xs text-gray-500">• 输入 <code className="px-1 py-0.5 bg-white rounded text-xs">todo 2</code> 显示"创建任务 2，回车确认"提示</p>
+                      <p className="text-xs text-gray-500">• 输入 <code className="px-1 py-0.5 bg-white rounded text-xs">todo delete 6</code> 显示任务详情和确认提示</p>
+                      <p className="text-xs text-gray-500">• 自动检查任务 ID 是否存在，提供友好提示</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">优先级图标</div>
+                      <p className="text-xs text-gray-600 mb-2">优先级通过红绿灯样式的图标显示，直观易识别：</p>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center gap-1.5">
+                          <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                            <circle cx="8" cy="8" r="7" fill="#DC2626" stroke="#991B1B" strokeWidth="0.5"/>
+                            <circle cx="8" cy="8" r="4" fill="#FEE2E2" opacity="0.3"/>
+                          </svg>
+                          <span className="text-xs text-gray-700">高优先级</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                            <circle cx="8" cy="8" r="7" fill="#D97706" stroke="#92400E" strokeWidth="0.5"/>
+                            <circle cx="8" cy="8" r="4" fill="#FEF3C7" opacity="0.3"/>
+                          </svg>
+                          <span className="text-xs text-gray-700">中优先级</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                            <circle cx="8" cy="8" r="7" fill="#059669" stroke="#047857" strokeWidth="0.5"/>
+                            <circle cx="8" cy="8" r="4" fill="#D1FAE5" opacity="0.3"/>
+                          </svg>
+                          <span className="text-xs text-gray-700">低优先级</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500">图标显示在搜索结果列表和预览窗口中，颜色清晰，易于识别</p>
                     </div>
                   </div>
                 </div>

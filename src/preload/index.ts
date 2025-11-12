@@ -95,6 +95,13 @@ contextBridge.exposeInMainWorld('electron', {
         help: () => ipcRenderer.invoke('time-help'),
       },
       
+      // TODO 相关
+      todo: {
+        handleQuery: (query: string, executeOnly?: boolean) => ipcRenderer.invoke('todo-handle-query', query, executeOnly),
+        complete: (partial: string) => ipcRenderer.invoke('todo-complete', partial),
+        help: () => ipcRenderer.invoke('todo-help'),
+      },
+      
       // 随机数相关
       random: {
         handleQuery: (query: string) => ipcRenderer.invoke('random-handle-query', query),

@@ -155,7 +155,7 @@ class StringService {
     if (!match) {
       match = query.match(titleCommandReversePattern);
       if (match) {
-        conversionType = 'title';
+      conversionType = 'title';
         text = match[1] ? match[1].trim() : '';
       }
     }
@@ -255,14 +255,14 @@ class StringService {
       if (match) {
         conversionType = 'camel';
         text = match[1] ? match[1].trim() : '';
-      }
+    }
     }
 
     // 检查反向格式: <字符串> snake case
     if (!match) {
       match = query.match(snakeCommandReversePattern);
       if (match) {
-        conversionType = 'snake';
+      conversionType = 'snake';
         text = match[1] ? match[1].trim() : '';
       }
     }
@@ -425,7 +425,7 @@ class StringService {
     if (!match) {
       match = query.match(trimCommandPattern);
       if (match) {
-        trimType = 'trim';
+      trimType = 'trim';
         text = match[1] ? match[1].trim() : '';
       }
     }
@@ -443,7 +443,7 @@ class StringService {
     if (!match) {
       match = query.match(trimCommandReversePattern);
       if (match) {
-        trimType = 'trim';
+      trimType = 'trim';
         text = match[1] ? match[1].trim() : '';
       }
     }
@@ -721,7 +721,7 @@ class StringService {
       // 如果描述包含查询，额外加分
       if (format.description.includes(query)) {
         matchResult.score = Math.max(matchResult.score, 100);
-      }
+    }
       
       if (matchResult.score > 0) {
         suggestions.push({ ...format, score: matchResult.score });

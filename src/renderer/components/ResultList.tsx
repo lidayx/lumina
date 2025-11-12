@@ -34,6 +34,15 @@ export interface SearchResult {
     success: boolean;
     error?: string;
   }; // 时间工具结果数据
+  todoData?: {
+    id: number;
+    content: string;
+    priority: 'high' | 'medium' | 'low';
+    status: 'pending' | 'done';
+    createdAt: number;
+    completedAt?: number;
+    tags?: string;
+  }; // TODO 任务数据
   suggestionData?: any; // 补全建议数据（用于Tab补全）
 }
 
@@ -311,8 +320,29 @@ const ResultItem = React.memo<{
 
       {/* Content */}
       <div className="ml-3 flex-1 min-w-0 overflow-hidden">
-        <div className="text-sm font-medium text-gray-900 dark:text-white truncate break-words">
-          {highlightText(result.title, query)}
+        <div className="text-sm font-medium text-gray-900 dark:text-white truncate break-words flex items-center gap-1.5">
+          {/* 如果是 TODO 任务，显示优先级图标（红绿灯样式） */}
+          {result.todoData && (
+            <span className="flex-shrink-0">
+              {result.todoData.priority === 'high' ? (
+                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="7" fill="#DC2626" stroke="#991B1B" strokeWidth="0.5"/>
+                  <circle cx="8" cy="8" r="4" fill="#FEE2E2" opacity="0.3"/>
+                </svg>
+              ) : result.todoData.priority === 'low' ? (
+                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="7" fill="#059669" stroke="#047857" strokeWidth="0.5"/>
+                  <circle cx="8" cy="8" r="4" fill="#D1FAE5" opacity="0.3"/>
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="7" fill="#D97706" stroke="#92400E" strokeWidth="0.5"/>
+                  <circle cx="8" cy="8" r="4" fill="#FEF3C7" opacity="0.3"/>
+                </svg>
+              )}
+            </span>
+          )}
+          <span>{highlightText(result.title, query)}</span>
         </div>
         {result.description && (
           <div className="text-xs text-gray-500 dark:text-gray-500 truncate mt-0.5 break-words">
@@ -330,6 +360,7 @@ const ResultItem = React.memo<{
     prevProps.result.title === nextProps.result.title &&
     prevProps.result.description === nextProps.result.description &&
     prevProps.result.icon === nextProps.result.icon &&
+    prevProps.result.todoData?.priority === nextProps.result.todoData?.priority &&
     prevProps.query === nextProps.query
   );
 });

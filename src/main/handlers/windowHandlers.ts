@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import { openSettingsWindow } from '../windows/settingsWindow';
 import { openPluginWindow } from '../windows/pluginWindow';
-import { toggleMainWindow } from '../windows/mainWindow';
+import { toggleMainWindow, getMainWindow } from '../windows/mainWindow';
 import { showPreviewWindow, hidePreviewWindow, updatePreviewContent, closePreviewWindow } from '../windows/previewWindow';
 
 /**
@@ -49,6 +49,16 @@ export function registerWindowHandlers() {
   ipcMain.removeHandler('preview-close');
   ipcMain.handle('preview-close', () => {
     closePreviewWindow();
+  });
+
+  // 刷新主窗口搜索结果
+  ipcMain.removeHandler('main-window-refresh-search');
+  ipcMain.handle('main-window-refresh-search', () => {
+    const mainWindow = getMainWindow();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      // 发送刷新搜索的消息到主窗口
+      mainWindow.webContents.send('refresh-search');
+    }
   });
 }
 

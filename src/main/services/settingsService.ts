@@ -55,6 +55,7 @@ export interface AppSettings {
   featureTranslation: boolean; // 翻译功能（默认 true）
   featureVariableName: boolean; // 变量名生成功能（默认 true）
   featureCalculator: boolean; // 计算器功能（默认 true）
+  featureTodo: boolean; // TODO 管理功能（默认 true）
   
   // 快捷键设置
   globalShortcut: string; // 全局快捷键（默认 "Shift+Space"）
@@ -98,6 +99,7 @@ class SettingsService {
     featureTranslation: true, // 默认启用翻译功能
     featureVariableName: true, // 默认启用变量名生成功能
     featureCalculator: true, // 默认启用计算器功能
+    featureTodo: true, // 默认启用 TODO 管理功能
     globalShortcut: 'Shift+Space', // 默认全局快捷键
   };
 

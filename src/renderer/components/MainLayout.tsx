@@ -410,6 +410,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             let randomResult = null;
             let translateResult = null;
             let variableNameResult = null;
+            let todoResult = null;
             
             if (!isFileSearch && !urlCheck.isURL) {
               // 先检查是否是数学函数表达式（如 log(100), sin(30)），如果是则跳过其他模块，直接使用计算器
@@ -446,8 +447,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                     console.log('🔍 [模块检测] translateResult 匹配:', actualQuery);
                   }
                 }
+                if (!encodeResult && !stringResult && !timeResult && !randomResult && !translateResult) {
+                  // 输入过程中只执行查询操作，不执行修改操作（创建、删除、编辑、完成）
+                  todoResult = await window.electron.todo.handleQuery(actualQuery, false).catch(() => null);
+                  if (todoResult) {
+                    console.log('🔍 [模块检测] todoResult 匹配:', actualQuery);
+                  }
+                }
               }
-              if (!encodeResult && !stringResult && !timeResult && !randomResult && !translateResult) {
+              if (!encodeResult && !stringResult && !timeResult && !randomResult && !translateResult && !todoResult) {
                 // 先检查是否是数学表达式（简单或包含括号）或数学函数，如果是则跳过变量名生成
                 const isMathExpression = /^\d+\s*[\+\-*/]\s*\d+$/.test(actualQuery.trim()) || // 简单数学表达式
                                          /^[\d\s\+\-*/().,π]+$/.test(actualQuery.trim()) && /[\+\-*/().,π]/.test(actualQuery.trim()) || // 包含运算符的数学表达式
@@ -465,20 +473,21 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             }
             
             // 如果所有独立模块都没有处理，再尝试计算器
-            const shouldCallCalculator = !encodeResult && !stringResult && !timeResult && !randomResult && !translateResult && !variableNameResult && finalIsCalculation;
+            const shouldCallCalculator = !encodeResult && !stringResult && !timeResult && !randomResult && !translateResult && !variableNameResult && !todoResult && finalIsCalculation;
             console.log('🔍 [计算器检测]', {
               query: actualQuery,
               shouldCallCalculator,
               finalIsCalculation,
               isSimpleMath,
               isCalculation,
-              hasOtherResults: !!(encodeResult || stringResult || timeResult || randomResult || translateResult || variableNameResult),
+              hasOtherResults: !!(encodeResult || stringResult || timeResult || randomResult || translateResult || variableNameResult || todoResult),
               encodeResult: encodeResult ? '有结果' : 'null',
               stringResult: stringResult ? '有结果' : 'null',
               timeResult: timeResult ? '有结果' : 'null',
               randomResult: randomResult ? '有结果' : 'null',
               translateResult: translateResult ? '有结果' : 'null',
               variableNameResult: variableNameResult ? '有结果' : 'null',
+              todoResult: todoResult ? '有结果' : 'null',
             });
             const calcResult = shouldCallCalculator
               ? await window.electron.calculator.calculate(actualQuery).catch((err) => {
@@ -529,6 +538,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                                     /^(?:varname|变量名|camel|snake|pascal)\s+\w/i.test(queryLower);
             const isTimeKeyword = /^(?:time|时间|timestamp|date|日期)(\s|$)/i.test(queryLower) ||
                                  /^(?:time|时间|timestamp|date|日期)\s+\w/i.test(queryLower);
+            const isTodoKeyword = /^(?:todo|待办|任务)(\s|$)/i.test(queryLower) ||
+                                 /^(?:todo|待办|任务)\s+\w/i.test(queryLower) ||
+                                 /^(?:done|完成|delete|删除|edit|编辑|search|搜索)/i.test(queryLower);
             
             // 命令补全（如果处于命令模式）
             let commandCompletions: any[] = [];
@@ -643,6 +655,22 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   } else {
                     featureHelp = await window.electron.time.help().catch(() => null);
                   }
+                } else if (isTodoKeyword) {
+                  featureType = 'todo';
+                  const queryForComplete = actualQuery.trim();
+                  if (queryForComplete) {
+                    const cached = completionCache.get('todo', queryForComplete);
+                    if (cached) {
+                      featureCompletions = cached;
+                    } else {
+                      featureCompletions = await window.electron.todo.complete(queryForComplete).catch(() => []);
+                      if (featureCompletions.length > 0) {
+                        completionCache.set('todo', queryForComplete, featureCompletions);
+                      }
+                    }
+                  } else {
+                    featureHelp = await window.electron.todo.help().catch(() => null);
+                  }
                 }
               } catch (error) {
                 console.error('功能补全失败:', error);
@@ -739,6 +767,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             const hasRandomResult = randomResult !== null;
             const hasTranslateResult = translateResult !== null;
             const hasVariableNameResult = variableNameResult !== null;
+            const hasTodoResult = todoResult !== null;
             
             const shouldShowFeatureCompletion = featureType && 
                                                !isCommandMode && 
@@ -750,6 +779,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                                                !hasRandomResult && // 如果有随机数生成结果（包括错误），不显示补全
                                                !hasTranslateResult && // 如果有翻译结果（包括错误），不显示补全
                                                !hasVariableNameResult && // 如果有变量名生成结果（包括错误），不显示补全
+                                               !hasTodoResult && // 如果有 TODO 结果（包括错误），不显示补全
                                                (isOnlyKeyword || !calcResult || !calcResult.success);
             
             // 调试日志
@@ -814,6 +844,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   'translate': 'command',
                   'random': 'command',
                   'varname': 'command',
+                  'todo': 'command',
                 };
                 const resultType = featureTypeMap[featureType] || 'command';
                 
@@ -825,6 +856,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   'string': '📝',
                   'varname': '🏷️',
                   'time': '⏰',
+                  'todo': '📋',
                 };
                 const icon = featureIcons[featureType] || '💡';
                 
@@ -1094,6 +1126,80 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                 score: 1000,
                 priorityScore: 1000,
                 timeData: timeResult,
+              });
+            }
+            
+            // TODO 结果（如果有）
+            if (todoResult && todoResult.success) {
+              // 检查是否是任务列表查询（包含多个任务）
+              const isListQuery = /^(?:todo|待办)(?:\s+(?:all|done|pending|全部|已完成|未完成))?$/i.test(todoResult.input.trim()) ||
+                                 /^(?:todo|待办)\s+search/i.test(todoResult.input.trim());
+              
+              if (isListQuery && todoResult.todos && todoResult.todos.length > 0) {
+                // 任务列表查询：为每个任务创建一个选项
+                todoResult.todos.forEach((todo: any, index: number) => {
+                  const dateStr = new Date(todo.createdAt).toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  }).replace(/\//g, '-');
+                  
+                  if (todo.status === 'pending') {
+                    combinedResults.push({
+                      id: `todo-item-${todo.id}`,
+                      type: 'command' as const,
+                      title: `[${todo.id}] ${todo.content} (${dateStr})`,
+                      description: `TODO ${index + 1}/${todoResult.todos.length}：${todoResult.input}`,
+                      action: `todo:view:${todo.id}`,
+                      score: 2000 - index,
+                      priorityScore: 2000 - index,
+                      todoData: todo, // 保存任务数据用于预览
+                    });
+                  } else {
+                    const completedDateStr = todo.completedAt 
+                      ? new Date(todo.completedAt).toLocaleString('zh-CN', {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        }).replace(/\//g, '-')
+                      : '';
+                    combinedResults.push({
+                      id: `todo-item-${todo.id}`,
+                      type: 'command' as const,
+                      title: `[✓] ${todo.content} (${completedDateStr} 完成)`,
+                      description: `TODO ${index + 1}/${todoResult.todos.length}：${todoResult.input}`,
+                      action: `todo:view:${todo.id}`,
+                      score: 2000 - index,
+                      priorityScore: 2000 - index,
+                      todoData: todo, // 保存任务数据用于预览
+                    });
+                  }
+                });
+              } else {
+                // 单行结果（创建、完成、删除、编辑等操作）
+                combinedResults.push({
+                  id: 'todo-result',
+                  type: 'command' as const,
+                  title: todoResult.output.trim(),
+                  description: `TODO：${todoResult.input}`,
+                  action: 'todo:copy',
+                  score: 2000,
+                  priorityScore: 2000,
+                });
+              }
+            } else if (todoResult && !todoResult.success && todoResult.error) {
+              combinedResults.push({
+                id: 'todo-error',
+                type: 'command' as const,
+                title: todoResult.error,
+                description: `TODO：${todoResult.input || query}`,
+                action: 'todo:copy',
+                score: 1000,
+                priorityScore: 1000,
               });
             }
             
@@ -2052,9 +2158,37 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             switchToType(nextType);
           }
         }
-      } else if (e.key === 'Enter' && results[selectedIndex]) {
+      } else if (e.key === 'Enter') {
         e.preventDefault();
-        handleSelect(selectedIndex);
+        const trimmedQuery = query.trim();
+        
+        // 优先检查是否是 TODO 修改操作（创建、删除、编辑、完成）
+        // 这些操作应该直接执行，而不是执行选中的结果
+        const isTodoModifyOperation = /^(?:todo|待办)\s+(?:delete|remove|del|done|complete|finish|edit|update|完成|删除|移除|删|编辑|更新)\s+\d+/i.test(trimmedQuery) ||
+                                     /^(?:todo|待办)\s+(?!all|done|pending|search|全部|已完成|未完成|搜索)\S+/i.test(trimmedQuery);
+        
+        if (isTodoModifyOperation) {
+          // 执行 TODO 修改操作
+          console.log('🔍 [前端] 检测到 TODO 修改操作，执行:', trimmedQuery);
+          window.electron.todo.handleQuery(trimmedQuery, true).then((result: any) => {
+            console.log('🔍 [前端] TODO 修改操作结果:', result);
+            if (result && result.success) {
+              // 操作成功后，关闭窗口
+              hideMainWindow();
+            } else if (result) {
+              // 操作失败，重新搜索以更新结果（显示错误信息）
+              handleSearch(query);
+            }
+          }).catch((error) => {
+            console.error('❌ [前端] TODO 修改操作失败:', error);
+          });
+        } else if (results[selectedIndex]) {
+          // 如果有选中结果，执行选中结果的操作
+          handleSelect(selectedIndex);
+        } else if (results.length > 0) {
+          // 其他情况，执行第一个结果（如果有）
+          handleSelect(0);
+        }
       }
     };
 
@@ -2134,6 +2268,27 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
       }
     };
   }, [selectedResult, query, previewWindowEnabled]);
+
+  // 监听刷新搜索的消息
+  React.useEffect(() => {
+    const handleRefreshSearch = () => {
+      console.log('[MainLayout] 收到刷新搜索消息，重新搜索');
+      // 重新触发搜索：直接设置 query 会触发 searchAll
+      if (query.trim()) {
+        setQuery(query); // 这会触发 searchAll useEffect
+      }
+    };
+
+    if (window.electron && window.electron.on) {
+      window.electron.on('refresh-search', handleRefreshSearch);
+    }
+
+    return () => {
+      if (window.electron && window.electron.off) {
+        window.electron.off('refresh-search', handleRefreshSearch);
+      }
+    };
+  }, [query]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
