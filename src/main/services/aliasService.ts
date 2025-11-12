@@ -113,6 +113,7 @@ class AliasService {
 
       // 添加到内存
       this.aliases.set(aliasName, alias);
+      this.clearSortedCache(); // 清除排序缓存
 
       console.log(`✅ [别名服务] 已添加别名: ${name} -> ${command}`);
       return alias;
@@ -142,6 +143,7 @@ class AliasService {
 
       // 从内存删除
       this.aliases.delete(aliasName);
+      this.clearSortedCache(); // 清除排序缓存
 
       console.log(`✅ [别名服务] 已删除别名: ${name}`);
       return true;
@@ -174,6 +176,7 @@ class AliasService {
       stmt.run([alias.command, alias.type, alias.description || null, aliasName]);
       stmt.free();
       dbManager.saveDatabase();
+      this.clearSortedCache(); // 清除排序缓存
 
       console.log(`✅ [别名服务] 已更新别名: ${name}`);
       return true;
@@ -186,7 +189,12 @@ class AliasService {
   /**
    * 解析输入，检查是否匹配别名
    * 支持命令链：`g 搜索词` -> `google 搜索词`
+   * 优化：使用防抖减少数据库写入频率
    */
+  private useCountUpdateQueue: Map<string, number> = new Map();
+  private useCountUpdateTimer: NodeJS.Timeout | null = null;
+  private readonly USE_COUNT_UPDATE_DELAY = 2000; // 2秒防抖
+
   public resolveAlias(input: string): { resolved: string; alias?: Alias; hasArgs: boolean } | null {
     if (!this.loaded) {
       return null;
@@ -207,7 +215,7 @@ class AliasService {
       return null;
     }
 
-    // 增加使用次数
+    // 增加使用次数（异步，不阻塞）
     this.incrementUseCount(aliasName);
 
     // 构建解析后的命令
@@ -237,37 +245,85 @@ class AliasService {
   }
 
   /**
-   * 增加使用次数
+   * 增加使用次数（优化：使用防抖批量更新）
    */
-  private async incrementUseCount(name: string): Promise<void> {
+  private incrementUseCount(name: string): void {
+    const alias = this.aliases.get(name.toLowerCase());
+    if (!alias) return;
+
+    // 立即更新内存中的计数
+    alias.useCount = (alias.useCount || 0) + 1;
+
+    // 加入更新队列
+    this.useCountUpdateQueue.set(name, alias.useCount);
+
+    // 防抖：延迟批量更新数据库
+    if (this.useCountUpdateTimer) {
+      clearTimeout(this.useCountUpdateTimer);
+    }
+
+    this.useCountUpdateTimer = setTimeout(() => {
+      this.flushUseCountUpdates();
+    }, this.USE_COUNT_UPDATE_DELAY);
+  }
+
+  /**
+   * 批量刷新使用次数到数据库
+   */
+  private async flushUseCountUpdates(): Promise<void> {
+    if (this.useCountUpdateQueue.size === 0) {
+      return;
+    }
+
     try {
-      const alias = this.aliases.get(name.toLowerCase());
-      if (!alias) return;
-
-      alias.useCount = (alias.useCount || 0) + 1;
-
-      // 更新数据库
       const db = await dbManager.getDb();
-      const stmt = db.prepare('UPDATE aliases SET useCount = ? WHERE name = ?');
-      stmt.run([alias.useCount, alias.name]);
-      stmt.free();
+      const updates = Array.from(this.useCountUpdateQueue.entries());
+      this.useCountUpdateQueue.clear();
+
+      // 批量更新
+      for (const [name, count] of updates) {
+        const stmt = db.prepare('UPDATE aliases SET useCount = ? WHERE name = ?');
+        stmt.run([count, name]);
+        stmt.free();
+      }
+
       dbManager.saveDatabase();
     } catch (error) {
-      console.error(`❌ [别名服务] 更新使用次数失败: ${error}`);
+      console.error(`❌ [别名服务] 批量更新使用次数失败: ${error}`);
     }
   }
 
   /**
    * 获取所有别名
+   * 优化：缓存排序结果，减少重复计算
    */
+  private sortedAliasesCache: Alias[] | null = null;
+
   public getAllAliases(): Alias[] {
-    return Array.from(this.aliases.values()).sort((a, b) => {
+    // 如果缓存有效，直接返回
+    if (this.sortedAliasesCache) {
+      return this.sortedAliasesCache;
+    }
+
+    // 计算排序结果
+    const sorted = Array.from(this.aliases.values()).sort((a, b) => {
       // 按使用次数降序，然后按创建时间降序
       if (b.useCount !== a.useCount) {
         return b.useCount - a.useCount;
       }
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
+
+    // 缓存结果
+    this.sortedAliasesCache = sorted;
+    return sorted;
+  }
+
+  /**
+   * 清除排序缓存（在别名变更时调用）
+   */
+  private clearSortedCache(): void {
+    this.sortedAliasesCache = null;
   }
 
   /**

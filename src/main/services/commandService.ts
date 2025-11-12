@@ -41,6 +41,10 @@ class CommandService {
   private commands: Map<string, CommandInfo> = new Map();
   private history: CommandHistory[] = [];
   private historyLoaded: boolean = false;
+  
+  // 缓存搜索结果（性能优化）
+  private searchCache: Map<string, CommandInfo[]> = new Map();
+  private readonly SEARCH_CACHE_MAX_SIZE = 50;
 
   constructor() {
     this.initDefaultCommands();
@@ -164,6 +168,7 @@ class CommandService {
 
   /**
    * 搜索命令
+   * 优化：使用缓存减少重复计算
    */
   public searchCommands(query: string): CommandInfo[] {
     if (!query) {
@@ -171,6 +176,13 @@ class CommandService {
     }
 
     const searchTerm = query.toLowerCase().trim();
+    
+    // 检查缓存
+    const cached = this.searchCache.get(searchTerm);
+    if (cached !== undefined) {
+      return cached;
+    }
+
     const results: CommandInfo[] = [];
 
     for (const cmd of this.commands.values()) {
@@ -183,6 +195,15 @@ class CommandService {
         results.push(cmd);
       }
     }
+
+    // 缓存结果（限制缓存大小）
+    if (this.searchCache.size >= this.SEARCH_CACHE_MAX_SIZE) {
+      const firstKey = this.searchCache.keys().next().value;
+      if (firstKey) {
+        this.searchCache.delete(firstKey);
+      }
+    }
+    this.searchCache.set(searchTerm, results);
 
     return results;
   }

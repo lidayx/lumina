@@ -113,6 +113,7 @@ class BookmarkService {
 
   /**
    * 扫描所有书签文件（支持多 Profile，并行读取）
+   * 优化：改进去重逻辑，减少数组操作
    */
   private async scanAllBookmarks(bookmarkPaths: string[]): Promise<void> {
     // 并行读取所有书签文件（性能优化：从串行改为并行）
@@ -125,9 +126,8 @@ class BookmarkService {
     
     const bookmarkArrays = await Promise.all(bookmarkPromises);
     
-    // 合并并去重（优化：使用 Map 存储索引，避免 indexOf）
-    const allBookmarks: Bookmark[] = [];
-    const bookmarkMap = new Map<string, { bookmark: Bookmark; index: number }>(); // 用于去重（基于 URL）
+    // 合并并去重（优化：使用 Map 直接存储书签，避免双重循环）
+    const bookmarkMap = new Map<string, Bookmark>(); // URL -> Bookmark
 
     for (const bookmarks of bookmarkArrays) {
       for (const bookmark of bookmarks) {
@@ -135,29 +135,24 @@ class BookmarkService {
         
         if (!existing) {
           // 新书签，直接添加
-          const index = allBookmarks.length;
-          bookmarkMap.set(bookmark.url, { bookmark, index });
-          allBookmarks.push(bookmark);
+          bookmarkMap.set(bookmark.url, bookmark);
         } else {
           // 已存在，比较日期，保留更新的那个
-          const shouldReplace = bookmark.dateLastUsed && existing.bookmark.dateLastUsed
-            ? bookmark.dateLastUsed > existing.bookmark.dateLastUsed
-            : bookmark.dateAdded && existing.bookmark.dateAdded
-            ? bookmark.dateAdded > existing.bookmark.dateAdded
-            : false;
+          const existingTime = existing.dateLastUsed || existing.dateAdded || 0;
+          const newTime = bookmark.dateLastUsed || bookmark.dateAdded || 0;
           
-          if (shouldReplace) {
-            bookmarkMap.set(bookmark.url, { bookmark, index: existing.index });
-            allBookmarks[existing.index] = bookmark;
+          if (newTime > existingTime) {
+            bookmarkMap.set(bookmark.url, bookmark);
           }
         }
       }
     }
 
-    this.bookmarks = allBookmarks;
+    // 转换为数组
+    this.bookmarks = Array.from(bookmarkMap.values());
     
     // 保存到数据库
-    await this.saveBookmarksToDatabase(allBookmarks);
+    await this.saveBookmarksToDatabase(this.bookmarks);
   }
 
   /**
@@ -285,7 +280,7 @@ class BookmarkService {
 
   /**
    * 搜索书签（优化排序：精确匹配>前缀>URL命中>最近使用）
-   * 性能优化：使用搜索关键词缓存，提前过滤
+   * 性能优化：使用搜索关键词缓存，提前过滤，缓存小写转换
    */
   public searchBookmarks(query: string, maxResults: number = 50): Bookmark[] {
     if (!query) {
@@ -293,23 +288,25 @@ class BookmarkService {
     }
 
     const searchTerm = query.toLowerCase().trim();
-    const results: Array<{ bookmark: Bookmark; score: number }> = [];
+    if (!searchTerm) {
+      return this.bookmarks.slice(0, maxResults);
+    }
     
-    // 性能优化：如果查询很短，可以使用简单的包含检查提前过滤
+    const results: Array<{ bookmark: Bookmark; score: number }> = [];
     const minSearchLength = 2;
+    const now = Date.now();
     
     for (const bookmark of this.bookmarks) {
-      // 性能优化：使用缓存的搜索关键词（如果数据库中有）
-      // 否则使用名称和 URL 的小写版本
-      const searchKeywords = `${bookmark.name} ${bookmark.url}`.toLowerCase();
-      
-      // 快速预过滤：如果搜索关键词不包含查询词，直接跳过
-      if (searchTerm.length >= minSearchLength && !searchKeywords.includes(searchTerm)) {
-        continue;
-      }
-      
+      // 缓存小写转换结果（避免重复转换）
       const nameLower = bookmark.name.toLowerCase();
       const urlLower = bookmark.url.toLowerCase();
+      
+      // 快速预过滤：如果名称和URL都不包含查询词，直接跳过
+      if (searchTerm.length >= minSearchLength && 
+          !nameLower.includes(searchTerm) && 
+          !urlLower.includes(searchTerm)) {
+        continue;
+      }
       
       let score = 0;
       
@@ -335,9 +332,9 @@ class BookmarkService {
       }
 
       if (score > 0) {
-        // 加分：最近使用的书签
+        // 加分：最近使用的书签（优化：减少重复计算）
         if (bookmark.dateLastUsed) {
-          const daysSinceUsed = (Date.now() - bookmark.dateLastUsed) / (1000 * 60 * 60 * 24);
+          const daysSinceUsed = (now - bookmark.dateLastUsed) / (1000 * 60 * 60 * 24);
           if (daysSinceUsed < 7) {
             score += 10; // 7天内使用过，加10分
           } else if (daysSinceUsed < 30) {

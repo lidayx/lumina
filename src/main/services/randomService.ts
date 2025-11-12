@@ -178,11 +178,12 @@ class RandomService {
     const length = parseInt(match[1], 10);
 
     if (length < 1 || length > 1000) {
+      const errorMsg = '长度必须在 1-1000 之间';
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: '长度必须在 1-1000 之间',
+        error: errorMsg,
       };
     }
 
@@ -194,11 +195,12 @@ class RandomService {
         success: true,
       };
     } catch (error: any) {
+      const errorMsg = `随机字符串生成失败: ${error.message}`;
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: `随机字符串生成失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }
@@ -492,11 +494,12 @@ class RandomService {
     const length = parseInt(match[1], 10);
 
     if (length < 1 || length > 1000) {
+      const errorMsg = '长度必须在 1-1000 之间';
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: '长度必须在 1-1000 之间',
+        error: errorMsg,
       };
     }
 
@@ -508,11 +511,12 @@ class RandomService {
         success: true,
       };
     } catch (error: any) {
+      const errorMsg = `随机密码生成失败: ${error.message}`;
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: `随机密码生成失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }
@@ -580,20 +584,22 @@ class RandomService {
    */
   private generateRandomNumberResult(min: number, max: number, query: string): RandomResult {
     if (min > max) {
+      const errorMsg = '最小值不能大于最大值';
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: '最小值不能大于最大值',
+        error: errorMsg,
       };
     }
 
     if (min < -Number.MAX_SAFE_INTEGER || max > Number.MAX_SAFE_INTEGER) {
+      const errorMsg = '数值超出安全范围';
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: '数值超出安全范围',
+        error: errorMsg,
       };
     }
 
@@ -606,11 +612,12 @@ class RandomService {
         success: true,
       };
     } catch (error: any) {
+      const errorMsg = `随机数字生成失败: ${error.message}`;
       return {
         input: query,
         output: errorMsg,
         success: false,
-        error: `随机数字生成失败: ${error.message}`,
+        error: errorMsg,
       };
     }
   }

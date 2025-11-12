@@ -51,6 +51,43 @@ const LANGUAGE_MAP: Record<string, string> = {
   'spanish': 'es',
 };
 
+// 预编译正则表达式以提高性能
+const REGEX_PATTERNS = {
+  // 时区关键词匹配
+  TIMEZONE_KEYWORDS: /\b(utc|gmt|cst|est|pst|jst|bst|cet|ist|kst|aest|china|中国|beijing|北京|japan|日本|tokyo|东京|eastern|pacific|london|europe|india|印度|korea|韩国|australia|悉尼)\b/i,
+  // 日期格式匹配
+  DATE_PATTERN: /\d{4}[-\/]\d{2}[-\/]\d{2}/,
+  // to/到 关键词匹配
+  TO_KEYWORD: /\b(to|到|in)\b/i,
+  // 快捷翻译：en <文本> 或 zh <文本>
+  QUICK_TRANSLATE: /^(en|zh|cn)\s+(.+)$/i,
+  // 基础翻译：translate <文本> 或 翻译 <文本>
+  BASE_TRANSLATE: /^(?:translate|翻译|fanyi|fy)\s+(.+)$/i,
+  // 反向翻译：<文本> translate 或 <文本> 翻译
+  REVERSE_TRANSLATE: /^(.+?)\s+(?:translate|翻译|fanyi|fy)$/i,
+  // 完整格式：translate <文本> to <语言>
+  FULL_TRANSLATE: /^(?:translate|翻译|fanyi|fy)\s+(.+?)\s+(?:to|到)\s+(.+)$/i,
+  // 简单格式：<文本> to <语言>
+  SIMPLE_TRANSLATE: /^(.+?)\s+(?:to|到)\s+(.+)$/i,
+  // 完整格式带源语言：translate <文本> from <源语言> to <目标语言>
+  FULL_WITH_FROM: /^(?:translate|翻译|fanyi|fy)\s+(.+?)\s+from\s+(.+?)\s+to\s+(.+)$/i,
+  // 单位换算排除（用于排除单位换算查询）
+  UNIT_CONVERSION: /^\d+\.?\d*\s*[a-z°]+?\s*(?:to|到|in|=>)\s*[a-z°]+$/i,
+  // 单位关键词
+  UNIT_KEYWORDS: /\b(km|m|cm|mm|kg|g|mg|lb|oz|kmh|mph|ms|s|min|h|day|week|month|year|celsius|fahrenheit|kelvin|°c|°f|k|摄氏度|华氏度|开尔文|千米|米|厘米|毫米|公斤|克|毫克|磅|盎司|公里|小时|分钟|秒|天|周|月|年)\b/i,
+};
+
+// 有效语言代码集合（用于快速查找）
+const VALID_LANG_CODES = new Set([
+  'zh', 'zh-cn', '中文', 'chinese', 'cn',
+  'en', 'en-us', '英文', 'english', '英',
+  'ja', '日语', 'japanese',
+  'ko', '韩语', 'korean',
+  'fr', '法语', 'french',
+  'de', '德语', 'german',
+  'es', '西班牙语', 'spanish',
+]);
+
 // ========== 翻译提供者接口（为后期扩展API设计）==========
 
 /**
@@ -418,19 +455,18 @@ class TranslateService {
   } | null {
     // 0. 先排除时区转换（这些应该由时间服务处理）
     // 时区转换：包含时区关键词（如 UTC, GMT, CST, EST, PST 等）和 to/到
-    const hasTimezoneKeywords = /\b(utc|gmt|cst|est|pst|jst|bst|cet|ist|kst|aest|china|中国|beijing|北京|japan|日本|tokyo|东京|eastern|pacific|london|europe|india|印度|korea|韩国|australia|悉尼)\b/i.test(query);
+    const hasTimezoneKeywords = REGEX_PATTERNS.TIMEZONE_KEYWORDS.test(query);
     // 日期格式：YYYY-MM-DD 或 YYYY/MM/DD
-    const hasDatePattern = /\d{4}[-\/]\d{2}[-\/]\d{2}/.test(query);
+    const hasDatePattern = REGEX_PATTERNS.DATE_PATTERN.test(query);
     
     // 如果匹配时区转换，则排除翻译
-    if (hasTimezoneKeywords && hasDatePattern && /\b(to|到|in)\b/i.test(query)) {
+    if (hasTimezoneKeywords && hasDatePattern && REGEX_PATTERNS.TO_KEYWORD.test(query)) {
       console.log(`🌐 [翻译服务] 检测到时区转换，跳过: "${query}"`);
       return null;
     }
     
     // 1. 快捷翻译：en <文本> 或 zh <文本>
-    let pattern = /^(en|zh|cn)\s+(.+)$/i;
-    let match = query.match(pattern);
+    let match = query.match(REGEX_PATTERNS.QUICK_TRANSLATE);
     if (match) {
       const lang = match[1].toLowerCase();
       const text = match[2].trim();
@@ -441,13 +477,11 @@ class TranslateService {
     }
 
     // 2. 基础翻译：translate <文本> 或 翻译 <文本> 或 fanyi <文本> 或 fy <文本>
-    pattern = /^(?:translate|翻译|fanyi|fy)\s+(.+)$/i;
-    match = query.match(pattern);
+    match = query.match(REGEX_PATTERNS.BASE_TRANSLATE);
     if (match) {
       const text = match[1].trim();
       // 检查是否包含 "to" 或 "到"
-      const toPattern = /(.+?)\s+(?:to|到)\s+(.+)$/i;
-      const toMatch = text.match(toPattern);
+      const toMatch = text.match(REGEX_PATTERNS.SIMPLE_TRANSLATE);
       if (toMatch) {
         return {
           text: toMatch[1].trim(),
@@ -458,16 +492,14 @@ class TranslateService {
     }
 
     // 3. <文本> translate 或 <文本> 翻译 或 <文本> fanyi 或 <文本> fy
-    pattern = /^(.+?)\s+(?:translate|翻译|fanyi|fy)$/i;
-    match = query.match(pattern);
+    match = query.match(REGEX_PATTERNS.REVERSE_TRANSLATE);
     if (match) {
       const text = match[1].trim();
       return { text };
     }
 
     // 4. translate <文本> to <语言> 或 翻译 <文本> 到 <语言> 或 fanyi <文本> to <语言> 或 fy <文本> to <语言>
-    pattern = /^(?:translate|翻译|fanyi|fy)\s+(.+?)\s+(?:to|到)\s+(.+)$/i;
-    match = query.match(pattern);
+    match = query.match(REGEX_PATTERNS.FULL_TRANSLATE);
     if (match) {
       return {
         text: match[1].trim(),
@@ -476,27 +508,24 @@ class TranslateService {
     }
 
     // 5. <文本> to <语言> 或 <文本> 到 <语言>（仅当 to 后面是明确的语言代码时才匹配）
-    pattern = /^(.+?)\s+(?:to|到)\s+(.+)$/i;
-    match = query.match(pattern);
+    match = query.match(REGEX_PATTERNS.SIMPLE_TRANSLATE);
     if (match) {
       const potentialLang = match[2].trim().toLowerCase();
       const text = match[1].trim();
       
-      // 检查是否是有效的语言代码（在 LANGUAGE_MAP 中）
-      const validLangCodes = ['zh', 'zh-cn', '中文', 'chinese', 'cn', 'en', 'en-us', '英文', 'english', '英', 'ja', '日语', 'japanese', 'ko', '韩语', 'korean', 'fr', '法语', 'french', 'de', '德语', 'german', 'es', '西班牙语', 'spanish'];
-      if (validLangCodes.includes(potentialLang)) {
-      return {
+      // 检查是否是有效的语言代码（使用 Set 进行快速查找）
+      if (VALID_LANG_CODES.has(potentialLang)) {
+        return {
           text,
           to: this.normalizeLanguageCode(potentialLang),
-      };
+        };
       }
       // 如果不是有效的语言代码，不匹配
       return null;
     }
 
     // 6. translate <文本> from <源语言> to <目标语言> 或 fanyi <文本> from <源语言> to <目标语言> 或 fy <文本> from <源语言> to <目标语言>
-    pattern = /^(?:translate|翻译|fanyi|fy)\s+(.+?)\s+from\s+(.+?)\s+to\s+(.+)$/i;
-    match = query.match(pattern);
+    match = query.match(REGEX_PATTERNS.FULL_WITH_FROM);
     if (match) {
       return {
         text: match[1].trim(),

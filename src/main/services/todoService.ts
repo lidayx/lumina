@@ -56,6 +56,11 @@ const DEFAULT_TEMPLATES: TodoTemplate[] = [
  */
 class TodoService {
   private initialized: boolean = false;
+  // 缓存模板和历史记录，避免重复查询
+  private templatesCache: TodoTemplate[] | null = null;
+  private historyCache: Array<{ content: string; usageCount: number }> | null = null;
+  private cacheTimestamp: number = 0;
+  private readonly CACHE_TTL = 30000; // 缓存30秒
 
   /**
    * 初始化服务（创建表结构）
@@ -610,6 +615,9 @@ class TodoService {
 
       dbManager.saveDatabase();
 
+      // 清除缓存
+      this.clearCache();
+
       return {
         input: `todo ${content}`,
         output: `任务已创建 (ID: ${todoId}) - ${this.formatTodoItem({ id: todoId, content, priority, status: 'pending', createdAt: now })}`,
@@ -776,6 +784,9 @@ class TodoService {
 
       dbManager.saveDatabase();
 
+      // 清除缓存
+      this.clearCache();
+
       return {
         input: `todo done ${id}`,
         output: `任务已完成: ${todo.content}`,
@@ -828,6 +839,9 @@ class TodoService {
       deleteStmt.free();
 
       dbManager.saveDatabase();
+
+      // 清除缓存
+      this.clearCache();
 
       console.log(`✅ [TODO服务] 任务已删除: ID=${id}, content="${content}"`);
 
@@ -895,6 +909,9 @@ class TodoService {
       }
 
       dbManager.saveDatabase();
+
+      // 清除缓存
+      this.clearCache();
 
       return {
         input: `todo edit ${id} ${content}`,
@@ -1161,9 +1178,15 @@ class TodoService {
   }
 
   /**
-   * 获取任务模板
+   * 获取任务模板（带缓存）
    */
   private async getTemplates(): Promise<TodoTemplate[]> {
+    const now = Date.now();
+    // 如果缓存有效，直接返回
+    if (this.templatesCache && (now - this.cacheTimestamp) < this.CACHE_TTL) {
+      return this.templatesCache;
+    }
+
     try {
       const db = await dbManager.getDb();
       const stmt = db.prepare('SELECT * FROM todo_templates ORDER BY usage_count DESC, created_at DESC LIMIT 20');
@@ -1181,17 +1204,29 @@ class TodoService {
       }
       stmt.free();
 
-      return templates;
+      // 更新缓存
+      this.templatesCache = templates.length > 0 ? templates : DEFAULT_TEMPLATES;
+      this.cacheTimestamp = now;
+      return this.templatesCache;
     } catch (error) {
       console.error('❌ [TODO服务] 获取模板失败:', error);
-      return DEFAULT_TEMPLATES;
+      const fallback = DEFAULT_TEMPLATES;
+      this.templatesCache = fallback;
+      this.cacheTimestamp = now;
+      return fallback;
     }
   }
 
   /**
-   * 获取历史记录
+   * 获取历史记录（带缓存）
    */
   private async getHistory(limit: number = 10): Promise<Array<{ content: string; usageCount: number }>> {
+    const now = Date.now();
+    // 如果缓存有效且 limit 不超过缓存大小，直接返回
+    if (this.historyCache && (now - this.cacheTimestamp) < this.CACHE_TTL && this.historyCache.length >= limit) {
+      return this.historyCache.slice(0, limit);
+    }
+
     try {
       const db = await dbManager.getDb();
       const stmt = db.prepare('SELECT content, usage_count FROM todo_history ORDER BY usage_count DESC, last_used_at DESC LIMIT ?');
@@ -1207,11 +1242,26 @@ class TodoService {
       }
       stmt.free();
 
+      // 更新缓存
+      this.historyCache = history;
+      this.cacheTimestamp = now;
       return history;
     } catch (error) {
       console.error('❌ [TODO服务] 获取历史记录失败:', error);
-      return [];
+      const fallback: Array<{ content: string; usageCount: number }> = [];
+      this.historyCache = fallback;
+      this.cacheTimestamp = now;
+      return fallback;
     }
+  }
+
+  /**
+   * 清除缓存（在创建、更新、删除任务后调用）
+   */
+  private clearCache(): void {
+    this.templatesCache = null;
+    this.historyCache = null;
+    this.cacheTimestamp = 0;
   }
 
   /**

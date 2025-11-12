@@ -15,6 +15,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
   const [loading, setLoading] = React.useState(false);
   const [showNoResult, setShowNoResult] = React.useState(false);
   const [isFirstLaunch, setIsFirstLaunch] = React.useState(true);
+  // 用于防止搜索结果更新后立即被鼠标悬停覆盖选中状态
+  const [ignoreHover, setIgnoreHover] = React.useState(false);
 
   // 监听主窗口显示事件，清空输入并获取焦点
   React.useEffect(() => {
@@ -23,6 +25,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
       setQuery('');
       setResults([]);
       setSelectedIndex(0);
+      setIgnoreHover(false);
     };
 
     window.electron.on('main-window-show', handleMainWindowShow);
@@ -85,6 +88,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
   const hideMainWindow = () => {
     setQuery(''); // 清空搜索
     setResults([]); // 清空结果
+    setSelectedIndex(0); // 重置选中索引
+    setIgnoreHover(false); // 重置悬停保护状态
     // 先隐藏预览窗口
     window.electron.preview.hide();
     // 延迟隐藏窗口，确保状态更新完成
@@ -251,6 +256,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
           if (!query.trim()) {
             console.log('⚠️ [搜索] 查询为空，清空结果');
             setResults([]);
+            setSelectedIndex(0); // 重置选中索引
+            setIgnoreHover(false); // 清空结果时不需要保护
             setLoading(false);
             return;
           }
@@ -953,6 +960,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               
               // 设置结果并返回（命令模式下只显示命令相关结果）
               setResults(combinedResults);
+              setSelectedIndex(0); // 重置选中索引为第一个
+              setIgnoreHover(true); // 暂时忽略鼠标悬停，防止覆盖默认选中
+              setTimeout(() => setIgnoreHover(false), 200); // 200ms 后恢复悬停功能
               setLoading(false);
               setShowNoResult(combinedResults.length === 0);
               return;
@@ -1812,9 +1822,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
 
             combinedResults.sort(sortFunction);
             setResults(combinedResults);
+            setSelectedIndex(0); // 重置选中索引为第一个
+            setIgnoreHover(true); // 暂时忽略鼠标悬停，防止覆盖默认选中
+            setTimeout(() => setIgnoreHover(false), 200); // 200ms 后恢复悬停功能
       } catch (error) {
         console.error('Search error:', error);
         setResults([]);
+        setSelectedIndex(0); // 重置选中索引
+        setIgnoreHover(true);
+        setTimeout(() => setIgnoreHover(false), 200);
       } finally {
         setLoading(false);
       }
@@ -1842,6 +1858,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
 
   // 处理鼠标悬停（只更新选中索引，不执行操作）
   const handleHover = (index: number) => {
+    // 如果搜索结果刚刚更新，忽略悬停事件，保持第一个选中
+    if (ignoreHover) {
+      return;
+    }
     if (index >= 0 && index < results.length) {
       setSelectedIndex(index);
     }

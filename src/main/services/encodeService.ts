@@ -21,6 +21,26 @@ import { calculateMatchScore } from '../../shared/utils/matchUtils';
  * 编码解码服务类
  */
 class EncodeService {
+  // ========== 常量 ==========
+  // 预编译正则表达式（性能优化）
+  private readonly URL_ENCODE_PATTERN = /^(?:url\s+encode|url编码)(?:\s+(.+))?$/i;
+  private readonly URL_DECODE_PATTERN = /^(?:url\s+decode|url解码)(?:\s+(.+))?$/i;
+  private readonly URL_ENCODE_REVERSE_PATTERN = /^(.+?)\s+(?:url\s+encode|url编码)$/i;
+  private readonly URL_DECODE_REVERSE_PATTERN = /^(.+?)\s+(?:url\s+decode|url解码)$/i;
+  
+  private readonly HTML_ENCODE_PATTERN = /^(?:html\s+encode|html编码)(?:\s+(.+))?$/i;
+  private readonly HTML_DECODE_PATTERN = /^(?:html\s+decode|html解码)(?:\s+(.+))?$/i;
+  private readonly HTML_ENCODE_REVERSE_PATTERN = /^(.+?)\s+(?:html\s+encode|html编码)$/i;
+  private readonly HTML_DECODE_REVERSE_PATTERN = /^(.+?)\s+(?:html\s+decode|html解码)$/i;
+  
+  private readonly BASE64_ENCODE_PATTERN = /^(?:base64\s+encode|base64编码)(?:\s+(.+))?$/i;
+  private readonly BASE64_DECODE_PATTERN = /^(?:base64\s+decode|base64解码)(?:\s+(.+))?$/i;
+  private readonly BASE64_ENCODE_REVERSE_PATTERN = /^(.+?)\s+(?:base64\s+encode|base64编码)$/i;
+  private readonly BASE64_DECODE_REVERSE_PATTERN = /^(.+?)\s+(?:base64\s+decode|base64解码)$/i;
+  
+  private readonly MD5_PATTERN = /^md5(?:\s+(.+))?$/i;
+  private readonly MD5_REVERSE_PATTERN = /^(.+?)\s+md5$/i;
+
   // ========== 公共 API ==========
 
   /**
@@ -78,49 +98,61 @@ class EncodeService {
 
   /**
    * 处理 URL 编码/解码
+   * 优化：使用预编译正则表达式，提取公共逻辑
    */
   private handleUrlEncode(query: string): EncodeResult | null {
-    // 先检查是否匹配完整的命令格式（即使没有参数）
-    const encodeCommandPattern = /^(?:url\s+encode|url编码)(?:\s+(.+))?$/i;
-    const decodeCommandPattern = /^(?:url\s+decode|url解码)(?:\s+(.+))?$/i;
-    const encodeCommandReversePattern = /^(.+?)\s+(?:url\s+encode|url编码)$/i;
-    const decodeCommandReversePattern = /^(.+?)\s+(?:url\s+decode|url解码)$/i;
-    
+    return this.handleEncodeDecode(
+      query,
+      this.URL_ENCODE_PATTERN,
+      this.URL_DECODE_PATTERN,
+      this.URL_ENCODE_REVERSE_PATTERN,
+      this.URL_DECODE_REVERSE_PATTERN,
+      'URL',
+      (text, isEncode) => isEncode ? encodeURIComponent(text) : decodeURIComponent(text)
+    );
+  }
+
+  /**
+   * 通用的编码/解码处理逻辑（减少重复代码）
+   */
+  private handleEncodeDecode(
+    query: string,
+    encodePattern: RegExp,
+    decodePattern: RegExp,
+    encodeReversePattern: RegExp,
+    decodeReversePattern: RegExp,
+    type: string,
+    processor: (text: string, isEncode: boolean) => string
+  ): EncodeResult | null {
     let match: RegExpMatchArray | null = null;
     let isEncode = true;
     let text = '';
 
-    // 检查正向格式: url encode <字符串> 或 url编码 <字符串>
-    match = query.match(encodeCommandPattern);
+    // 检查正向格式
+    match = query.match(encodePattern);
     if (match) {
       isEncode = true;
       text = match[1] ? match[1].trim() : '';
-    }
-
-    // 检查正向格式: url decode <字符串> 或 url解码 <字符串>
-    if (!match) {
-      match = query.match(decodeCommandPattern);
+    } else {
+      match = query.match(decodePattern);
       if (match) {
         isEncode = false;
         text = match[1] ? match[1].trim() : '';
       }
     }
 
-    // 检查反向格式: <字符串> url encode 或 <字符串> url编码
+    // 检查反向格式
     if (!match) {
-      match = query.match(encodeCommandReversePattern);
+      match = query.match(encodeReversePattern);
       if (match) {
         isEncode = true;
         text = match[1] ? match[1].trim() : '';
-      }
-    }
-
-    // 检查反向格式: <字符串> url decode 或 <字符串> url解码
-    if (!match) {
-      match = query.match(decodeCommandReversePattern);
-      if (match) {
-      isEncode = false;
-        text = match[1] ? match[1].trim() : '';
+      } else {
+        match = query.match(decodeReversePattern);
+        if (match) {
+          isEncode = false;
+          text = match[1] ? match[1].trim() : '';
+        }
       }
     }
 
@@ -140,23 +172,14 @@ class EncodeService {
     }
 
     try {
-      if (isEncode) {
-        const encoded = encodeURIComponent(text);
-        return {
-          input: query,
-          output: encoded,
-          success: true,
-        };
-      } else {
-        const decoded = decodeURIComponent(text);
-        return {
-          input: query,
-          output: decoded,
-          success: true,
-        };
-      }
+      const result = processor(text, isEncode);
+      return {
+        input: query,
+        output: result,
+        success: true,
+      };
     } catch (error: any) {
-      const errorMsg = `URL ${isEncode ? '编码' : '解码'}失败: ${error.message}`;
+      const errorMsg = `${type} ${isEncode ? '编码' : '解码'}失败: ${error.message}`;
       return {
         input: query,
         output: errorMsg,
@@ -170,92 +193,18 @@ class EncodeService {
 
   /**
    * 处理 HTML 编码/解码
+   * 优化：使用通用处理函数
    */
   private handleHtmlEncode(query: string): EncodeResult | null {
-    // 先检查是否匹配完整的命令格式（即使没有参数）
-    const encodeCommandPattern = /^(?:html\s+encode|html编码)(?:\s+(.+))?$/i;
-    const decodeCommandPattern = /^(?:html\s+decode|html解码)(?:\s+(.+))?$/i;
-    const encodeCommandReversePattern = /^(.+?)\s+(?:html\s+encode|html编码)$/i;
-    const decodeCommandReversePattern = /^(.+?)\s+(?:html\s+decode|html解码)$/i;
-    
-    let match: RegExpMatchArray | null = null;
-    let isEncode = true;
-    let text = '';
-
-    // 检查正向格式: html encode <字符串> 或 html编码 <字符串>
-    match = query.match(encodeCommandPattern);
-    if (match) {
-      isEncode = true;
-      text = match[1] ? match[1].trim() : '';
-    }
-
-    // 检查正向格式: html decode <字符串> 或 html解码 <字符串>
-    if (!match) {
-      match = query.match(decodeCommandPattern);
-      if (match) {
-        isEncode = false;
-        text = match[1] ? match[1].trim() : '';
-      }
-    }
-
-    // 检查反向格式: <字符串> html encode 或 <字符串> html编码
-    if (!match) {
-      match = query.match(encodeCommandReversePattern);
-      if (match) {
-        isEncode = true;
-        text = match[1] ? match[1].trim() : '';
-      }
-    }
-
-    // 检查反向格式: <字符串> html decode 或 <字符串> html解码
-    if (!match) {
-      match = query.match(decodeCommandReversePattern);
-      if (match) {
-      isEncode = false;
-        text = match[1] ? match[1].trim() : '';
-      }
-    }
-
-    // 如果没有匹配到任何格式，返回 null
-    if (!match) {
-      return null;
-    }
-
-    // 如果匹配到命令格式但没有参数，返回错误提示
-    if (!text) {
-      return {
-        input: query,
-        output: '',
-        success: false,
-        error: `请输入要${isEncode ? '编码' : '解码'}的内容`,
-      };
-    }
-
-    try {
-      if (isEncode) {
-        const encoded = this.htmlEncode(text);
-        return {
-          input: query,
-          output: encoded,
-          success: true,
-        };
-      } else {
-        const decoded = this.htmlDecode(text);
-        return {
-          input: query,
-          output: decoded,
-          success: true,
-        };
-      }
-    } catch (error: any) {
-      const errorMsg = `HTML ${isEncode ? '编码' : '解码'}失败: ${error.message}`;
-      return {
-        input: query,
-        output: errorMsg,
-        success: false,
-        error: errorMsg,
-      };
-    }
+    return this.handleEncodeDecode(
+      query,
+      this.HTML_ENCODE_PATTERN,
+      this.HTML_DECODE_PATTERN,
+      this.HTML_ENCODE_REVERSE_PATTERN,
+      this.HTML_DECODE_REVERSE_PATTERN,
+      'HTML',
+      (text, isEncode) => isEncode ? this.htmlEncode(text) : this.htmlDecode(text)
+    );
   }
 
   /**
@@ -290,116 +239,39 @@ class EncodeService {
 
   /**
    * 处理 Base64 编码/解码
+   * 优化：使用通用处理函数
    */
   private handleBase64Encode(query: string): EncodeResult | null {
-    // 先检查是否匹配完整的命令格式（即使没有参数）
-    const encodeCommandPattern = /^(?:base64\s+encode|base64编码)(?:\s+(.+))?$/i;
-    const decodeCommandPattern = /^(?:base64\s+decode|base64解码)(?:\s+(.+))?$/i;
-    const encodeCommandReversePattern = /^(.+?)\s+(?:base64\s+encode|base64编码)$/i;
-    const decodeCommandReversePattern = /^(.+?)\s+(?:base64\s+decode|base64解码)$/i;
-    
-    let match: RegExpMatchArray | null = null;
-    let isEncode = true;
-    let text = '';
-
-    // 检查正向格式: base64 encode <字符串> 或 base64编码 <字符串>
-    match = query.match(encodeCommandPattern);
-    if (match) {
-      isEncode = true;
-      text = match[1] ? match[1].trim() : '';
-    }
-
-    // 检查正向格式: base64 decode <字符串> 或 base64解码 <字符串>
-    if (!match) {
-      match = query.match(decodeCommandPattern);
-      if (match) {
-        isEncode = false;
-        text = match[1] ? match[1].trim() : '';
-      }
-    }
-
-    // 检查反向格式: <字符串> base64 encode 或 <字符串> base64编码
-    if (!match) {
-      match = query.match(encodeCommandReversePattern);
-      if (match) {
-        isEncode = true;
-        text = match[1] ? match[1].trim() : '';
-      }
-    }
-
-    // 检查反向格式: <字符串> base64 decode 或 <字符串> base64解码
-    if (!match) {
-      match = query.match(decodeCommandReversePattern);
-      if (match) {
-      isEncode = false;
-        text = match[1] ? match[1].trim() : '';
-      }
-    }
-
-    // 如果没有匹配到任何格式，返回 null
-    if (!match) {
-      return null;
-    }
-
-    // 如果匹配到命令格式但没有参数，返回错误提示
-    if (!text) {
-      return {
-        input: query,
-        output: '',
-        success: false,
-        error: `请输入要${isEncode ? '编码' : '解码'}的内容`,
-      };
-    }
-
-    try {
-      if (isEncode) {
-        const encoded = Buffer.from(text, 'utf-8').toString('base64');
-        return {
-          input: query,
-          output: encoded,
-          success: true,
-        };
-      } else {
-        const decoded = Buffer.from(text, 'base64').toString('utf-8');
-        return {
-          input: query,
-          output: decoded,
-          success: true,
-        };
-      }
-    } catch (error: any) {
-      const errorMsg = `Base64 ${isEncode ? '编码' : '解码'}失败: ${error.message}`;
-      return {
-        input: query,
-        output: errorMsg,
-        success: false,
-        error: errorMsg,
-      };
-    }
+    return this.handleEncodeDecode(
+      query,
+      this.BASE64_ENCODE_PATTERN,
+      this.BASE64_DECODE_PATTERN,
+      this.BASE64_ENCODE_REVERSE_PATTERN,
+      this.BASE64_DECODE_REVERSE_PATTERN,
+      'Base64',
+      (text, isEncode) => isEncode 
+        ? Buffer.from(text, 'utf-8').toString('base64')
+        : Buffer.from(text, 'base64').toString('utf-8')
+    );
   }
 
   // ========== MD5 加密 ==========
 
   /**
    * 处理 MD5 加密
+   * 优化：使用预编译正则表达式
    */
   private handleMd5(query: string): EncodeResult | null {
-    // 先检查是否匹配完整的命令格式（即使没有参数）
-    const md5CommandPattern = /^md5(?:\s+(.+))?$/i;
-    const md5CommandReversePattern = /^(.+?)\s+md5$/i;
-    
     let match: RegExpMatchArray | null = null;
     let text = '';
 
     // 检查正向格式: md5 <字符串>
-    match = query.match(md5CommandPattern);
+    match = query.match(this.MD5_PATTERN);
     if (match) {
       text = match[1] ? match[1].trim() : '';
-    }
-
-    // 检查反向格式: <字符串> md5
-    if (!match) {
-      match = query.match(md5CommandReversePattern);
+    } else {
+      // 检查反向格式: <字符串> md5
+      match = query.match(this.MD5_REVERSE_PATTERN);
       if (match) {
         text = match[1] ? match[1].trim() : '';
       }

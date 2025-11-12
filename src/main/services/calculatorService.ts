@@ -20,6 +20,43 @@ export interface CalculationResult {
  * 计算器服务类
  */
 class CalculatorService {
+  // ========== 常量 ==========
+  // 预编译正则表达式（性能优化）
+  private readonly PURE_NUMBER_REGEX = /^-?\d+\.?\d*$/;
+  private readonly MATH_OPERATORS_REGEX = /[\+\-*/().,π]/;
+  private readonly MATH_FUNCTIONS_REGEX = /\b(sin|cos|tan|log|sqrt)\b/i;
+
+  // 函数映射表（缓存，避免重复创建）
+  private readonly FUNCTION_MAP: Record<string, string> = {
+    'π': 'Math.PI',
+    'pi': 'Math.PI',
+    'e': 'Math.E',
+    'sin': 'Math.sin',
+    'cos': 'Math.cos',
+    'tan': 'Math.tan',
+    'asin': 'Math.asin',
+    'acos': 'Math.acos',
+    'atan': 'Math.atan',
+    'sinh': 'Math.sinh',
+    'cosh': 'Math.cosh',
+    'tanh': 'Math.tanh',
+    'asinh': 'Math.asinh',
+    'acosh': 'Math.acosh',
+    'atanh': 'Math.atanh',
+    'log': 'Math.log10',
+    'ln': 'Math.log',
+    'lg': 'Math.log10',
+    'exp': 'Math.exp',
+    'sqrt': 'Math.sqrt',
+    'cbrt': 'Math.cbrt',
+    'abs': 'Math.abs',
+    'floor': 'Math.floor',
+    'ceil': 'Math.ceil',
+    'round': 'Math.round',
+    'max': 'Math.max',
+    'min': 'Math.min',
+  };
+
   // ========== 公共 API ==========
 
   /**
@@ -47,8 +84,8 @@ class CalculatorService {
         return { input: expression, output: errorMsg, success: false, error: errorMsg };
       }
 
-      // 检查是否为纯数字
-      if (/^-?\d+\.?\d*$/.test(expression)) {
+      // 检查是否为纯数字（使用预编译正则）
+      if (this.PURE_NUMBER_REGEX.test(expression)) {
         return { input: expression, output: expression, success: true };
       }
 
@@ -61,15 +98,10 @@ class CalculatorService {
 
       // 如果所有功能都返回 null，且不是纯数字，也不尝试计算数学表达式
       // 这样可以避免在功能关闭时显示"表达式格式错误"，而是继续显示其他搜索结果
-      // 检查是否包含数学运算符或函数，如果没有，则不尝试计算
-      const hasMathOperators = /[\+\-*/().,π]/.test(expression) || /\b(sin|cos|tan|log|sqrt)\b/i.test(expression);
-      console.log(`🔍 [计算器] 检查数学运算符: ${expression}`, {
-        hasPlus: /\+/.test(expression),
-        hasMinus: /-/.test(expression),
-        hasMultiply: /\*/.test(expression),
-        hasDivide: /\//.test(expression),
-        hasMathOperators,
-      });
+      // 检查是否包含数学运算符或函数（使用预编译正则）
+      const hasMathOperators = this.MATH_OPERATORS_REGEX.test(expression) || 
+                               this.MATH_FUNCTIONS_REGEX.test(expression);
+      
       if (!hasMathOperators) {
         // 没有数学运算符，返回 null，让系统继续尝试其他搜索方式
         console.log(`ℹ️ [计算器] 未识别为计算查询，返回 null: ${expression}`);
@@ -90,7 +122,8 @@ class CalculatorService {
       console.error(`❌ [计算器] 计算失败: ${error.message}`);
       // 如果计算失败，且不是明显的数学表达式，返回 null 而不是错误
       // 这样可以避免在功能关闭时显示错误，而是继续显示其他搜索结果
-      const hasMathOperators = /[\+\-*/().,π]/.test(expression) || /\b(sin|cos|tan|log|sqrt)\b/i.test(expression);
+      const hasMathOperators = this.MATH_OPERATORS_REGEX.test(expression) || 
+                               this.MATH_FUNCTIONS_REGEX.test(expression);
       if (!hasMathOperators) {
         console.log(`ℹ️ [计算器] 计算失败但无数学运算符，返回 null: ${expression}`);
         return null as any; // 返回 null，让前端继续显示其他搜索结果
@@ -136,51 +169,28 @@ class CalculatorService {
 
   /**
    * 替换科学函数
+   * 优化：使用缓存的函数映射，预编译正则表达式
    */
+  private readonly FUNCTION_REGEX_CACHE: Map<string, RegExp> = new Map();
+
   private replaceScientificFunctions(expression: string): string {
     let result = expression.toLowerCase();
     
-    // 替换数学函数
-    const functionMap: Record<string, string> = {
-      'π': 'Math.PI',
-      'pi': 'Math.PI',
-      'e': 'Math.E',
-      'sin': 'Math.sin',
-      'cos': 'Math.cos',
-      'tan': 'Math.tan',
-      'asin': 'Math.asin',
-      'acos': 'Math.acos',
-      'atan': 'Math.atan',
-      'sinh': 'Math.sinh',
-      'cosh': 'Math.cosh',
-      'tanh': 'Math.tanh',
-      'asinh': 'Math.asinh',
-      'acosh': 'Math.acosh',
-      'atanh': 'Math.atanh',
-      'log': 'Math.log10',
-      'ln': 'Math.log',
-      'lg': 'Math.log10',
-      'exp': 'Math.exp',
-      'sqrt': 'Math.sqrt',
-      'cbrt': 'Math.cbrt',
-      'abs': 'Math.abs',
-      'floor': 'Math.floor',
-      'ceil': 'Math.ceil',
-      'round': 'Math.round',
-      'max': 'Math.max',
-      'min': 'Math.min',
-    };
-
-    // 替换函数名
-    for (const [func, replacement] of Object.entries(functionMap)) {
-      const regex = new RegExp(`\\b${func}\\b`, 'gi');
+    // 替换函数名（使用缓存的函数映射）
+    for (const [func, replacement] of Object.entries(this.FUNCTION_MAP)) {
+      // 使用缓存的正则表达式
+      let regex = this.FUNCTION_REGEX_CACHE.get(func);
+      if (!regex) {
+        regex = new RegExp(`\\b${func}\\b`, 'gi');
+        this.FUNCTION_REGEX_CACHE.set(func, regex);
+      }
       result = result.replace(regex, replacement);
     }
 
     // 处理函数调用（添加括号）
     result = result.replace(/(\d+)\s*([A-Za-z]+)/g, (match, num, func) => {
-      if (functionMap[func.toLowerCase()]) {
-        return `${functionMap[func.toLowerCase()]}(${num})`;
+      if (this.FUNCTION_MAP[func.toLowerCase()]) {
+        return `${this.FUNCTION_MAP[func.toLowerCase()]}(${num})`;
       }
       return match;
     });

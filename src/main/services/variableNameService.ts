@@ -26,6 +26,34 @@ export interface VariableNameResult {
 
 type NamingStyle = 'camel' | 'snake' | 'pascal' | 'constant' | 'kebab';
 
+// 预编译正则表达式以提高性能
+const REGEX_PATTERNS = {
+  // 简单数学表达式：数字 + 运算符 + 数字
+  SIMPLE_MATH: /^\d+\s*[\+\-*/]\s*\d+$/,
+  // 复杂数学表达式：包含数字、运算符、括号、π等
+  MATH_EXPRESSION: /^[\d\s\+\-*/().,π]+$/,
+  // 数学运算符检测
+  HAS_MATH_OPERATORS: /[\+\-*/().,π]/,
+  // 中文字符检测
+  CHINESE_CHAR: /[\u4e00-\u9fa5]/,
+  // 英文字母或数字
+  ALPHANUMERIC: /[a-zA-Z0-9]/,
+  // 大写字母
+  UPPERCASE: /[A-Z]/,
+  // 小写字母
+  LOWERCASE: /[a-z]/,
+  // 驼峰命名分割（在大写字母前分割）
+  CAMEL_SPLIT: /(?=[A-Z])/,
+  // 快捷方式：camel <文本>、snake <文本>、pascal <文本>
+  QUICK_STYLE: /^(camel|snake|pascal)\s+(.+)$/i,
+  // varname <文本> <风格> 或 变量名 <文本> <风格>
+  VARNAME_WITH_STYLE: /^(?:varname|变量名)\s+(.+?)\s+(camel|snake|pascal|constant|kebab)$/i,
+  // varname <文本> 或 变量名 <文本>
+  VARNAME_SIMPLE: /^(?:varname|变量名)\s+(.+)$/i,
+  // <文本> varname 或 <文本> 变量名
+  VARNAME_REVERSE: /^(.+?)\s+(?:varname|变量名)$/i,
+};
+
 /**
  * 变量名生成服务类
  */
@@ -145,16 +173,15 @@ class VariableNameService {
     style?: NamingStyle;
   } | null {
     // 先排除明显的数学表达式（简单表达式或包含括号的表达式）
-    const isSimpleMath = /^\d+\s*[\+\-*/]\s*\d+$/.test(query);
-    const isMathExpression = /^[\d\s\+\-*/().,π]+$/.test(query) && /[\+\-*/().,π]/.test(query);
+    const isSimpleMath = REGEX_PATTERNS.SIMPLE_MATH.test(query);
+    const isMathExpression = REGEX_PATTERNS.MATH_EXPRESSION.test(query) && REGEX_PATTERNS.HAS_MATH_OPERATORS.test(query);
     if (isSimpleMath || isMathExpression) {
       console.log(`🏷️ [变量名服务] 检测到数学表达式，跳过: "${query}"`);
       return null;
     }
 
     // 1. 快捷方式：camel <文本>、snake <文本>、pascal <文本>
-    let pattern = /^(camel|snake|pascal)\s+(.+)$/i;
-    let match = query.match(pattern);
+    let match = query.match(REGEX_PATTERNS.QUICK_STYLE);
     if (match) {
       return {
         text: match[2].trim(),
@@ -163,8 +190,7 @@ class VariableNameService {
     }
 
     // 2. varname <文本> <风格> 或 变量名 <文本> <风格>
-    pattern = /^(?:varname|变量名)\s+(.+?)\s+(camel|snake|pascal|constant|kebab)$/i;
-    match = query.match(pattern);
+    match = query.match(REGEX_PATTERNS.VARNAME_WITH_STYLE);
     if (match) {
       return {
         text: match[1].trim(),
@@ -173,8 +199,7 @@ class VariableNameService {
     }
 
     // 3. varname <文本> 或 变量名 <文本>
-    pattern = /^(?:varname|变量名)\s+(.+)$/i;
-    match = query.match(pattern);
+    match = query.match(REGEX_PATTERNS.VARNAME_SIMPLE);
     if (match) {
       return {
         text: match[1].trim(),
@@ -182,8 +207,7 @@ class VariableNameService {
     }
 
     // 4. <文本> varname 或 <文本> 变量名
-    pattern = /^(.+?)\s+(?:varname|变量名)$/i;
-    match = query.match(pattern);
+    match = query.match(REGEX_PATTERNS.VARNAME_REVERSE);
     if (match) {
       return {
         text: match[1].trim(),
@@ -225,7 +249,7 @@ class VariableNameService {
       const char = text[i];
 
       // 中文字符
-      if (/[\u4e00-\u9fa5]/.test(char)) {
+      if (REGEX_PATTERNS.CHINESE_CHAR.test(char)) {
         if (currentWord) {
           words.push(currentWord);
           currentWord = '';
@@ -242,9 +266,9 @@ class VariableNameService {
         }
       }
       // 英文字母或数字
-      else if (/[a-zA-Z0-9]/.test(char)) {
+      else if (REGEX_PATTERNS.ALPHANUMERIC.test(char)) {
         // 检测驼峰命名：如果当前字符是大写，且前面有小写字母，说明是新单词的开始
-        if (/[A-Z]/.test(char) && currentWord && /[a-z]/.test(currentWord)) {
+        if (REGEX_PATTERNS.UPPERCASE.test(char) && currentWord && REGEX_PATTERNS.LOWERCASE.test(currentWord)) {
           // 将当前累积的单词加入数组
           words.push(currentWord);
           currentWord = char;
@@ -270,10 +294,10 @@ class VariableNameService {
     if (words.length === 1 && words[0]) {
       const singleWord = words[0];
       // 检测是否包含大写字母（驼峰命名或帕斯卡命名）
-      if (/[A-Z]/.test(singleWord)) {
+      if (REGEX_PATTERNS.UPPERCASE.test(singleWord)) {
         // 按大写字母分割：在驼峰命名中，大写字母通常是新单词的开始
         // 例如：userName -> user, Name
-        const camelCaseWords = singleWord.split(/(?=[A-Z])/);
+        const camelCaseWords = singleWord.split(REGEX_PATTERNS.CAMEL_SPLIT);
         if (camelCaseWords.length > 1) {
           // 返回分割后的单词数组（全部转为小写）
           return camelCaseWords

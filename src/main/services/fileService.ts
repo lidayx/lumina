@@ -204,13 +204,17 @@ class FileService {
 
   /**
    * 计算文件匹配分数
+   * 优化：缓存小写转换结果
    */
   private calculateFileScore(file: FileInfo, searchTerm: string): number {
     let score = 0;
     
+    // 缓存文件名和路径的小写版本（避免重复转换）
+    const nameLower = file.name.toLowerCase();
+    const pathLower = file.path.toLowerCase();
+    
     // 检查文件名（权重高）
-    if (file.name.toLowerCase().includes(searchTerm)) {
-      const nameLower = file.name.toLowerCase();
+    if (nameLower.includes(searchTerm)) {
       if (nameLower === searchTerm) {
         score = 100; // 完全匹配
       } else if (nameLower.startsWith(searchTerm)) {
@@ -220,7 +224,7 @@ class FileService {
       }
     }
     // 检查路径（权重低）
-    else if (file.path.toLowerCase().includes(searchTerm)) {
+    else if (pathLower.includes(searchTerm)) {
       score = 40; // 路径匹配
     }
     
@@ -229,15 +233,27 @@ class FileService {
 
   /**
    * 排序并限制结果数量
+   * 优化：提前过滤低分结果，减少排序工作量
    */
   private sortAndLimitResults(results: FileInfo[], searchTerm: string, maxResults: number): FileInfo[] {
-    // 计算每个文件的评分并排序
+    // 计算每个文件的评分
     const resultsWithScore = results.map(file => ({
       file,
       score: this.calculateFileScore(file, searchTerm),
     }));
     
-    return resultsWithScore
+    // 过滤掉评分为0的结果（不匹配）
+    const filtered = resultsWithScore.filter(item => item.score > 0);
+    
+    // 如果过滤后结果仍然很多，只对高分结果排序
+    if (filtered.length > maxResults * 2) {
+      // 只保留评分较高的结果进行排序
+      filtered.sort((a, b) => b.score - a.score);
+      return filtered.slice(0, maxResults).map(item => item.file);
+    }
+    
+    // 正常排序
+    return filtered
       .sort((a, b) => {
         // 按评分排序（降序）
         if (b.score !== a.score) {

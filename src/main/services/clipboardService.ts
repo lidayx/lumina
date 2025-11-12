@@ -24,10 +24,14 @@ export interface ClipboardItem {
 class ClipboardService {
   private isEnabled: boolean = false;
   private lastContent: string = '';
-  private debounceTimer: NodeJS.Timeout | null = null;
-  private watchInterval: NodeJS.Timeout | null = null;
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private watchInterval: ReturnType<typeof setInterval> | null = null;
   private readonly DEBOUNCE_DELAY = 500; // 500ms 防抖
   private readonly WATCH_INTERVAL = 1000; // 1秒检查一次剪贴板
+  
+  // 缓存预览结果（性能优化）
+  private previewCache: Map<string, string> = new Map();
+  private readonly PREVIEW_CACHE_MAX_SIZE = 100;
 
   // ========== 公共 API ==========
 
@@ -442,21 +446,38 @@ class ClipboardService {
 
   /**
    * 获取内容预览（前100字符）
+   * 优化：使用缓存减少重复计算
    */
   private getPreview(content: string): string {
     if (!content) {
       return '';
     }
     
+    // 检查缓存
+    const cached = this.previewCache.get(content);
+    if (cached !== undefined) {
+      return cached;
+    }
+    
     // 移除换行符，替换为空格
     const cleaned = content.replace(/\n/g, ' ').replace(/\r/g, '');
     
     // 截取前100字符
-    if (cleaned.length <= 100) {
-      return cleaned;
-    }
+    const preview = cleaned.length <= 100 
+      ? cleaned 
+      : cleaned.substring(0, 100) + '...';
     
-    return cleaned.substring(0, 100) + '...';
+    // 缓存结果（限制缓存大小）
+    if (this.previewCache.size >= this.PREVIEW_CACHE_MAX_SIZE) {
+      // 删除最旧的条目（FIFO）
+      const firstKey = this.previewCache.keys().next().value;
+      if (firstKey) {
+        this.previewCache.delete(firstKey);
+      }
+    }
+    this.previewCache.set(content, preview);
+    
+    return preview;
   }
 
   /**

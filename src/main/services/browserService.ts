@@ -126,13 +126,28 @@ class BrowserService {
 
   /**
    * 判断是否为浏览器应用
+   * 优化：提前返回，减少不必要的遍历
    */
   private isBrowserApp(name?: string, nameCn?: string | null, nameEn?: string | null): boolean {
-    const searchTexts = [name?.toLowerCase(), nameCn?.toLowerCase(), nameEn?.toLowerCase()];
+    if (!name && !nameCn && !nameEn) {
+      return false;
+    }
     
-    return this.BROWSER_NAMES.some(browserName => 
-      searchTexts.some(text => text?.includes(browserName))
-    );
+    // 缓存小写转换结果
+    const nameLower = name?.toLowerCase() || '';
+    const nameCnLower = nameCn?.toLowerCase() || '';
+    const nameEnLower = nameEn?.toLowerCase() || '';
+    
+    // 检查是否包含任何浏览器名称
+    for (const browserName of this.BROWSER_NAMES) {
+      if (nameLower.includes(browserName) || 
+          nameCnLower.includes(browserName) || 
+          nameEnLower.includes(browserName)) {
+        return true;
+      }
+    }
+    
+    return false;
   }
 
   // ========== 数据库加载相关 ==========

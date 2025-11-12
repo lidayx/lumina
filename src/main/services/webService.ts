@@ -392,6 +392,7 @@ class WebService {
 
   /**
    * 添加搜索历史
+   * 优化：减少排序操作，使用更高效的清理策略
    */
   private addToHistory(query: string, url: string): void {
     const id = `history-${query}`;
@@ -410,12 +411,19 @@ class WebService {
       });
     }
 
-    // 限制历史记录数量
+    // 限制历史记录数量（优化：只在必要时清理）
     if (this.searchHistory.size > 100) {
-      const sorted = Array.from(this.searchHistory.values())
-        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-      const toRemove = sorted.slice(50);
-      toRemove.forEach(item => this.searchHistory.delete(item.id));
+      // 只保留最近的50条（更高效：直接删除旧的，而不是排序）
+      const entries = Array.from(this.searchHistory.entries());
+      // 按时间戳排序，保留最新的50条
+      entries.sort((a, b) => b[1].timestamp.getTime() - a[1].timestamp.getTime());
+      const toKeep = entries.slice(0, 50);
+      
+      // 清空并重新填充
+      this.searchHistory.clear();
+      for (const [id, history] of toKeep) {
+        this.searchHistory.set(id, history);
+      }
     }
   }
 

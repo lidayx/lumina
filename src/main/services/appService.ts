@@ -1342,6 +1342,7 @@ $shortcuts | ConvertTo-Json
 
   /**
    * 计算应用匹配分数
+   * 优化：缓存小写转换结果，提前返回高分匹配
    */
   private calculateAppScore(app: AppInfo, searchTerm: string): number {
     // 性能优化：使用缓存的关键词，避免重复计算拼音
@@ -1353,65 +1354,64 @@ $shortcuts | ConvertTo-Json
       this.searchKeywordsCache.set(app.id, appKeys);
     }
     
-    let maxScore = 0;
+    // 缓存小写转换结果（避免重复转换）
+    const nameLower = app.name.toLowerCase();
     
-    // 检查原始名称
-    if (app.name.toLowerCase().includes(searchTerm)) {
-      const nameLower = app.name.toLowerCase();
-      if (nameLower === searchTerm) {
-        maxScore = Math.max(maxScore, 100); // 完全匹配
-      } else if (nameLower.startsWith(searchTerm)) {
-        maxScore = Math.max(maxScore, 80); // 开头匹配
-      } else {
-        maxScore = Math.max(maxScore, 60); // 包含匹配
-      }
+    // 检查原始名称（优先检查，可能获得高分）
+    if (nameLower === searchTerm) {
+      return 100; // 完全匹配，直接返回最高分
+    } else if (nameLower.startsWith(searchTerm)) {
+      return 80; // 开头匹配，直接返回
+    } else if (nameLower.includes(searchTerm)) {
+      return 60; // 包含匹配
     }
     
     // 检查搜索关键词（使用缓存的关键词）
     for (const key of appKeys) {
       if (key.includes(searchTerm) && key.length >= searchTerm.length) {
-        maxScore = Math.max(maxScore, 40); // 拼音匹配
-        break;
+        return 40; // 拼音匹配
       }
     }
     
-    return maxScore;
+    return 0;
   }
 
   /**
    * 排序应用结果
+   * 优化：缓存小写转换，减少重复计算
    */
   private sortAppResults(results: Array<{ app: AppInfo; score: number }>, searchTerm: string): Array<{ app: AppInfo; score: number }> {
-    return results.sort((a, b) => {
+    // 预计算小写名称和匹配信息（避免在排序函数中重复计算）
+    const resultsWithInfo = results.map(item => ({
+      ...item,
+      nameLower: item.app.name.toLowerCase(),
+      startsWith: item.app.name.toLowerCase().startsWith(searchTerm),
+      indexOf: item.app.name.toLowerCase().indexOf(searchTerm),
+    }));
+    
+    return resultsWithInfo.sort((a, b) => {
       // 1. 按评分排序
       if (b.score !== a.score) {
         return b.score - a.score;
       }
       
-      const aName = a.app.name.toLowerCase();
-      const bName = b.app.name.toLowerCase();
-      
       // 2. 开头匹配优先
-      const aStarts = aName.startsWith(searchTerm);
-      const bStarts = bName.startsWith(searchTerm);
-      if (aStarts && !bStarts) return -1;
-      if (bStarts && !aStarts) return 1;
+      if (a.startsWith && !b.startsWith) return -1;
+      if (b.startsWith && !a.startsWith) return 1;
       
       // 3. 索引位置
-      const aIndex = aName.indexOf(searchTerm);
-      const bIndex = bName.indexOf(searchTerm);
-      if (aIndex !== bIndex) {
-        return aIndex - bIndex;
+      if (a.indexOf !== b.indexOf) {
+        return a.indexOf - b.indexOf;
       }
       
       // 4. 名称长度（短优先）
-      if (aName.length !== bName.length) {
-        return aName.length - bName.length;
+      if (a.nameLower.length !== b.nameLower.length) {
+        return a.nameLower.length - b.nameLower.length;
       }
       
       // 5. 使用次数
       return b.app.launchCount - a.app.launchCount;
-    });
+    }).map(({ nameLower, startsWith, indexOf, ...rest }) => rest);
   }
 
   /**
