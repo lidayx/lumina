@@ -64,18 +64,18 @@ const HANDLER_REGISTRATIONS = [
  * 处理第二实例启动，激活现有窗口
  */
 function handleSecondInstance(): void {
-  console.log('⚠️ 检测到试图启动第二个实例，激活现有实例');
-  
-  const mainWindow = getMainWindow();
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) {
-      mainWindow.restore();
+    console.log('⚠️ 检测到试图启动第二个实例，激活现有实例');
+    
+    const mainWindow = getMainWindow();
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.focus();
+      mainWindow.show();
     }
-    mainWindow.focus();
-    mainWindow.show();
-  }
 }
-
+  
 /**
  * 设置 macOS About 面板
  */
@@ -241,7 +241,7 @@ function cleanupAppResources(): void {
     () => debugLog.cleanup(),
     '清理 debug 日志失败:'
   );
-}
+  }
 
 // 所有窗口关闭时不退出应用（保持在托盘运行）
 app.on('window-all-closed', () => {
@@ -262,74 +262,74 @@ function setupDebugLogging(): void {
     info: console.info,
   };
 
-  console.log = (...args: any[]) => {
+console.log = (...args: any[]) => {
     originalMethods.log.apply(console, args);
-    debugLog.log(...args);
-  };
+  debugLog.log(...args);
+};
 
-  console.error = (...args: any[]) => {
+console.error = (...args: any[]) => {
     originalMethods.error.apply(console, args);
-    debugLog.error(...args);
-  };
+  debugLog.error(...args);
+};
 
-  console.warn = (...args: any[]) => {
+console.warn = (...args: any[]) => {
     originalMethods.warn.apply(console, args);
-    debugLog.warn(...args);
-  };
+  debugLog.warn(...args);
+};
 
-  console.info = (...args: any[]) => {
+console.info = (...args: any[]) => {
     originalMethods.info.apply(console, args);
-    debugLog.info(...args);
-  };
+  debugLog.info(...args);
+};
 }
 
 /**
  * 注册窗口相关的 IPC 处理器
  */
 function registerWindowIpcHandlers(): void {
-  ipcMain.handle('get-windows', () => {
-    return windowManager.getAllWindows().map((w) => ({
-      id: w.id,
-      type: w.title,
-    }));
-  });
+ipcMain.handle('get-windows', () => {
+  return windowManager.getAllWindows().map((w) => ({
+    id: w.id,
+    type: w.title,
+  }));
+});
 
-  ipcMain.handle('window-show', (_event, windowType: string) => {
-    windowManager.showWindow(windowType as any);
-  });
+ipcMain.handle('window-show', (_event, windowType: string) => {
+  windowManager.showWindow(windowType as any);
+});
 
-  ipcMain.handle('window-hide', (_event, windowType: string) => {
-    windowManager.hideWindow(windowType as any);
-    // 如果隐藏的是主窗口，同时隐藏预览窗口
-    if (windowType === 'main') {
+ipcMain.handle('window-hide', (_event, windowType: string) => {
+  windowManager.hideWindow(windowType as any);
+  // 如果隐藏的是主窗口，同时隐藏预览窗口
+  if (windowType === 'main') {
       import('./windows/previewWindow')
         .then(({ hidePreviewWindow }) => hidePreviewWindow())
         .catch((error) => console.error('Error hiding preview window:', error));
-    }
-  });
+  }
+});
 
-  ipcMain.handle('window-toggle', (_event, windowType: string) => {
-    windowManager.toggleWindow(windowType as any);
-  });
+ipcMain.handle('window-toggle', (_event, windowType: string) => {
+  windowManager.toggleWindow(windowType as any);
+});
 
-  ipcMain.handle('window-close', (_event, windowType: string) => {
-    windowManager.closeWindow(windowType as any);
-  });
+ipcMain.handle('window-close', (_event, windowType: string) => {
+  windowManager.closeWindow(windowType as any);
+});
 
-  // 调整窗口大小
-  ipcMain.handle('window-resize', (_event, width: number, height: number) => {
-    const mainWindow = windowManager.getWindow('main');
-    if (mainWindow) {
-      const [, currentY] = mainWindow.getPosition();
-      mainWindow.setSize(width, height);
-      
-      const display = screen.getPrimaryDisplay();
-      const { width: screenWidth } = display.workAreaSize;
-      const x = Math.floor((screenWidth - width) / 2);
-      
-      mainWindow.setPosition(x, currentY);
-    }
-  });
+// 调整窗口大小
+ipcMain.handle('window-resize', (_event, width: number, height: number) => {
+  const mainWindow = windowManager.getWindow('main');
+  if (mainWindow) {
+    const [, currentY] = mainWindow.getPosition();
+    mainWindow.setSize(width, height);
+    
+    const display = screen.getPrimaryDisplay();
+    const { width: screenWidth } = display.workAreaSize;
+    const x = Math.floor((screenWidth - width) / 2);
+    
+    mainWindow.setPosition(x, currentY);
+  }
+});
 }
 
 // 设置 debug 日志

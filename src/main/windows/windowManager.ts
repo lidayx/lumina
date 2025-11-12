@@ -86,7 +86,7 @@ class WindowManager {
       return {
         titleBarStyle: 'hidden',
         trafficLightPosition: HIDDEN_TRAFFIC_LIGHT_POSITION,
-      };
+    };
     }
     
     return {
@@ -119,12 +119,12 @@ class WindowManager {
       };
     }
     
-    // 其他窗口：屏幕居中
+      // 其他窗口：屏幕居中
     return {
       x: Math.floor((screenWidth - config.width) / 2),
       y: Math.floor((screenHeight - config.height) / 2),
     };
-  }
+    }
 
   /**
    * 设置窗口事件监听器

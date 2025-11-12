@@ -301,7 +301,7 @@ export class SystemSearchService {
         } else {
           // Unix-like (macOS/Linux)
           const findCommand = `find "${searchPath}" -iname "*${escapedQuery}*" -type f 2>/dev/null | head -${maxResults}`;
-          const { stdout } = await execAsync(findCommand, {
+        const { stdout } = await execAsync(findCommand, {
             maxBuffer: MAX_BUFFER_SIZE,
             timeout: FIND_SEARCH_TIMEOUT,
           });

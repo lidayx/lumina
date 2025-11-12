@@ -46,8 +46,8 @@ contextBridge.exposeInMainWorld('electron', {
     getInfo: createInvoke('app-get-info'),
   },
   
-  // 文件相关
-  file: {
+      // 文件相关
+      file: {
     getAll: createInvoke('file-get-all'),
     search: createInvoke('file-search'),
     open: createInvoke('file-open'),
@@ -56,10 +56,10 @@ contextBridge.exposeInMainWorld('electron', {
     getImageSize: createInvoke('file-get-image-size'),
     getVideoInfo: createInvoke('file-get-video-info'),
     index: createInvoke('file-index'),
-  },
-  
-  // 网页搜索相关
-  web: {
+      },
+      
+      // 网页搜索相关
+      web: {
     getEngines: createInvoke('web-get-engines'),
     search: createInvoke('web-search'),
     open: createInvoke('web-open'),
@@ -70,10 +70,10 @@ contextBridge.exposeInMainWorld('electron', {
     updateEngine: createInvoke('web-update-engine'),
     deleteEngine: createInvoke('web-delete-engine'),
     setDefaultEngine: createInvoke('web-set-default-engine'),
-  },
-  
-  // 浏览器设置相关
-  browser: {
+      },
+      
+      // 浏览器设置相关
+      browser: {
     getAll: createInvoke('browser-get-all'),
     add: createInvoke('browser-add'),
     update: createInvoke('browser-update'),
@@ -81,10 +81,10 @@ contextBridge.exposeInMainWorld('electron', {
     setDefault: createInvoke('browser-set-default'),
     getDefault: createInvoke('browser-get-default'),
     openUrl: createInvoke('browser-open-url'),
-  },
-  
-  // 命令执行相关
-  command: {
+      },
+      
+      // 命令执行相关
+      command: {
     getAll: createInvoke('command-get-all'),
     search: createInvoke('command-search'),
     execute: createInvoke('command-execute'),
@@ -93,118 +93,118 @@ contextBridge.exposeInMainWorld('electron', {
     clearHistory: createInvoke('command-clear-history'),
     complete: createInvoke('command-complete'),
     help: createInvoke('command-help'),
-  },
-  
-  // 计算器相关
-  calculator: {
+      },
+      
+      // 计算器相关
+      calculator: {
     calculate: createInvoke('calculator-calculate'),
-  },
-  
-  // 时间相关
-  time: {
+      },
+      
+      // 时间相关
+      time: {
     getAllFormats: createInvoke('time-get-all-formats'),
     handleQuery: createInvoke('time-handle-query'),
     complete: createInvoke('time-complete'),
     help: createInvoke('time-help'),
-  },
-  
-  // TODO 相关
-  todo: {
+      },
+      
+      // TODO 相关
+      todo: {
     handleQuery: createInvoke('todo-handle-query'),
     complete: createInvoke('todo-complete'),
     help: createInvoke('todo-help'),
-  },
-  
-  // 随机数相关
-  random: {
+      },
+      
+      // 随机数相关
+      random: {
     handleQuery: createInvoke('random-handle-query'),
     complete: createInvoke('random-complete'),
     help: createInvoke('random-help'),
-  },
-  
-  // 翻译相关
-  translate: {
+      },
+      
+      // 翻译相关
+      translate: {
     handleQuery: createInvoke('translate-handle-query'),
     complete: createInvoke('translate-complete'),
     help: createInvoke('translate-help'),
-  },
-  
-  // 变量名相关
-  varname: {
+      },
+      
+      // 变量名相关
+      varname: {
     handleQuery: createInvoke('varname-handle-query'),
     complete: createInvoke('varname-complete'),
     help: createInvoke('varname-help'),
-  },
-  
-  // 编码解码相关
-  encode: {
+      },
+      
+      // 编码解码相关
+      encode: {
     handleQuery: createInvoke('encode-handle-query'),
     complete: createInvoke('encode-complete'),
     help: createInvoke('encode-help'),
-  },
-  
-  // 字符串工具相关
-  string: {
+      },
+      
+      // 字符串工具相关
+      string: {
     handleQuery: createInvoke('string-handle-query'),
     complete: createInvoke('string-complete'),
     help: createInvoke('string-help'),
-  },
-  
-  // 书签相关
-  bookmark: {
+      },
+      
+      // 书签相关
+      bookmark: {
     getAll: createInvoke('bookmark-get-all'),
     search: createInvoke('bookmark-search'),
     reload: createInvoke('bookmark-reload'),
     getInfo: createInvoke('bookmark-get-info'),
-  },
-  
-  // 应用设置相关
-  settings: {
+      },
+      
+      // 应用设置相关
+      settings: {
     getAll: createInvoke('settings-get-all'),
     update: createInvoke('settings-update'),
     reset: createInvoke('settings-reset'),
     getLogFile: createInvoke('settings-get-log-file'),
-  },
-  
-  // 快捷键相关
-  shortcut: {
+      },
+      
+      // 快捷键相关
+      shortcut: {
     getCurrent: createInvoke('shortcut-get-current'),
     set: createInvoke('shortcut-set'),
     checkAvailable: createInvoke('shortcut-check-available'),
     format: createInvoke('shortcut-format'),
-  },
-  
-  // 别名相关
-  alias: {
+      },
+      
+      // 别名相关
+      alias: {
     getAll: createInvoke('alias-get-all'),
     add: createInvoke('alias-add'),
     remove: createInvoke('alias-remove'),
     update: createInvoke('alias-update'),
     get: createInvoke('alias-get'),
     resolve: createInvoke('alias-resolve'),
-  },
-  
-  // 剪贴板相关
-  clipboard: {
+      },
+      
+      // 剪贴板相关
+      clipboard: {
     getHistory: createInvoke('clipboard-get-history'),
     search: createInvoke('clipboard-search'),
     delete: createInvoke('clipboard-delete'),
     clear: createInvoke('clipboard-clear'),
     paste: createInvoke('clipboard-paste'),
-  },
-  
-  // 窗口相关
+      },
+      
+      // 窗口相关
   windowResize: createInvoke('window-resize'),
   windowHide: createInvoke('window-hide'),
-  
-  // 预览窗口相关
-  preview: {
+      
+      // 预览窗口相关
+      preview: {
     show: createInvoke('preview-show'),
     hide: createInvoke('preview-hide'),
     update: (result: any, query: string) => 
       ipcRenderer.invoke('preview-update', result, query).then(() => undefined),
     close: createInvoke('preview-close'),
-  },
+      },
 });
 
   // 类型定义
