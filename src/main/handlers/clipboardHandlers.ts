@@ -1,61 +1,86 @@
-import { ipcMain } from 'electron';
 import { clipboardService } from '../services/clipboardService';
+import { registerHandler, validateString, validateNumberOptional } from './handlerUtils';
 
 /**
  * 注册剪贴板相关的 IPC 处理器
  */
 export function registerClipboardHandlers() {
   // 获取历史记录
-  ipcMain.handle('clipboard-get-history', async (_event, limit?: number) => {
-    try {
-      return await clipboardService.getHistory(limit);
-    } catch (error) {
-      console.error('获取剪贴板历史失败:', error);
-      return [];
+  registerHandler(
+    'clipboard-get-history',
+    '获取剪贴板历史',
+    async (_event, limit?: number) => {
+      const validatedLimit = validateNumberOptional(limit, 'limit');
+      return await clipboardService.getHistory(validatedLimit);
+    },
+    {
+      logPrefix: '📋 [剪贴板Handler]',
+      returnNullOnError: true,
+      defaultValue: [],
     }
-  });
+  );
 
   // 搜索历史记录
-  ipcMain.handle('clipboard-search', async (_event, query: string, limit?: number) => {
-    try {
-      return await clipboardService.searchHistory(query, limit);
-    } catch (error) {
-      console.error('搜索剪贴板历史失败:', error);
-      return [];
+  registerHandler(
+    'clipboard-search',
+    '搜索剪贴板历史',
+    async (_event, query: string, limit?: number) => {
+      const validatedQuery = validateString(query, 'query');
+      const validatedLimit = validateNumberOptional(limit, 'limit');
+      return await clipboardService.searchHistory(validatedQuery, validatedLimit);
+    },
+    {
+      logPrefix: '📋 [剪贴板Handler]',
+      returnNullOnError: true,
+      defaultValue: [],
     }
-  });
+  );
 
   // 删除记录
-  ipcMain.handle('clipboard-delete', async (_event, id: string) => {
-    try {
-      await clipboardService.deleteItem(id);
+  registerHandler(
+    'clipboard-delete',
+    '删除剪贴板记录',
+    async (_event, id: string) => {
+      const validatedId = validateString(id, 'id');
+      await clipboardService.deleteItem(validatedId);
       return { success: true };
-    } catch (error) {
-      console.error('删除剪贴板记录失败:', error);
-      return { success: false, error: error instanceof Error ? error.message : '删除失败' };
+    },
+    {
+      logPrefix: '📋 [剪贴板Handler]',
+      returnNullOnError: true,
+      defaultValue: { success: false, error: '删除失败' },
     }
-  });
+  );
 
   // 清空历史
-  ipcMain.handle('clipboard-clear', async () => {
-    try {
+  registerHandler(
+    'clipboard-clear',
+    '清空剪贴板历史',
+    async () => {
       await clipboardService.clearHistory();
       return { success: true };
-    } catch (error) {
-      console.error('清空剪贴板历史失败:', error);
-      return { success: false, error: error instanceof Error ? error.message : '清空失败' };
+    },
+    {
+      logPrefix: '📋 [剪贴板Handler]',
+      returnNullOnError: true,
+      defaultValue: { success: false, error: '清空失败' },
     }
-  });
+  );
 
   // 粘贴指定项
-  ipcMain.handle('clipboard-paste', async (_event, id: string) => {
-    try {
-      await clipboardService.pasteItem(id);
+  registerHandler(
+    'clipboard-paste',
+    '粘贴剪贴板项',
+    async (_event, id: string) => {
+      const validatedId = validateString(id, 'id');
+      await clipboardService.pasteItem(validatedId);
       return { success: true };
-    } catch (error) {
-      console.error('粘贴剪贴板项失败:', error);
-      return { success: false, error: error instanceof Error ? error.message : '粘贴失败' };
+    },
+    {
+      logPrefix: '📋 [剪贴板Handler]',
+      returnNullOnError: true,
+      defaultValue: { success: false, error: '粘贴失败' },
     }
-  });
+  );
 }
 

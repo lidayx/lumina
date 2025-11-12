@@ -1,8 +1,8 @@
-import { ipcMain } from 'electron';
 import { openSettingsWindow } from '../windows/settingsWindow';
 import { openPluginWindow } from '../windows/pluginWindow';
 import { toggleMainWindow, getMainWindow } from '../windows/mainWindow';
 import { showPreviewWindow, hidePreviewWindow, updatePreviewContent, closePreviewWindow } from '../windows/previewWindow';
+import { registerHandler, validateString } from './handlerUtils';
 
 /**
  * 注册窗口相关的 IPC 处理器
@@ -10,55 +10,107 @@ import { showPreviewWindow, hidePreviewWindow, updatePreviewContent, closePrevie
  */
 export function registerWindowHandlers() {
   // 打开设置窗口
-  ipcMain.removeHandler('open-settings');
-  ipcMain.handle('open-settings', () => {
-    openSettingsWindow();
-  });
+  registerHandler(
+    'open-settings',
+    '打开设置窗口',
+    () => {
+      openSettingsWindow();
+    },
+    {
+      logPrefix: '🪟 [窗口Handler]',
+    }
+  );
 
   // 打开插件管理窗口
-  ipcMain.removeHandler('open-plugins');
-  ipcMain.handle('open-plugins', () => {
-    openPluginWindow();
-  });
+  registerHandler(
+    'open-plugins',
+    '打开插件管理窗口',
+    () => {
+      openPluginWindow();
+    },
+    {
+      logPrefix: '🪟 [窗口Handler]',
+    }
+  );
 
   // 切换主窗口的显示/隐藏状态
-  ipcMain.removeHandler('toggle-main-window');
-  ipcMain.handle('toggle-main-window', () => {
-    toggleMainWindow();
-  });
+  registerHandler(
+    'toggle-main-window',
+    '切换主窗口',
+    () => {
+      toggleMainWindow();
+    },
+    {
+      logPrefix: '🪟 [窗口Handler]',
+    }
+  );
 
   // 显示预览窗口
-  ipcMain.removeHandler('preview-show');
-  ipcMain.handle('preview-show', () => {
-    showPreviewWindow();
-  });
+  registerHandler(
+    'preview-show',
+    '显示预览窗口',
+    () => {
+      showPreviewWindow();
+    },
+    {
+      logPrefix: '🪟 [窗口Handler]',
+    }
+  );
 
   // 隐藏预览窗口
-  ipcMain.removeHandler('preview-hide');
-  ipcMain.handle('preview-hide', () => {
-    hidePreviewWindow();
-  });
+  registerHandler(
+    'preview-hide',
+    '隐藏预览窗口',
+    () => {
+      hidePreviewWindow();
+    },
+    {
+      logPrefix: '🪟 [窗口Handler]',
+    }
+  );
 
   // 更新预览内容
-  ipcMain.removeHandler('preview-update');
-  ipcMain.handle('preview-update', async (_event, result: any, query: string) => {
-    await updatePreviewContent(result, query);
-  });
+  registerHandler(
+    'preview-update',
+    '更新预览内容',
+    async (_event, result: any, query: string) => {
+      const validatedQuery = validateString(query, 'query');
+      if (!result || typeof result !== 'object') {
+        throw new Error('result 必须是对象类型');
+      }
+      await updatePreviewContent(result, validatedQuery);
+    },
+    {
+      logPrefix: '🪟 [窗口Handler]',
+    }
+  );
 
   // 关闭预览窗口
-  ipcMain.removeHandler('preview-close');
-  ipcMain.handle('preview-close', () => {
-    closePreviewWindow();
-  });
+  registerHandler(
+    'preview-close',
+    '关闭预览窗口',
+    () => {
+      closePreviewWindow();
+    },
+    {
+      logPrefix: '🪟 [窗口Handler]',
+    }
+  );
 
   // 刷新主窗口搜索结果
-  ipcMain.removeHandler('main-window-refresh-search');
-  ipcMain.handle('main-window-refresh-search', () => {
-    const mainWindow = getMainWindow();
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      // 发送刷新搜索的消息到主窗口
-      mainWindow.webContents.send('refresh-search');
+  registerHandler(
+    'main-window-refresh-search',
+    '刷新主窗口搜索结果',
+    () => {
+      const mainWindow = getMainWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        // 发送刷新搜索的消息到主窗口
+        mainWindow.webContents.send('refresh-search');
+      }
+    },
+    {
+      logPrefix: '🪟 [窗口Handler]',
     }
-  });
+  );
 }
 

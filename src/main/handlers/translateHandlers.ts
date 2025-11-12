@@ -1,16 +1,19 @@
-import { ipcMain } from 'electron';
 import { translateService } from '../services/translateService';
+import { registerHandler, validateString } from './handlerUtils';
 
 /**
  * 注册翻译相关的 IPC 处理器
  * 提供多语言翻译功能
  */
 export function registerTranslateHandlers() {
-  // 处理翻译查询
-  ipcMain.handle('translate-handle-query', async (_event, query: string) => {
-    try {
-      console.log(`🌐 [翻译Handler] 处理查询: "${query}"`);
-      const result = await translateService.handleTranslateQuery(query);
+  registerHandler(
+    'translate-handle-query',
+    '翻译查询',
+    async (_event, query: string) => {
+      const validatedQuery = validateString(query, 'query');
+      console.log(`🌐 [翻译Handler] 处理查询: "${validatedQuery}"`);
+      
+      const result = await translateService.handleTranslateQuery(validatedQuery);
       if (result) {
         // 将 TranslateResult 转换为统一格式
         return {
@@ -22,10 +25,12 @@ export function registerTranslateHandlers() {
       }
       // 返回 null 表示无法识别为翻译查询，让前端继续尝试其他模块
       return null;
-    } catch (error: any) {
-      console.error('翻译处理失败:', error);
-      return null;
+    },
+    {
+      logPrefix: '🌐 [翻译Handler]',
+      returnNullOnError: true,
+      defaultValue: null,
     }
-  });
+  );
 }
 

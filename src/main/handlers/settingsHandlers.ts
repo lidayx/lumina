@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { registerHandler } from './handlerUtils';
 
 /**
  * 注册设置相关的 IPC 处理器
@@ -6,49 +6,60 @@ import { ipcMain } from 'electron';
  */
 export function registerSettingsHandlers() {
   // 获取所有应用设置
-  ipcMain.handle('settings-get-all', async () => {
-    try {
+  registerHandler(
+    'settings-get-all',
+    '获取所有设置',
+    async () => {
       const { default: settingsService } = await import('../services/settingsService');
       return settingsService.getSettings();
-    } catch (error) {
-      console.error('获取设置失败:', error);
-      throw error;
+    },
+    {
+      logPrefix: '⚙️ [设置Handler]',
     }
-  });
+  );
 
   // 更新应用设置（支持部分更新）
-  ipcMain.handle('settings-update', async (_event, updates: any) => {
-    try {
+  registerHandler(
+    'settings-update',
+    '更新设置',
+    async (_event, updates: any) => {
+      if (!updates || typeof updates !== 'object') {
+        throw new Error('updates 必须是对象类型');
+      }
       const { default: settingsService } = await import('../services/settingsService');
       await settingsService.updateSettings(updates);
       return { success: true };
-    } catch (error) {
-      console.error('更新设置失败:', error);
-      throw error;
+    },
+    {
+      logPrefix: '⚙️ [设置Handler]',
     }
-  });
+  );
 
   // 重置所有设置为默认值
-  ipcMain.handle('settings-reset', async () => {
-    try {
+  registerHandler(
+    'settings-reset',
+    '重置设置',
+    async () => {
       const { default: settingsService } = await import('../services/settingsService');
       await settingsService.resetSettings();
       return { success: true };
-    } catch (error) {
-      console.error('重置设置失败:', error);
-      throw error;
+    },
+    {
+      logPrefix: '⚙️ [设置Handler]',
     }
-  });
+  );
 
   // 获取调试日志文件的完整路径
-  ipcMain.handle('settings-get-log-file', async () => {
-    try {
+  registerHandler(
+    'settings-get-log-file',
+    '获取日志文件路径',
+    async () => {
       const { debugLog } = await import('../utils/debugLog');
       return debugLog.getLogFile();
-    } catch (error) {
-      console.error('获取日志文件路径失败:', error);
-      throw error;
+    },
+    {
+      logPrefix: '⚙️ [设置Handler]',
     }
-  });
+  );
 }
 
