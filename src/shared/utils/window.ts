@@ -1,50 +1,52 @@
 import { WindowType } from '../types/window';
 
+// 常量定义
+const DEV_BASE_URL = 'http://localhost:3000';
+const HASH_MAP: Record<WindowType, string> = {
+  main: '',
+  settings: '#settings',
+  plugin: '#plugins',
+  preview: '#preview',
+};
+
 // 在 Node 环境中使用，无需访问 process.env
-let isDev = false;
-if (typeof process !== 'undefined' && process.env) {
-  isDev = process.env.NODE_ENV === 'development';
+const isDev = typeof process !== 'undefined' && 
+              process.env && 
+              process.env.NODE_ENV === 'development';
+
+// 缓存生产模式的路径，避免重复 require
+let cachedIndexPath: string | null = null;
+
+/**
+ * 获取生产模式的索引文件路径
+ * 使用缓存避免重复 require
+ */
+function getIndexPath(): string {
+  if (cachedIndexPath === null) {
+    const path = require('path');
+    const { app } = require('electron');
+    cachedIndexPath = path.join(app.getAppPath(), 'dist', 'index.html');
+  }
+  return cachedIndexPath;
 }
 
 /**
  * 获取窗口 URL
+ * 优化：减少重复代码，使用映射表
+ * 
+ * @param type 窗口类型
+ * @returns 窗口 URL
  */
 export function getWindowUrl(type: WindowType): string {
+  const hash = HASH_MAP[type] || '';
+  
   if (isDev) {
     // 开发模式：从开发服务器加载
-    const baseUrl = 'http://localhost:3000';
-    switch (type) {
-      case 'main':
-        return baseUrl;
-      case 'settings':
-        return `${baseUrl}#settings`;
-      case 'plugin':
-        return `${baseUrl}#plugins`;
-      case 'preview':
-        return `${baseUrl}#preview`;
-      default:
-        return baseUrl;
-    }
+    return hash ? `${DEV_BASE_URL}${hash}` : DEV_BASE_URL;
   } else {
     // 生产模式：从本地文件加载
-    const path = require('path');
-    const { app } = require('electron');
-    
-    // app.asar 结构：app.asar/dist/index.html
-    const indexPath = path.join(app.getAppPath(), 'dist', 'index.html');
-    
-    switch (type) {
-      case 'main':
-        return `file://${indexPath}`;
-      case 'settings':
-        return `file://${indexPath}#settings`;
-      case 'plugin':
-        return `file://${indexPath}#plugins`;
-      case 'preview':
-        return `file://${indexPath}#preview`;
-      default:
-        return `file://${indexPath}`;
-    }
+    const indexPath = getIndexPath();
+    return `file://${indexPath}${hash}`;
   }
 }
 

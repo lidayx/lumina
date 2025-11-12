@@ -5,39 +5,45 @@
 
 /**
  * 计算两个字符串的编辑距离（Levenshtein Distance）
+ * 使用空间优化版本，只保留两行数据而不是整个矩阵
  * 编辑距离越小，相似度越高
+ * 
+ * @param str1 第一个字符串
+ * @param str2 第二个字符串
+ * @returns 编辑距离
  */
 export function levenshteinDistance(str1: string, str2: string): number {
   const len1 = str1.length;
   const len2 = str2.length;
   
-  // 创建矩阵
-  const matrix: number[][] = [];
+  // 快速路径：如果其中一个字符串为空
+  if (len1 === 0) return len2;
+  if (len2 === 0) return len1;
   
-  // 初始化第一行和第一列
-  for (let i = 0; i <= len1; i++) {
-    matrix[i] = [i];
-  }
-  for (let j = 0; j <= len2; j++) {
-    matrix[0][j] = j;
-  }
+  // 空间优化：只使用两行数据
+  let prevRow: number[] = Array(len2 + 1).fill(0).map((_, i) => i);
+  let currRow: number[] = new Array(len2 + 1);
   
-  // 填充矩阵
   for (let i = 1; i <= len1; i++) {
+    currRow[0] = i;
+    
     for (let j = 1; j <= len2; j++) {
       if (str1[i - 1] === str2[j - 1]) {
-        matrix[i][j] = matrix[i - 1][j - 1];
+        currRow[j] = prevRow[j - 1];
       } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j] + 1,     // 删除
-          matrix[i][j - 1] + 1,     // 插入
-          matrix[i - 1][j - 1] + 1  // 替换
+        currRow[j] = Math.min(
+          prevRow[j] + 1,      // 删除
+          currRow[j - 1] + 1,  // 插入
+          prevRow[j - 1] + 1   // 替换
         );
       }
     }
+    
+    // 交换行
+    [prevRow, currRow] = [currRow, prevRow];
   }
   
-  return matrix[len1][len2];
+  return prevRow[len2];
 }
 
 /**
@@ -125,47 +131,57 @@ for (const [chinese, pinyins] of Object.entries(PINYIN_MAP)) {
 
 /**
  * 中文转拼音（简化版，仅支持常用词汇）
+ * 使用 Set 去重，提高性能
+ * 
+ * @param chinese 中文字符串
+ * @returns 拼音数组（去重）
  */
 export function chineseToPinyin(chinese: string): string[] {
-  const results: string[] = [];
+  const results = new Set<string>();
   
   // 直接查找映射表
-  if (PINYIN_MAP[chinese]) {
-    results.push(...PINYIN_MAP[chinese]);
+  const directMatch = PINYIN_MAP[chinese];
+  if (directMatch) {
+    directMatch.forEach(pinyin => results.add(pinyin));
   }
   
-  // 尝试部分匹配
+  // 尝试部分匹配（只检查包含关系，避免重复添加）
   for (const [key, pinyins] of Object.entries(PINYIN_MAP)) {
-    if (chinese.includes(key)) {
-      results.push(...pinyins);
+    if (key !== chinese && chinese.includes(key)) {
+      pinyins.forEach(pinyin => results.add(pinyin));
     }
   }
   
-  return results;
+  return Array.from(results);
 }
 
 /**
  * 检查拼音匹配
+ * 优化：缓存字符串转换结果，减少重复计算
+ * 
  * @param query 查询字符串（可能是拼音）
  * @param target 目标字符串（中文或英文）
+ * @returns 是否匹配
  */
 export function pinyinMatch(query: string, target: string): boolean {
   const queryLower = query.toLowerCase().trim();
-  const targetLower = target.toLowerCase();
+  if (!queryLower) return false;
+  
+  const hasChinese = /[\u4e00-\u9fa5]/.test(target);
   
   // 如果 target 是中文，检查 query 是否匹配其拼音
-  if (/[\u4e00-\u9fa5]/.test(target)) {
+  if (hasChinese) {
     const pinyins = chineseToPinyin(target);
     for (const pinyin of pinyins) {
-      if (pinyin.includes(queryLower) || queryLower.includes(pinyin) || pinyin === queryLower) {
+      if (pinyin === queryLower || pinyin.includes(queryLower) || queryLower.includes(pinyin)) {
         return true;
       }
     }
   }
   
   // 反向检查：如果 query 是拼音，检查是否匹配 target 的中文
-  if (PINYIN_TO_CHINESE[queryLower]) {
-    const chineseWords = PINYIN_TO_CHINESE[queryLower];
+  const chineseWords = PINYIN_TO_CHINESE[queryLower];
+  if (chineseWords) {
     for (const chinese of chineseWords) {
       if (target.includes(chinese)) {
         return true;
@@ -174,13 +190,15 @@ export function pinyinMatch(query: string, target: string): boolean {
   }
   
   // 部分拼音匹配：检查 query 是否是 target 中某个中文字的拼音
-  const chineseChars = target.match(/[\u4e00-\u9fa5]/g);
-  if (chineseChars) {
-    for (const char of chineseChars) {
-      const charPinyins = chineseToPinyin(char);
-      for (const pinyin of charPinyins) {
-        if (pinyin.includes(queryLower) || queryLower.includes(pinyin)) {
-          return true;
+  if (hasChinese) {
+    const chineseChars = target.match(/[\u4e00-\u9fa5]/g);
+    if (chineseChars) {
+      for (const char of chineseChars) {
+        const charPinyins = chineseToPinyin(char);
+        for (const pinyin of charPinyins) {
+          if (pinyin === queryLower || pinyin.includes(queryLower) || queryLower.includes(pinyin)) {
+            return true;
+          }
         }
       }
     }
@@ -272,6 +290,16 @@ export interface MatchScore {
   reasons: string[];
 }
 
+/**
+ * 综合匹配评分
+ * 结合多种匹配算法，返回综合评分（0-1000）
+ * 优化：提前返回完全匹配，减少不必要的计算
+ * 
+ * @param query 查询字符串
+ * @param target 目标字符串
+ * @param keywords 可选的关键词列表
+ * @returns 匹配分数和原因
+ */
 export function calculateMatchScore(
   query: string,
   target: string,
@@ -282,32 +310,30 @@ export function calculateMatchScore(
   const reasons: string[] = [];
   let score = 0;
   
-  // 1. 完全匹配（最高优先级）
+  // 1. 完全匹配（最高优先级，提前返回）
   if (queryLower === targetLower) {
-    score = 1000;
-    reasons.push('完全匹配');
-    return { score, reasons };
+    return { score: 1000, reasons: ['完全匹配'] };
   }
   
-  // 2. 开头匹配
+  // 2. 开头匹配（高优先级）
   if (targetLower.startsWith(queryLower)) {
-    score = Math.max(score, 500);
+    score = 500;
     reasons.push('开头匹配');
   }
   
-  // 3. 包含匹配
+  // 3. 包含匹配（基础匹配）
   if (targetLower.includes(queryLower)) {
     score = Math.max(score, 200);
     reasons.push('包含匹配');
   }
   
-  // 4. 按顺序包含字符
+  // 4. 按顺序包含字符（部分匹配）
   if (containsInOrder(queryLower, targetLower)) {
     score = Math.max(score, 300);
     reasons.push('顺序匹配');
   }
   
-  // 5. 模糊匹配（编辑距离）
+  // 5. 模糊匹配（编辑距离，计算成本较高，放在后面）
   const sim = similarity(queryLower, targetLower);
   if (sim >= 0.8) {
     score = Math.max(score, 400);
@@ -320,7 +346,7 @@ export function calculateMatchScore(
     reasons.push('低相似度匹配');
   }
   
-  // 6. 拼音匹配
+  // 6. 拼音匹配（中文场景）
   if (pinyinMatch(queryLower, targetLower)) {
     score = Math.max(score, 350);
     reasons.push('拼音匹配');
@@ -332,8 +358,8 @@ export function calculateMatchScore(
     reasons.push('同义词匹配');
   }
   
-  // 8. 关键词匹配
-  if (keywords && keywords.length > 0) {
+  // 8. 关键词匹配（可选）
+  if (keywords && keywords.length > 0 && queryLower.length > 0) {
     const queryWords = queryLower.split(/\s+/).filter(w => w.length > 0);
     const matchedKeywords = queryWords.filter(word => 
       keywords.some(kw => {

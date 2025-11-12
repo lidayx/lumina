@@ -51,20 +51,40 @@ export function getPinyinInitial(text: string): string {
 
 /**
  * 获取字符的拼音首字母
+ * 优化：使用 Map 提高查找性能
  */
-function getCharPinyin(char: string): string {
-  // 检查应用名称映射
-  for (const [key, variations] of Object.entries(appNameMap)) {
-    if (key.includes(char)) {
-      return variations[0] || char;
+// 预构建查找映射，避免每次遍历对象
+const appNameLookup = new Map<string, string>();
+const pinyinLookup = new Map<string, string>();
+
+// 初始化查找映射
+for (const [key, variations] of Object.entries(appNameMap)) {
+  for (const char of key) {
+    if (!appNameLookup.has(char) && variations[0]) {
+      appNameLookup.set(char, variations[0]);
     }
+  }
+}
+
+for (const [key, variations] of Object.entries(pinyinMap)) {
+  for (const char of key) {
+    if (!pinyinLookup.has(char) && variations[0]) {
+      pinyinLookup.set(char, variations[0]);
+    }
+  }
+}
+
+function getCharPinyin(char: string): string {
+  // 优先检查应用名称映射
+  const appPinyin = appNameLookup.get(char);
+  if (appPinyin) {
+    return appPinyin;
   }
   
   // 检查拼音映射
-  for (const [key, variations] of Object.entries(pinyinMap)) {
-    if (key.includes(char)) {
-      return variations[0] || char;
-    }
+  const pinyin = pinyinLookup.get(char);
+  if (pinyin) {
+    return pinyin;
   }
   
   return char;
@@ -72,21 +92,30 @@ function getCharPinyin(char: string): string {
 
 /**
  * 获取所有拼音变化
+ * 优化：缓存字符串转换结果，减少重复计算
+ * 
+ * @param text 输入文本
+ * @returns 所有可能的拼音变化（去重）
  */
 export function getPinyinVariations(text: string): string[] {
   if (!text) return [];
   
   const variations = new Set<string>();
+  const textLower = text.toLowerCase();
   
-  // 添加原始文本
-  variations.add(text.toLowerCase());
+  // 添加原始文本（小写）
+  variations.add(textLower);
   
-  // 添加英文和数字
-  variations.add(text.replace(/[^a-zA-Z0-9]/g, '').toLowerCase());
+  // 添加英文和数字（去除非字母数字字符）
+  const alphanumeric = text.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  if (alphanumeric) {
+    variations.add(alphanumeric);
+  }
   
-  // 检查应用名称映射
+  // 检查应用名称映射（优化：只检查一次 toLowerCase）
   for (const [key, values] of Object.entries(appNameMap)) {
-    if (key.toLowerCase().includes(text.toLowerCase()) || text.toLowerCase().includes(key.toLowerCase())) {
+    const keyLower = key.toLowerCase();
+    if (keyLower.includes(textLower) || textLower.includes(keyLower)) {
       values.forEach(v => variations.add(v.toLowerCase()));
     }
   }
@@ -97,7 +126,7 @@ export function getPinyinVariations(text: string): string[] {
     variations.add(initials);
   }
   
-  // 添加常见拼音组合
+  // 添加常见拼音组合（优化：使用 includes 检查，避免重复 toLowerCase）
   if (text.includes('微信')) {
     variations.add('wechat');
     variations.add('weixin');
@@ -121,19 +150,37 @@ export function getPinyinVariations(text: string): string[] {
 
 /**
  * 高级搜索匹配 - 支持拼音、英文、中文
+ * 优化：提前返回，减少不必要的计算
+ * 
+ * @param query 查询字符串
+ * @param target 目标字符串
+ * @returns 是否匹配
  */
 export function fuzzyMatch(query: string, target: string): boolean {
   const lowerQuery = query.toLowerCase().trim();
-  const lowerTarget = target.toLowerCase().trim();
-  
   if (!lowerQuery) return false;
   
-  // 1. 完全匹配
+  const lowerTarget = target.toLowerCase().trim();
+  
+  // 1. 完全匹配（最快，优先检查）
   if (lowerTarget.includes(lowerQuery)) {
     return true;
   }
   
-  // 2. 拼音匹配
+  // 2. 首字母匹配（快速检查）
+  const targetInitials = getPinyinInitial(target);
+  if (targetInitials && targetInitials.includes(lowerQuery)) {
+    return true;
+  }
+  
+  // 3. 单词首字母匹配（例如：WeChat -> wc）
+  const words = lowerTarget.split(/[\s-]+/);
+  const wordInitials = words.map(w => w[0] || '').join('');
+  if (wordInitials && wordInitials.includes(lowerQuery)) {
+    return true;
+  }
+  
+  // 4. 拼音匹配（计算成本较高，放在后面）
   const targetPinyin = getPinyinVariations(target);
   for (const variant of targetPinyin) {
     if (variant.includes(lowerQuery)) {
@@ -141,7 +188,7 @@ export function fuzzyMatch(query: string, target: string): boolean {
     }
   }
   
-  // 3. 查询的拼音匹配
+  // 5. 查询的拼音匹配
   const queryPinyin = getPinyinVariations(lowerQuery);
   for (const variant of queryPinyin) {
     if (lowerTarget.includes(variant)) {
@@ -149,19 +196,7 @@ export function fuzzyMatch(query: string, target: string): boolean {
     }
   }
   
-  // 4. 首字母匹配
-  const targetInitials = getPinyinInitial(target);
-  if (targetInitials.includes(lowerQuery)) {
-    return true;
-  }
-  
-  // 5. 单词首字母匹配（例如：WeChat -> wc）
-  const words = lowerTarget.split(/[\s-]+/);
-  const wordInitials = words.map(w => w[0] || '').join('');
-  if (wordInitials.includes(lowerQuery)) {
-    return true;
-  }
-  
   return false;
 }
+
 
