@@ -47,7 +47,7 @@ export const resetSearchState = (
  */
 export const generateBrowserOptions = async (url: string): Promise<SearchResult[]> => {
   try {
-    const allBrowsers = await window.electron.invoke('browser-get-all');
+    const allBrowsers = await window.electron.browser.getAll();
     
     const options: SearchResult[] = allBrowsers.map((browser: any, index: number) => {
       console.log('浏览器图标:', browser.name, 'icon:', browser.icon ? '有' : '无');
