@@ -247,30 +247,31 @@ export const ResultList: React.FC<ResultListProps> = ({
     itemRefs.current = itemRefs.current.slice(0, results.length);
   }, [results.length]);
 
+  // 使用 useMemo 缓存结果项列表，避免不必要的重新渲染
+  const resultItems = useMemo(() => {
+    return results.map((result, index) => {
+      const isSelected = index === selectedIndex;
+      
+      return (
+        <ResultItem
+          key={result.id}
+          result={result}
+          isSelected={isSelected}
+          query={query}
+          onSelect={() => onSelect(index)}
+          onHover={onHover ? () => onHover(index) : undefined}
+          itemRef={(el) => {
+            itemRefs.current[index] = el;
+          }}
+        />
+      );
+    });
+  }, [results, selectedIndex, query, onSelect, onHover]);
+
   if (results.length === 0) {
     return <EmptyResult />;
   }
 
-  return (
-    <div className="space-y-0.5">
-      {results.map((result, index) => {
-        const isSelected = index === selectedIndex;
-        
-        return (
-          <ResultItem
-            key={result.id}
-            result={result}
-            isSelected={isSelected}
-            query={query}
-            onSelect={() => onSelect(index)}
-            onHover={onHover ? () => onHover(index) : undefined}
-            itemRef={(el) => {
-              itemRefs.current[index] = el;
-            }}
-          />
-        );
-      })}
-    </div>
-  );
+  return <div className="space-y-0.5">{resultItems}</div>;
 };
 

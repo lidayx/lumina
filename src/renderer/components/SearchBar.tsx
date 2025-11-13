@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
@@ -11,10 +11,15 @@ interface SearchBarProps {
   onTabComplete?: () => void; // Tab补全回调
 }
 
+// 常量定义
+const FOCUS_DELAY_MS = 50;
+const DEFAULT_PLACEHOLDER = '搜索应用、文件或命令...';
+const LOADING_PLACEHOLDER = '正在初始化（仅首次需要）...';
+
 export const SearchBar: React.FC<SearchBarProps> = ({
   onSearch,
   onEscape,
-  placeholder = '搜索应用、文件或命令...',
+  placeholder = DEFAULT_PLACEHOLDER,
   autoFocus = true,
   isLoading = false,
   query: externalQuery,
@@ -27,35 +32,48 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   // 使用外部传入的 query，如果没有则使用内部状态
   const query = externalQuery !== undefined ? externalQuery : internalQuery;
 
+  // 清空查询的辅助函数
+  const clearQuery = useCallback(() => {
+    if (onQueryChange) {
+      onQueryChange('');
+    } else {
+      setInternalQuery('');
+    }
+    onSearch('');
+    inputRef.current?.focus();
+  }, [onQueryChange, onSearch]);
+
+  // 聚焦输入框的辅助函数
+  const focusInput = useCallback(() => {
+    if (inputRef.current && !inputRef.current.matches(':focus')) {
+      inputRef.current.focus();
+    }
+  }, []);
+
+  // 自动聚焦效果
   useEffect(() => {
     if (autoFocus && inputRef.current) {
       // 延迟一点确保窗口完全显示后再聚焦
       const timer = setTimeout(() => {
         inputRef.current?.focus();
-      }, 50);
+      }, FOCUS_DELAY_MS);
       return () => clearTimeout(timer);
     }
   }, [autoFocus]);
 
   // 监听窗口显示事件，自动聚焦输入框
   useEffect(() => {
-    const handleFocus = () => {
-      if (inputRef.current && !inputRef.current.matches(':focus')) {
-        inputRef.current.focus();
-      }
-    };
-
     const handleMainWindowShow = () => {
       // 主窗口显示时，延迟一点后聚焦
       setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.focus();
         }
-      }, 50);
+      }, FOCUS_DELAY_MS);
     };
 
     // 窗口获得焦点时聚焦输入框
-    window.addEventListener('focus', handleFocus);
+    window.addEventListener('focus', focusInput);
     
     // 监听主窗口显示事件
     if (window.electron) {
@@ -63,17 +81,18 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     }
     
     // 组件挂载时也聚焦
-    handleFocus();
+    focusInput();
 
     return () => {
-      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('focus', focusInput);
       if (window.electron) {
         window.electron.removeListener('main-window-show', handleMainWindowShow);
       }
     };
-  }, []);
+  }, [focusInput]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 处理输入变化
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (onQueryChange) {
       onQueryChange(value);
@@ -81,30 +100,30 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       setInternalQuery(value);
     }
     onSearch(value);
-  };
+  }, [onQueryChange, onSearch]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  // 处理键盘事件
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape') {
       if (query) {
         // 如果有内容，清空内容
-        if (onQueryChange) {
-          onQueryChange('');
-        } else {
-          setInternalQuery('');
-        }
-        onSearch('');
+        clearQuery();
       } else {
         // 如果已经为空，隐藏窗口
-        if (onEscape) {
-          onEscape();
-        }
+        onEscape?.();
       }
     } else if (e.key === 'Tab' && onTabComplete && !e.shiftKey) {
       // Tab补全：如果当前有选中的补全建议，自动填充
       e.preventDefault();
       onTabComplete();
     }
-  };
+  }, [query, clearQuery, onEscape, onTabComplete]);
+
+  // 计算 placeholder 文本
+  const displayPlaceholder = useMemo(
+    () => (isLoading ? LOADING_PLACEHOLDER : placeholder),
+    [isLoading, placeholder]
+  );
 
   return (
     <div className="relative w-full">
@@ -129,7 +148,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         value={query}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        placeholder={isLoading ? '正在初始化（仅首次需要）...' : placeholder}
+        placeholder={displayPlaceholder}
         disabled={isLoading}
         className="block w-full pl-10 pr-10 py-3 text-base border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       />
@@ -143,16 +162,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       )}
       {!isLoading && query && (
         <button
-          onClick={() => {
-            if (onQueryChange) {
-              onQueryChange('');
-            } else {
-              setInternalQuery('');
-            }
-            onSearch('');
-            inputRef.current?.focus();
-          }}
+          onClick={clearQuery}
           className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          aria-label="清空搜索"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
