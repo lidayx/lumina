@@ -238,6 +238,17 @@ class WindowManager {
   }
 
   /**
+   * 检查窗口是否可见
+   */
+  public isWindowVisible(type: WindowType): boolean {
+    const window = this.getWindow(type);
+    if (window) {
+      return window.isVisible();
+    }
+    return false;
+  }
+
+  /**
    * 切换窗口显示状态
    */
   public toggleWindow(type: WindowType): void {

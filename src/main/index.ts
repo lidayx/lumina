@@ -316,6 +316,11 @@ ipcMain.handle('window-close', (_event, windowType: string) => {
   windowManager.closeWindow(windowType as any);
 });
 
+// 检查窗口是否可见
+ipcMain.handle('window-is-visible', (_event, windowType: string) => {
+  return windowManager.isWindowVisible(windowType as any);
+});
+
 // 调整窗口大小
 ipcMain.handle('window-resize', (_event, width: number, height: number) => {
   const mainWindow = windowManager.getWindow('main');

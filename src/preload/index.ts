@@ -196,6 +196,7 @@ contextBridge.exposeInMainWorld('electron', {
       // 窗口相关
   windowResize: createInvoke('window-resize'),
   windowHide: createInvoke('window-hide'),
+  windowIsVisible: createInvoke('window-is-visible'),
       
       // 预览窗口相关
       preview: {
@@ -301,6 +302,7 @@ contextBridge.exposeInMainWorld('electron', {
     };
     windowResize: (width: number, height: number) => Promise<void>;
     windowHide: (windowType: string) => Promise<void>;
+    windowIsVisible: (windowType: string) => Promise<boolean>;
     off: (channel: string, callback: (...args: any[]) => void) => void;
     preview: {
       show: () => Promise<void>;
