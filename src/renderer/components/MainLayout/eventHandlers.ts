@@ -253,6 +253,39 @@ export const createSelectHandler = (
         return;
       }
       
+      // 处理 IP 网络信息结果
+      if (result.action === 'ip:copy') {
+        try {
+          const calcData = (result as any).calcData;
+          // IP结果可能是"内网IP: 192.168.1.100"格式，复制整个title或只复制IP地址
+          let textToCopy = result.title || '';
+          if (calcData?.output) {
+            textToCopy = calcData.output;
+            // 如果包含冒号，尝试只提取IP地址部分
+            if (textToCopy.includes(': ')) {
+              const parts = textToCopy.split(': ');
+              if (parts.length === 2) {
+                // 如果第二部分是IP地址格式，只复制IP地址
+                if (/^(\d{1,3}\.){3}\d{1,3}$/.test(parts[1].trim())) {
+                  textToCopy = parts[1].trim();
+                } else {
+                  // 否则复制整个字符串
+                  textToCopy = textToCopy.trim();
+                }
+              }
+            }
+          }
+          if (textToCopy) {
+            await navigator.clipboard.writeText(textToCopy);
+            console.log('IP result copied:', textToCopy);
+          }
+          hideMainWindow();
+        } catch (error) {
+          console.error('Failed to copy IP result:', error);
+        }
+        return;
+      }
+      
       // 处理 TODO 结果
       if (result.action.startsWith('todo:')) {
         if (result.action === 'todo:copy') {

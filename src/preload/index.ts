@@ -150,6 +150,11 @@ contextBridge.exposeInMainWorld('electron', {
     help: createInvoke('string-help'),
       },
       
+      // IP 网络信息相关
+      ip: {
+    handleQuery: createInvoke('ip-handle-query'),
+      },
+      
       // 书签相关
       bookmark: {
     getAll: createInvoke('bookmark-get-all'),

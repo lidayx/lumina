@@ -13,6 +13,7 @@ export const callFeatureModules = async (
   let translateResult = null;
   let variableNameResult = null;
   let todoResult = null;
+  let ipResult = null;
   
   if (!isFileSearch && !urlCheck.isURL) {
     // 先检查是否是数学函数表达式
@@ -55,9 +56,15 @@ export const callFeatureModules = async (
           console.log('🔍 [模块检测] todoResult 匹配:', actualQuery);
         }
       }
+      if (!encodeResult && !stringResult && !timeResult && !randomResult && !translateResult && !todoResult) {
+        ipResult = await (window.electron as any).ip.handleQuery(actualQuery).catch(() => null);
+        if (ipResult) {
+          console.log('🔍 [模块检测] ipResult 匹配:', actualQuery);
+        }
+      }
     }
     
-    if (!encodeResult && !stringResult && !timeResult && !randomResult && !translateResult && !todoResult) {
+    if (!encodeResult && !stringResult && !timeResult && !randomResult && !translateResult && !todoResult && !ipResult) {
       // 先检查是否是数学表达式
       const isMathExpression = /^\d+\s*[\+\-*/]\s*\d+$/.test(actualQuery.trim()) ||
                                /^[\d\s\+\-*/().,π]+$/.test(actualQuery.trim()) && /[\+\-*/().,π]/.test(actualQuery.trim()) ||
@@ -82,6 +89,7 @@ export const callFeatureModules = async (
     translateResult,
     variableNameResult,
     todoResult,
+    ipResult,
   };
 };
 

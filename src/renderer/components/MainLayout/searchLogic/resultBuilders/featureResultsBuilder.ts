@@ -391,6 +391,68 @@ export const buildTranslateResults = (
 };
 
 /**
+ * 构建 IP 网络信息结果
+ */
+export const buildIpResults = (
+  ipResult: any,
+  query: string,
+  combinedResults: SearchResult[]
+): void => {
+  if (!ipResult) {
+    return;
+  }
+
+  if (ipResult.success) {
+    // 如果是多个结果（多个网络信息），为每个结果创建一个选项
+    if (ipResult.outputs && ipResult.outputs.length > 0) {
+      ipResult.outputs.forEach((output: string, index: number) => {
+        combinedResults.push({
+          id: `ip-result-${index}`,
+          type: 'command' as const,
+          title: output,
+          description: `网络信息 ${index + 1}/${ipResult.outputs.length} - 点击复制`,
+          action: 'ip:copy',
+          score: 2000 - index,
+          priorityScore: 2000 - index,
+          calcData: {
+            input: ipResult.input,
+            output: output,
+            success: true,
+          },
+        });
+      });
+    } else {
+      // 单个结果
+      combinedResults.push({
+        id: 'ip-result',
+        type: 'command' as const,
+        title: ipResult.output.trim(),
+        description: `网络信息：${ipResult.input}`,
+        action: 'ip:copy',
+        score: 2000,
+        priorityScore: 2000,
+        calcData: {
+          input: ipResult.input,
+          output: ipResult.output,
+          success: true,
+        },
+      });
+    }
+  } else if (ipResult.error) {
+    combinedResults.push({
+      id: 'ip-error',
+      type: 'command' as const,
+      title: ipResult.error, // 不显示"错误:"前缀
+      description: `网络信息：${ipResult.input || query}`,
+      action: 'ip:copy',
+      score: 1000,
+      priorityScore: 1000,
+      calcData: ipResult,
+    });
+  }
+};
+
+/**
  * 构建变量名生成结果
  */
 export const buildVariableNameResults = (

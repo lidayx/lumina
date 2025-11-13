@@ -21,6 +21,7 @@ import { registerRandomHandlers } from './handlers/randomHandlers';
 import { registerTranslateHandlers } from './handlers/translateHandlers';
 import { registerVariableNameHandlers } from './handlers/variableNameHandlers';
 import { registerTodoHandlers } from './handlers/todoHandlers';
+import { registerIpHandlers } from './handlers/ipHandlers';
 import { indexService } from './services/indexService';
 import { appService } from './services/appService';
 import { fileService } from './services/fileService';
@@ -58,6 +59,7 @@ const HANDLER_REGISTRATIONS = [
   registerTranslateHandlers,
   registerVariableNameHandlers,
   registerTodoHandlers,
+  registerIpHandlers,
 ];
 
 /**

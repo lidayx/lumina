@@ -6,7 +6,7 @@ import { detectKeywords } from './keywordDetectors';
 import { getCommandCompletions, getFeatureCompletions } from './completionHandlers';
 import { buildFeatureCompletionResults } from './resultBuilders/featureCompletionBuilder';
 import { buildCommandCompletionResults } from './resultBuilders/commandCompletionBuilder';
-import { buildEncodeResults, buildStringResults, buildTimeResults, buildTodoResults, buildRandomResults, buildTranslateResults, buildVariableNameResults } from './resultBuilders/featureResultsBuilder';
+import { buildEncodeResults, buildStringResults, buildTimeResults, buildTodoResults, buildRandomResults, buildTranslateResults, buildVariableNameResults, buildIpResults } from './resultBuilders/featureResultsBuilder';
 import { buildCalculatorResults } from './resultBuilders/calculatorResultBuilder';
 import { buildAppResults, buildFileResults, buildWebResults, buildBookmarkResults, buildCommandResults, buildURLResults, buildClipboardResults, buildSettingsResult } from './resultBuilders/searchResultsBuilder';
 import { sortResults } from '../resultSort';
@@ -99,17 +99,18 @@ export const handleSearch = async (
       translateResult,
       variableNameResult,
       todoResult,
+      ipResult,
     } = featureResults;
 
     // 如果所有独立模块都没有处理，再尝试计算器
-    const shouldCallCalculator = !encodeResult && !stringResult && !timeResult && !randomResult && !translateResult && !variableNameResult && !todoResult && finalIsCalculation;
+    const shouldCallCalculator = !encodeResult && !stringResult && !timeResult && !randomResult && !translateResult && !variableNameResult && !todoResult && !ipResult && finalIsCalculation;
     console.log('🔍 [计算器检测]', {
       query: actualQuery,
       shouldCallCalculator,
       finalIsCalculation,
       isSimpleMath,
       isCalculation,
-      hasOtherResults: !!(encodeResult || stringResult || timeResult || randomResult || translateResult || variableNameResult || todoResult),
+      hasOtherResults: !!(encodeResult || stringResult || timeResult || randomResult || translateResult || variableNameResult || todoResult || ipResult),
       encodeResult: encodeResult ? '有结果' : 'null',
       stringResult: stringResult ? '有结果' : 'null',
       timeResult: timeResult ? '有结果' : 'null',
@@ -117,6 +118,7 @@ export const handleSearch = async (
       translateResult: translateResult ? '有结果' : 'null',
       variableNameResult: variableNameResult ? '有结果' : 'null',
       todoResult: todoResult ? '有结果' : 'null',
+      ipResult: ipResult ? '有结果' : 'null',
     });
     const calcResult = shouldCallCalculator
       ? await window.electron.calculator.calculate(actualQuery).catch((err) => {
@@ -235,6 +237,7 @@ export const handleSearch = async (
     const hasTranslateResult = translateResult !== null;
     const hasVariableNameResult = variableNameResult !== null;
     const hasTodoResult = todoResult !== null;
+    const hasIpResult = ipResult !== null;
 
     const shouldShowFeatureCompletion = featureType &&
       !isCommandMode &&
@@ -247,6 +250,7 @@ export const handleSearch = async (
       !hasTranslateResult && // 如果有翻译结果（包括错误），不显示补全
       !hasVariableNameResult && // 如果有变量名生成结果（包括错误），不显示补全
       !hasTodoResult && // 如果有 TODO 结果（包括错误），不显示补全
+      !hasIpResult && // 如果有 IP 结果（包括错误），不显示补全
       (isOnlyKeyword || !calcResult || !calcResult.success);
 
     // 调试日志
@@ -321,6 +325,9 @@ export const handleSearch = async (
 
     // 构建变量名生成结果
     buildVariableNameResults(variableNameResult, query, combinedResults);
+
+    // 构建 IP 网络信息结果
+    buildIpResults(ipResult, query, combinedResults);
 
     // 构建计算器结果
     await buildCalculatorResults(calcResult, query, combinedResults);
