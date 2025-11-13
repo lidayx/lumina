@@ -44,6 +44,7 @@ export interface SearchResult {
     tags?: string;
   }; // TODO 任务数据
   suggestionData?: any; // 补全建议数据（用于Tab补全）
+  isTodoModifyOperation?: boolean; // 标记是否是 TODO 修改操作（创建、删除、编辑、完成）的确认提示
 }
 
 interface ResultListProps {

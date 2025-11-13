@@ -1,6 +1,5 @@
 import React from 'react';
 import { SearchResult } from '../ResultList';
-import { WINDOW_HIDE_DELAY } from './constants';
 
 /**
  * 创建结果选择处理器
@@ -254,6 +253,29 @@ export const createSelectHandler = (
         return;
       }
       
+      // 处理 TODO 结果
+      if (result.action.startsWith('todo:')) {
+        if (result.action === 'todo:copy') {
+          // 复制 TODO 结果
+          try {
+            const todoData = (result as any).todoData;
+            if (todoData?.content) {
+              await navigator.clipboard.writeText(todoData.content);
+              console.log('TODO result copied:', todoData.content);
+            }
+          } catch (error) {
+            console.error('Failed to copy TODO result:', error);
+          }
+          hideMainWindow();
+        } else if (result.action.startsWith('todo:view:')) {
+          // 查看 TODO 项详情（这里可以显示详情或执行其他操作）
+          // 目前只是关闭窗口，因为 TODO 详情已经在预览窗口中显示
+          console.log('TODO item viewed:', result.action);
+          hideMainWindow();
+        }
+        return;
+      }
+      
       // 默认处理
       onExecute(result);
       hideMainWindow();
@@ -273,7 +295,9 @@ export const createKeyboardHandler = (
   getNextType: (currentType: string) => string | null,
   switchToType: (type: string) => void,
   handleSelect: (index: number) => void | Promise<void>,
-  hideMainWindow: () => void
+  hideMainWindow: () => void,
+  setResults: React.Dispatch<React.SetStateAction<SearchResult[]>>,
+  isTodoOperationRef: React.MutableRefObject<boolean>
 ) => {
   return (e: KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
@@ -303,23 +327,46 @@ export const createKeyboardHandler = (
       e.preventDefault();
       const trimmedQuery = query.trim();
       
-      // 优先检查是否是 TODO 修改操作
+      // 检查是否是 TODO 操作（创建、删除、编辑、完成）
+      // 匹配：todo delete 1, todo done 1, todo edit 1 xxx, todo create xxx, 待办删除 1 等
       const isTodoModifyOperation = /^(?:todo|待办)\s+(?:delete|remove|del|done|complete|finish|edit|update|完成|删除|移除|删|编辑|更新)\s+\d+/i.test(trimmedQuery) ||
                                    /^(?:todo|待办)\s+(?!all|done|pending|search|全部|已完成|未完成|搜索)\S+/i.test(trimmedQuery);
       
       if (isTodoModifyOperation) {
-        console.log('🔍 [前端] 检测到 TODO 修改操作，执行:', trimmedQuery);
+        console.log('🔍 [前端] 检测到 TODO 操作，执行:', trimmedQuery);
+        // 设置 TODO 操作标志，阻止搜索和预览更新
+        isTodoOperationRef.current = true;
+        // 立即隐藏预览窗口，避免发送预览更新消息
+        window.electron.preview.hide().catch((err: any) => {
+          console.error('Failed to hide preview window before TODO operation:', err);
+        });
+        // 立即清空结果和查询，确保 selectedResult 变成 null
+        setResults([]);
+        setSelectedIndex(0);
+        setQuery('');
+        // 执行 TODO 操作
         (window.electron as any).todo.handleQuery(trimmedQuery, true).then((result: any) => {
-          console.log('🔍 [前端] TODO 修改操作结果:', result);
+          console.log('🔍 [前端] TODO 操作结果:', result);
+          // 清除 TODO 操作标志
+          isTodoOperationRef.current = false;
           if (result?.success) {
+            // 操作成功，关闭主窗口和预览窗口
             hideMainWindow();
           } else if (result) {
             // 操作失败，重新搜索以更新结果
-            setQuery(query);
+            setQuery(trimmedQuery);
+          } else {
+            // 如果 result 为 null 或 undefined，也关闭窗口
+            hideMainWindow();
           }
         }).catch((error: any) => {
-          console.error('❌ [前端] TODO 修改操作失败:', error);
+          console.error('❌ [前端] TODO 操作失败:', error);
+          // 清除 TODO 操作标志
+          isTodoOperationRef.current = false;
+          // 即使操作失败，也关闭窗口
+          hideMainWindow();
         });
+        return; // 提前返回，避免继续执行后续逻辑
       } else if (results[selectedIndex]) {
         handleSelect(selectedIndex);
       } else if (results.length > 0) {

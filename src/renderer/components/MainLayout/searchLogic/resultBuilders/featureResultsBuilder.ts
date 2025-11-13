@@ -229,14 +229,49 @@ export const buildTodoResults = (
       });
     } else {
       // 单行结果（创建、完成、删除、编辑等操作）
+      // 检查是否是删除/编辑/完成操作的确认提示
+      // 注意：输出可能是多行字符串，检查是否同时包含操作关键词和"按回车确认"
+      const outputText = todoResult.output || '';
+      
+      // 检查是否包含"按回车确认"关键词（这是确认提示的标志）
+      const hasConfirmPrompt = /按回车确认/i.test(outputText);
+      
+      // 检查是否包含各种操作关键词
+      const hasDeleteKeyword = /删除任务/i.test(outputText);
+      const hasEditKeyword = /编辑任务/i.test(outputText);
+      const hasCompleteKeyword = /完成任务/i.test(outputText);
+      const hasCreateKeyword = /创建任务/i.test(outputText);
+      
+      // 如果同时包含操作关键词和"按回车确认"，则认为是确认提示
+      const isDeleteConfirm = hasDeleteKeyword && hasConfirmPrompt;
+      const isEditConfirm = hasEditKeyword && hasConfirmPrompt;
+      const isCompleteConfirm = hasCompleteKeyword && hasConfirmPrompt;
+      const isCreateConfirm = hasCreateKeyword && hasConfirmPrompt;
+      
+      // 如果是删除/编辑/完成/创建操作的确认提示，标记为 TODO 操作，不显示预览
+      const isTodoModifyConfirm = isDeleteConfirm || isEditConfirm || isCompleteConfirm || isCreateConfirm;
+      
+      // 调试日志
+      if (isTodoModifyConfirm) {
+        console.log('🔍 [TODO结果构建] 检测到 TODO 修改操作确认提示，将隐藏预览窗口:', {
+          output: outputText.substring(0, 100), // 只显示前100个字符
+          isDeleteConfirm,
+          isEditConfirm,
+          isCompleteConfirm,
+          isCreateConfirm,
+        });
+      }
+      
       combinedResults.push({
         id: 'todo-result',
         type: 'command' as const,
         title: todoResult.output.trim(),
         description: `TODO：${todoResult.input}`,
-        action: 'todo:copy',
+        action: isTodoModifyConfirm ? 'todo:execute' : 'todo:copy', // 如果是确认提示，使用特殊的 action
         score: 2000,
         priorityScore: 2000,
+        // 标记为 TODO 修改操作，用于阻止预览窗口显示
+        isTodoModifyOperation: isTodoModifyConfirm,
       });
     }
   } else if (todoResult.error) {

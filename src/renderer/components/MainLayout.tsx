@@ -25,6 +25,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
   const [loading, setLoading] = React.useState(false);
   const [showNoResult, setShowNoResult] = React.useState(false);
   const [ignoreHover, setIgnoreHover] = React.useState(false);
+  
+  // 使用 ref 来标记是否正在进行 TODO 操作（创建、删除、编辑）
+  // ref 不会触发重新渲染，可以立即更新和读取
+  const isTodoOperationRef = React.useRef(false);
 
   // 使用自定义 hooks
   const isFirstLaunch = useFirstLaunch();
@@ -47,9 +51,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
 
   // 隐藏主窗口的辅助函数
   const hideMainWindow = React.useCallback(() => {
+    // 先隐藏预览窗口（立即执行，不等待状态更新）
+    window.electron.preview.hide().catch((err: any) => {
+      console.error('Failed to hide preview window:', err);
+    });
+    // 重置搜索状态
     resetSearchState(setQuery, setResults, setSelectedIndex, setIgnoreHover, setLoading);
-    // 先隐藏预览窗口
-    window.electron.preview.hide();
     // 延迟隐藏窗口，确保状态更新完成
     setTimeout(() => {
       window.electron.windowHide('main').catch((err: any) => {
@@ -82,6 +89,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
 
   // 搜索应用和文件
   React.useEffect(() => {
+    // 如果正在进行 TODO 操作（创建、删除、编辑），不执行搜索
+    if (isTodoOperationRef.current) {
+      console.log('⏱️ [防抖] 检测到 TODO 操作，跳过搜索');
+      return;
+    }
+    
     // 防抖搜索（统一防抖，所有搜索同时执行）
     // 补全查询使用较短延迟，普通搜索使用较长延迟
     const isCompletionQuery = query.trim().length > 0 && (
@@ -94,6 +107,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
 
     console.log('⏱️ [防抖] 设置延迟:', debounceDelay, 'ms, query:', query);
     const timer = setTimeout(() => {
+      // 再次检查是否正在进行 TODO 操作
+      if (isTodoOperationRef.current) {
+        console.log('⏱️ [防抖] 延迟结束，但检测到 TODO 操作，跳过搜索');
+        return;
+      }
       console.log('⏱️ [防抖] 延迟结束，开始执行搜索');
       handleSearch(
         query,
@@ -183,7 +201,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
       getNextType,
       switchToType,
       handleSelect,
-      hideMainWindow
+      hideMainWindow,
+      setResults,
+      isTodoOperationRef
     );
 
     window.addEventListener('keydown', handleKeyDown);
@@ -198,8 +218,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
     return results[selectedIndex] || null;
   }, [results, selectedIndex]);
 
-  // 使用预览窗口 hook
-  usePreviewWindow(selectedResult, query);
+  // 使用预览窗口 hook（传递 isTodoOperationRef 以阻止 TODO 操作期间的预览更新）
+  usePreviewWindow(selectedResult, query, isTodoOperationRef);
 
 
   // 监听刷新搜索的消息
