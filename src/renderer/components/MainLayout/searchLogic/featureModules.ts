@@ -56,7 +56,7 @@ export const callFeatureModules = async (
           console.log('🔍 [模块检测] todoResult 匹配:', actualQuery);
         }
       }
-      if (!encodeResult && !stringResult && !timeResult && !randomResult && !translateResult && !todoResult) {
+    if (!encodeResult && !stringResult && !timeResult && !randomResult && !translateResult && !todoResult) {
         ipResult = await (window.electron as any).ip.handleQuery(actualQuery).catch(() => null);
         if (ipResult) {
           console.log('🔍 [模块检测] ipResult 匹配:', actualQuery);
