@@ -2351,6 +2351,36 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 </div>
               </div>
 
+              {/* IP 网络信息 */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                <div className="p-6">
+                  <h3 className="text-lg font-medium mb-4">IP 网络信息</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-900 mb-2">查看网络信息</div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <code className="px-2 py-1 bg-white rounded text-xs">ip</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">查看ip</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">网络信息</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">network</code>
+                        <code className="px-2 py-1 bg-white rounded text-xs">ipinfo</code>
+                      </div>
+                      <p className="text-xs text-gray-600 mb-2">快速查看网络信息，包括：</p>
+                      <ul className="text-xs text-gray-600 space-y-1 ml-4 list-disc">
+                        <li>内网IP地址（自动检测所有网卡）</li>
+                        <li>外网IP地址（通过外部API获取，可能需要几秒钟）</li>
+                        <li>默认网关（通过系统命令获取）</li>
+                        <li>DNS服务器（系统配置的DNS服务器）</li>
+                      </ul>
+                      <p className="text-xs text-gray-500 mt-2">• 每个信息作为独立结果项，点击即可复制</p>
+                      <p className="text-xs text-gray-500">• 复制时自动提取IP地址部分（如"内网IP: 192.168.1.100"只复制"192.168.1.100"）</p>
+                      <p className="text-xs text-gray-500">• 支持跨平台（macOS、Windows、Linux）</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+ 
+
               {/* TODO 管理 */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
                 <div className="p-6">
