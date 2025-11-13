@@ -1,8 +1,22 @@
 import React from 'react';
-import { debounce } from '../../shared/utils/debounce';
 import { completionCache } from '../../shared/utils/completionCache';
 import { SearchBar } from './SearchBar';
 import { ResultList, SearchResult as SearchResultType } from './ResultList';
+import { 
+  WINDOW_HIDE_DELAY, 
+  HOVER_IGNORE_DELAY, 
+  SEARCH_DEBOUNCE_DELAY_NORMAL, 
+  SEARCH_DEBOUNCE_DELAY_COMPLETION,
+} from './MainLayout/constants';
+import { resetSearchState, generateBrowserOptions } from './MainLayout/utils';
+import { detectQueryType } from './MainLayout/queryDetectors';
+import { useWindowResize } from './MainLayout/hooks/useWindowResize';
+import { useFirstLaunch } from './MainLayout/hooks/useFirstLaunch';
+import { usePreviewWindow } from './MainLayout/hooks/usePreviewWindow';
+import { createSelectHandler, createKeyboardHandler } from './MainLayout/eventHandlers';
+import { sortResults } from './MainLayout/resultSort';
+import { callFeatureModules } from './MainLayout/searchLogic/featureModules';
+import { callSearchServices } from './MainLayout/searchLogic/searchServices';
 
 interface MainLayoutProps {
   onExecute?: (result: SearchResultType) => void;
@@ -14,18 +28,17 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
   const [results, setResults] = React.useState<SearchResultType[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [showNoResult, setShowNoResult] = React.useState(false);
-  const [isFirstLaunch, setIsFirstLaunch] = React.useState(true);
-  // 用于防止搜索结果更新后立即被鼠标悬停覆盖选中状态
   const [ignoreHover, setIgnoreHover] = React.useState(false);
+
+  // 使用自定义 hooks
+  const isFirstLaunch = useFirstLaunch();
+  useWindowResize(query, results, showNoResult, isFirstLaunch);
 
   // 监听主窗口显示事件，清空输入并获取焦点
   React.useEffect(() => {
     const handleMainWindowShow = () => {
       console.log('主窗口显示，清空输入并获取焦点');
-      setQuery('');
-      setResults([]);
-      setSelectedIndex(0);
-      setIgnoreHover(false);
+      resetSearchState(setQuery, setResults, setSelectedIndex, setIgnoreHover, setLoading);
     };
 
     window.electron.on('main-window-show', handleMainWindowShow);
@@ -35,214 +48,36 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
     };
   }, []);
 
-  // 检测首次启动并加载浏览器列表
-  React.useEffect(() => {
-    let timeoutId: NodeJS.Timeout | null = null;
-    let handleIndexingComplete: (() => void) | null = null;
-
-    const loadData = async () => {
-      try {
-        // 检测是否是首次启动（检查是否有缓存的应用）
-        const apps = await window.electron.invoke('app-get-all');
-        if (apps && apps.length > 0) {
-          // 有缓存，不是首次启动
-          setIsFirstLaunch(false);
-        } else {
-          // 无缓存，是首次启动
-          console.log('首次启动检测：无缓存，显示加载引导');
-          setIsFirstLaunch(true);
-          
-          // 设置备用超时（最多30秒后强制清除loading）
-          timeoutId = setTimeout(() => {
-            console.log('⏰ 超时30秒，强制清除loading');
-            setIsFirstLaunch(false);
-          }, 30000);
-
-          // 监听索引完成事件
-          handleIndexingComplete = () => {
-            console.log('✅ 收到索引完成事件，清除loading');
-            if (timeoutId) clearTimeout(timeoutId);
-            setIsFirstLaunch(false);
-          };
-
-          window.electron.on('indexing-complete', handleIndexingComplete);
-        }
-      } catch (error) {
-        console.error('加载数据失败:', error);
-      }
-    };
-    
-    loadData();
-    
-    // 清理函数
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      if (handleIndexingComplete) {
-        window.electron.removeListener('indexing-complete', handleIndexingComplete);
-      }
-    };
-  }, []);
-
 
   // 隐藏主窗口的辅助函数
-  const hideMainWindow = () => {
-    setQuery(''); // 清空搜索
-    setResults([]); // 清空结果
-    setSelectedIndex(0); // 重置选中索引
-    setIgnoreHover(false); // 重置悬停保护状态
+  const hideMainWindow = React.useCallback(() => {
+    resetSearchState(setQuery, setResults, setSelectedIndex, setIgnoreHover, setLoading);
     // 先隐藏预览窗口
     window.electron.preview.hide();
     // 延迟隐藏窗口，确保状态更新完成
     setTimeout(() => {
-      window.electron.windowHide('main').catch((err) => {
+      window.electron.windowHide('main').catch((err: any) => {
         console.error('Failed to hide window:', err);
       });
-    }, 50);
-  };
-
-  // 生成浏览器选项
-  const generateBrowserOptions = async (url: string): Promise<SearchResultType[]> => {
-    try {
-      const allBrowsers = await window.electron.invoke('browser-get-all');
-      
-      const options: SearchResultType[] = allBrowsers.map((browser: any, index: number) => {
-        console.log('浏览器图标:', browser.name, 'icon:', browser.icon ? '有' : '无');
-        return {
-          id: `browser-${browser.id}-${url}`,
-          type: 'web' as const,
-          title: browser.isDefault ? `${browser.name}（默认）` : browser.name,
-          description: '打开此网址',
-          action: `browser:${browser.id}:${url}`,
-          score: browser.isDefault ? 1500 + index : 1000 + index,
-          priorityScore: browser.isDefault ? 1500 : 1000,
-          icon: browser.icon, // 使用浏览器图标
-        };
-      });
-      
-      // 确保默认浏览器在第一位
-      return options.sort((a, b) => b.score - a.score);
-    } catch (error) {
-      console.error('生成浏览器选项失败:', error);
-      return [];
-    }
-  };
-  
-  // 加载状态（useAppSearch 已移除，只有 loading）
-  const loadingState = loading;
+    }, WINDOW_HIDE_DELAY);
+  }, []);
   
   // 延迟显示"未找到匹配结果"
   React.useEffect(() => {
-    if (loadingState || !query) {
+    if (loading || !query) {
       setShowNoResult(false);
       return;
     }
     
     const timer = setTimeout(() => {
-      if (results.length === 0 && !loadingState) {
+      if (results.length === 0 && !loading) {
         setShowNoResult(true);
       }
     }, 500);
     
     return () => clearTimeout(timer);
-  }, [query, results, loadingState]);
+  }, [query, results, loading]);
 
-  // 动态调整窗口大小（优化：立即执行+防抖后续更新）
-  const resizeTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-  const lastHeightRef = React.useRef<number>(80);
-  const lastWidthRef = React.useRef<number>(700);
-  
-  React.useEffect(() => {
-    if (!window.electron) return;
-
-    let height = 80; // 基础高度（只有输入框）
-
-    if (isFirstLaunch) {
-      // 首次启动时使用基础高度
-      height = 80;
-    } else if (query) {
-      // 有查询时根据结果调整高度
-      if (results.length > 0) {
-        // 有结果：80 (输入框) + 结果列表 + padding
-        const maxVisibleItems = 8;
-        const visibleItems = Math.min(results.length, maxVisibleItems);
-        height = 80 + visibleItems * 56 + 20;
-      } else if (showNoResult) {
-        // 无结果提示：80 + "未找到匹配结果"的高度
-        height = 80 + 60;
-      } else {
-        // 搜索中：保持基础高度，避免先增后缩造成跳动
-        height = 80;
-      }
-    } else {
-      // 无查询：只有输入框
-      height = 80;
-    }
-
-    // 清除之前的定时器
-    if (resizeTimerRef.current) {
-      clearTimeout(resizeTimerRef.current);
-    }
-
-    // 主窗口宽度固定（不再受预览影响）
-    const baseWidth = 700;
-    const targetWidth = baseWidth;
-
-    // 如果高度变化较大（超过5px）或者首次设置，立即更新
-    const heightDiff = Math.abs(height - lastHeightRef.current);
-    const widthDiff = Math.abs(targetWidth - (lastWidthRef.current || baseWidth));
-    const shouldUpdateImmediately = heightDiff > 5 || widthDiff > 5 || lastHeightRef.current === 80;
-    
-    if (shouldUpdateImmediately) {
-      // 立即执行
-      lastHeightRef.current = height;
-      lastWidthRef.current = targetWidth;
-      window.electron.windowResize(targetWidth, height).catch(err => {
-        console.error('调整窗口大小失败:', err);
-      });
-    } else {
-      // 小幅变化时使用短防抖（16ms，接近一帧时间）
-      if (resizeTimerRef.current) {
-        clearTimeout(resizeTimerRef.current);
-      }
-      resizeTimerRef.current = setTimeout(() => {
-        lastHeightRef.current = height;
-        lastWidthRef.current = targetWidth;
-        window.electron.windowResize(targetWidth, height).catch(err => {
-          console.error('调整窗口大小失败:', err);
-        });
-      }, 16); // 16ms 防抖（约一帧时间）
-    }
-
-    return () => {
-      if (resizeTimerRef.current) {
-        clearTimeout(resizeTimerRef.current);
-        resizeTimerRef.current = null;
-      }
-    };
-  }, [query, results.length, showNoResult, isFirstLaunch]);
-
-      // 检测是否为 URL
-      const isURL = (str: string): { isURL: boolean; url?: string } => {
-        try {
-          // 如果已经有 http:// 或 https://
-          if (str.startsWith('http://') || str.startsWith('https://')) {
-            return { isURL: true, url: str };
-          }
-          
-          // 检测常见的域名格式
-          const domainPattern = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?(\.[a-zA-Z]{2,})+$/;
-          if (str.match(domainPattern)) {
-            // 检查是否包含空格或斜杠，如果有则不认为是纯域名
-            if (str.includes(' ') || str.includes('/')) {
-              return { isURL: false };
-            }
-            return { isURL: true, url: `https://${str}` };
-          }
-          return { isURL: false };
-        } catch {
-          return { isURL: false };
-        }
-      };
 
       const handleSearch = (searchQuery: string) => {
         setQuery(searchQuery);
@@ -255,10 +90,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
           console.log('🚀 [搜索开始] query:', query);
           if (!query.trim()) {
             console.log('⚠️ [搜索] 查询为空，清空结果');
-            setResults([]);
-            setSelectedIndex(0); // 重置选中索引
-            setIgnoreHover(false); // 清空结果时不需要保护
-            setLoading(false);
+            resetSearchState(setQuery, setResults, setSelectedIndex, setIgnoreHover, setLoading);
             return;
           }
 
@@ -278,124 +110,25 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               console.log('别名解析失败，使用原查询');
             }
 
-            // 检测是否为 URL
-            const urlCheck = isURL(actualQuery.trim());
-            
-            // 检测是否为设置关键词
-            const isSettingsQuery = ['设置', 'settings', 'setting', '配置', 'preferences'].includes(actualQuery.trim().toLowerCase());
-            
-            // 检测是否为剪贴板搜索（优先检测，避免被其他查询拦截）
-            const clipboardMatch = actualQuery.trim().match(/^(?:clip|clipboard|剪贴板|cb)(?:\s+(.+))?$/i);
-            const isClipboardSearch = clipboardMatch !== null;
-            const clipboardQuery = clipboardMatch ? (clipboardMatch[1] || '') : '';
-            
-            // 检测是否为计算表达式
-            // 优先检测简单的数学表达式（如 "1+2", "3*4"），避免被其他功能误匹配
-            const queryTrimmed = actualQuery.trim();
-            
-            // 先检测简单的数学表达式（纯数字+运算符+纯数字，无其他关键词）
-            const isSimpleMath = /^\d+\s*[\+\-*/]\s*\d+$/.test(queryTrimmed);
-            console.log('🔍 [计算器检测-简单数学]', {
-              query: queryTrimmed,
-              isSimpleMath,
-              testResult: /^\d+\s*[\+\-*/]\s*\d+$/.test(queryTrimmed),
-            });
-            
-            // 检测是否为计算表达式（包含运算符、函数、单位转换等）
-            const isCalculation = (
-              // 简单数学表达式（优先）
-              isSimpleMath ||
-              // 包含运算符或特殊字符（不包括空格），且不是纯数字
-              (/[\+\-*/().,π]/.test(queryTrimmed) && !/^[\d.,\s]+$/.test(queryTrimmed)) ||
-              // 包含数学函数（使用单词边界，避免误匹配如 "weixin" 中的 "in"）
-              /\b(sin|cos|tan|log|sqrt)\b/i.test(queryTrimmed) ||
-              // 注意：单位换算功能已删除，不再检测单位换算模式
-              // 保留 to/到 的检测，但排除时间/翻译/变量名相关的 to
-              (/\b(to|到|in|=>)\b/i.test(queryTrimmed) && 
-               !/^(?:translate|翻译|fanyi|fy|en|zh|cn)\s+/i.test(queryTrimmed) &&
-               !/^(?:varname|变量名|camel|snake|pascal)\s+/i.test(queryTrimmed) &&
-               !/^\d{4}[-\/]\d{2}[-\/]\d{2}/.test(queryTrimmed) &&
-               !/^(timestamp|ts)\s+\d{10,13}$/i.test(queryTrimmed) &&
-               !/^\d{10,13}\s+(?:to|转)\s+date$/i.test(queryTrimmed) &&
-               !/^.+?\s+(?:to|转)\s+timestamp$/i.test(queryTrimmed)) ||
-              // 包含单位转换箭头符号
-              /=>/.test(queryTrimmed) ||
-              // 时间查询关键词（精确匹配单个词，避免误匹配应用名）
-              /^(time|时间|date|日期|now|今天|今天日期|当前时间|现在几点)\s*$/i.test(queryTrimmed) ||
-              // 纯日期时间字符串（如：2024-01-15 14:30:45）
-              /^\d{4}[-\/]\d{2}[-\/]\d{2}(\s+\d{2}:\d{2}(:\d{2})?)?$/i.test(queryTrimmed) ||
-              // ISO 日期时间格式
-              /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/i.test(queryTrimmed) ||
-              // 时间戳模式：timestamp 或 ts 开头加数字
-              /^(timestamp|ts)\s+\d{10,13}$/i.test(queryTrimmed) ||
-              // 时间戳转日期：数字 + to date
-              /^\d{10,13}\s+(?:to|转)\s+date$/i.test(queryTrimmed) ||
-              // 日期转时间戳：日期 + to timestamp
-              /^.+?\s+(?:to|转)\s+timestamp$/i.test(queryTrimmed) ||
-              // 翻译关键词检测
-              /^(?:translate|翻译|fanyi|fy|en|zh|cn)\s+/i.test(queryTrimmed) ||
-              /\s+(?:translate|翻译|fanyi|fy|to|到)$/i.test(queryTrimmed) ||
-              /(?:translate|翻译|fanyi|fy)\s+.+\s+(?:to|到)\s+/i.test(queryTrimmed) ||
-              // 变量名生成关键词检测
-              /^(?:varname|变量名|camel|snake|pascal)\s+/i.test(queryTrimmed) ||
-              /\s+(?:varname|变量名)$/i.test(queryTrimmed) ||
-              // 时间计算：包含 - 或 + 且看起来像日期格式
-              (/^\d{4}[-\/]\d{2}[-\/]\d{2}/.test(queryTrimmed) && /[\+\-]/.test(queryTrimmed)) ||
-              // 日期格式化：format 或格式化关键字
-              /^(?:format|格式化)\s+.+?\s+.+?$/i.test(queryTrimmed) ||
-              /^.+?\s+(?:format|格式化)\s+.+?$/i.test(queryTrimmed) ||
-              // 时区转换：包含 to/in/到 和时区关键词（更宽松的匹配）
-              /\s+(?:to|in|到)\s+(utc|gmt|cst|est|pst|jst|bst|cet|ist|kst|aest|china|中国|beijing|北京|japan|日本|tokyo|东京|eastern|pacific|london|europe|india|印度|korea|韩国|australia|悉尼|utc[+\-]\d+)/i.test(queryTrimmed) ||
-              // 编码解码关键词检测
-              // URL 编码/解码
-              /(?:url\s+(?:encode|decode|编码|解码)|(?:encode|decode|编码|解码)\s+url)/i.test(queryTrimmed) ||
-              // HTML 编码/解码
-              /(?:html\s+(?:encode|decode|编码|解码)|(?:encode|decode|编码|解码)\s+html)/i.test(queryTrimmed) ||
-              // Base64 编码/解码
-              /(?:base64\s+(?:encode|decode|编码|解码)|(?:encode|decode|编码|解码)\s+base64)/i.test(queryTrimmed) ||
-              // MD5 加密
-              /^md5\s+/i.test(queryTrimmed) ||
-              /\s+md5$/i.test(queryTrimmed) ||
-              // 字符串工具关键词检测
-              /(?:uppercase|lowercase|大写|小写|title\s+case|标题)/i.test(queryTrimmed) ||
-              /(?:camel\s+case|snake\s+case)/i.test(queryTrimmed) ||
-              /(?:reverse|反转)/i.test(queryTrimmed) ||
-              /(?:trim|去除空格)/i.test(queryTrimmed) ||
-              /(?:count|统计|word\s+count)/i.test(queryTrimmed) ||
-              /^replace\s+/i.test(queryTrimmed) ||
-              /^extract\s+/i.test(queryTrimmed) ||
-              // 随机数生成关键词检测
-              /^(?:uuid|generate\s+uuid)$/i.test(queryTrimmed) ||
-              /^uuid\s+v[14]$/i.test(queryTrimmed) ||
-              /^random\s+(string|password|number)/i.test(queryTrimmed) ||
-              /^(string|password|number)\s+random/i.test(queryTrimmed) ||
-              // 密码生成关键词检测（pwd/password/密码）
-              /^(?:pwd|password|密码)(?:\s+\d+)?$/i.test(queryTrimmed)
-            );
-            
-            // 检测是否为文件搜索（file + 空格 + 关键字）
-            const fileSearchMatch = query.trim().match(/^file\s+(.+)$/i);
-            const isFileSearch = fileSearchMatch !== null;
-            const fileSearchQuery = fileSearchMatch ? fileSearchMatch[1] : '';
-            
-            // 检测是否为命令模式（以 > 开头）
-            const commandMatch = query.trim().match(/^>\s*(.*)$/);
-            const isCommandMode = commandMatch !== null;
-            const commandQuery = commandMatch ? commandMatch[1] : '';
-            
-            console.log('🔍 [文件搜索] 检测:', { 
-              query, 
+            // 检测查询类型
+            const detection = detectQueryType(query, actualQuery);
+            const { 
+              urlCheck, 
+              isSettingsQuery, 
+              isClipboardSearch, 
+              clipboardQuery,
               isFileSearch, 
               fileSearchQuery,
-              match: fileSearchMatch 
-            });
-            
-            // 如果检测到文件搜索或 URL，禁用计算器（文件搜索和 URL 优先）
-            const finalIsCalculation = (isFileSearch || urlCheck.isURL) ? false : isCalculation;
+              isCommandMode, 
+              commandQuery,
+              isSimpleMath,
+              isCalculation,
+              finalIsCalculation,
+            } = detection;
             
             console.log('🔍 [计算器检测-前置]', {
               query: actualQuery,
-              queryTrimmed,
+              queryTrimmed: actualQuery.trim(),
               isSimpleMath,
               isCalculation,
               isFileSearch,
@@ -409,75 +142,17 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             
             console.log('🔍 [文件搜索] 设置:', { fileSearchEnabled });
 
-            // 并行搜索所有类型（统一防抖，确保结果同时返回以便正确排序）
-            // 先尝试独立的功能模块（优先级高于计算器）
-            let encodeResult = null;
-            let stringResult = null;
-            let timeResult = null;
-            let randomResult = null;
-            let translateResult = null;
-            let variableNameResult = null;
-            let todoResult = null;
-            
-            if (!isFileSearch && !urlCheck.isURL) {
-              // 先检查是否是数学函数表达式（如 log(100), sin(30)），如果是则跳过其他模块，直接使用计算器
-              const hasMathFunctions = /\b(sin|cos|tan|log|sqrt)\s*\(/i.test(actualQuery.trim());
-              if (hasMathFunctions) {
-                console.log('🔍 [模块检测] 检测到数学函数表达式，跳过其他模块:', actualQuery);
-              } else {
-                // 按优先级顺序尝试各个模块
-                encodeResult = await window.electron.encode.handleQuery(actualQuery).catch(() => null);
-                if (encodeResult) {
-                  console.log('🔍 [模块检测] encodeResult 匹配:', actualQuery);
-                }
-                if (!encodeResult) {
-                  stringResult = await window.electron.string.handleQuery(actualQuery).catch(() => null);
-                  if (stringResult) {
-                    console.log('🔍 [模块检测] stringResult 匹配:', actualQuery);
-                  }
-                }
-                if (!encodeResult && !stringResult) {
-                  timeResult = await window.electron.time.handleQuery(actualQuery).catch(() => null);
-                  if (timeResult) {
-                    console.log('🔍 [模块检测] timeResult 匹配:', actualQuery);
-                  }
-                }
-                if (!encodeResult && !stringResult && !timeResult) {
-                  randomResult = await window.electron.random.handleQuery(actualQuery).catch(() => null);
-                  if (randomResult) {
-                    console.log('🔍 [模块检测] randomResult 匹配:', actualQuery);
-                  }
-                }
-                if (!encodeResult && !stringResult && !timeResult && !randomResult) {
-                  translateResult = await window.electron.translate.handleQuery(actualQuery).catch(() => null);
-                  if (translateResult) {
-                    console.log('🔍 [模块检测] translateResult 匹配:', actualQuery);
-                  }
-                }
-                if (!encodeResult && !stringResult && !timeResult && !randomResult && !translateResult) {
-                  // 输入过程中只执行查询操作，不执行修改操作（创建、删除、编辑、完成）
-                  todoResult = await window.electron.todo.handleQuery(actualQuery, false).catch(() => null);
-                  if (todoResult) {
-                    console.log('🔍 [模块检测] todoResult 匹配:', actualQuery);
-                  }
-                }
-              }
-              if (!encodeResult && !stringResult && !timeResult && !randomResult && !translateResult && !todoResult) {
-                // 先检查是否是数学表达式（简单或包含括号）或数学函数，如果是则跳过变量名生成
-                const isMathExpression = /^\d+\s*[\+\-*/]\s*\d+$/.test(actualQuery.trim()) || // 简单数学表达式
-                                         /^[\d\s\+\-*/().,π]+$/.test(actualQuery.trim()) && /[\+\-*/().,π]/.test(actualQuery.trim()) || // 包含运算符的数学表达式
-                                         /\b(sin|cos|tan|log|sqrt)\s*\(/i.test(actualQuery.trim()); // 数学函数表达式
-                if (!isMathExpression) {
-                  variableNameResult = await window.electron.varname.handleQuery(actualQuery).catch(() => null);
-                  if (variableNameResult) {
-                    console.log('🔍 [模块检测] variableNameResult 匹配:', actualQuery);
-                  }
-                } else {
-                  console.log('🔍 [模块检测] 跳过变量名生成（数学表达式）:', actualQuery);
-                  variableNameResult = null;
-                }
-              }
-            }
+            // 调用功能模块
+            const featureResults = await callFeatureModules(actualQuery, isFileSearch, urlCheck);
+            const {
+              encodeResult,
+              stringResult,
+              timeResult,
+              randomResult,
+              translateResult,
+              variableNameResult,
+              todoResult,
+            } = featureResults;
             
             // 如果所有独立模块都没有处理，再尝试计算器
             const shouldCallCalculator = !encodeResult && !stringResult && !timeResult && !randomResult && !translateResult && !variableNameResult && !todoResult && finalIsCalculation;
@@ -556,10 +231,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               try {
                 if (commandQuery) {
                   // 有输入，进行命令补全
-                  commandCompletions = await window.electron.command.complete(commandQuery).catch(() => []);
+                  commandCompletions = await (window.electron.command as any).complete(commandQuery).catch(() => []);
                   // 如果只有一个匹配结果，获取帮助信息
                   if (commandCompletions.length === 1) {
-                    commandHelp = await window.electron.command.help(commandCompletions[0].id).catch(() => null);
+                    commandHelp = await (window.electron.command as any).help(commandCompletions[0].id).catch(() => null);
                   }
                 } else {
                   // 没有输入，显示所有命令
@@ -581,17 +256,17 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   featureType = 'translate';
                   const queryForComplete = actualQuery.replace(/^(?:translate|翻译|fanyi|fy|en|zh|cn)\s*/i, '').trim();
                   if (queryForComplete) {
-                    featureCompletions = await window.electron.translate.complete(queryForComplete).catch(() => []);
+                    featureCompletions = await (window.electron as any).translate.complete(queryForComplete).catch(() => []);
                   } else {
-                    featureHelp = await window.electron.translate.help().catch(() => null);
+                    featureHelp = await (window.electron as any).translate.help().catch(() => null);
                   }
                 } else if (isRandomKeyword) {
                   featureType = 'random';
                   const queryForComplete = actualQuery.replace(/^(?:pwd|password|密码|uuid|random)\s*/i, '').trim();
                   if (queryForComplete) {
-                    featureCompletions = await window.electron.random.complete(queryForComplete).catch(() => []);
+                    featureCompletions = await (window.electron as any).random.complete(queryForComplete).catch(() => []);
                   } else {
-                    featureHelp = await window.electron.random.help().catch(() => null);
+                    featureHelp = await (window.electron as any).random.help().catch(() => null);
                   }
                 } else if (isEncodeKeyword) {
                   featureType = 'encode';
@@ -600,17 +275,17 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   if (queryForComplete) {
                     // 尝试从缓存获取
                     const cached = completionCache.get('encode', queryForComplete);
-                    if (cached) {
+                    if (cached && Array.isArray(cached)) {
                       featureCompletions = cached;
                     } else {
-                      featureCompletions = await window.electron.encode.complete(queryForComplete).catch(() => []);
+                      featureCompletions = await (window.electron as any).encode.complete(queryForComplete).catch(() => []);
                       console.log('🔍 [编码补全]', { queryForComplete, completions: featureCompletions });
                       if (featureCompletions.length > 0) {
                         completionCache.set('encode', queryForComplete, featureCompletions);
                       }
                     }
                   } else {
-                    featureHelp = await window.electron.encode.help().catch(() => null);
+                    featureHelp = await (window.electron as any).encode.help().catch(() => null);
                   }
                 } else if (isStringKeyword) {
                   featureType = 'string';
@@ -618,65 +293,65 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   const queryForComplete = actualQuery.trim();
                   if (queryForComplete) {
                     const cached = completionCache.get('string', queryForComplete);
-                    if (cached) {
+                    if (cached && Array.isArray(cached)) {
                       featureCompletions = cached;
                     } else {
-                      featureCompletions = await window.electron.string.complete(queryForComplete).catch(() => []);
+                      featureCompletions = await (window.electron as any).string.complete(queryForComplete).catch(() => []);
                       console.log('🔍 [字符串补全]', { queryForComplete, completions: featureCompletions });
                       if (featureCompletions.length > 0) {
                         completionCache.set('string', queryForComplete, featureCompletions);
                       }
                     }
                   } else {
-                    featureHelp = await window.electron.string.help().catch(() => null);
+                    featureHelp = await (window.electron as any).string.help().catch(() => null);
                   }
                 } else if (isVarnameKeyword) {
                   featureType = 'varname';
                   const queryForComplete = actualQuery.replace(/^(?:varname|变量名|camel|snake|pascal)\s*/i, '').trim();
                   if (queryForComplete) {
                     const cached = completionCache.get('varname', queryForComplete);
-                    if (cached) {
+                    if (cached && Array.isArray(cached)) {
                       featureCompletions = cached;
                     } else {
-                      featureCompletions = await window.electron.varname.complete(queryForComplete).catch(() => []);
+                      featureCompletions = await (window.electron as any).varname.complete(queryForComplete).catch(() => []);
                       if (featureCompletions.length > 0) {
                         completionCache.set('varname', queryForComplete, featureCompletions);
                       }
                     }
                   } else {
-                    featureHelp = await window.electron.varname.help().catch(() => null);
+                    featureHelp = await (window.electron as any).varname.help().catch(() => null);
                   }
                 } else if (isTimeKeyword) {
                   featureType = 'time';
                   const queryForComplete = actualQuery.replace(/^(?:time|时间|timestamp|date|日期)\s*/i, '').trim();
                   if (queryForComplete) {
                     const cached = completionCache.get('time', queryForComplete);
-                    if (cached) {
+                    if (cached && Array.isArray(cached)) {
                       featureCompletions = cached;
                     } else {
-                      featureCompletions = await window.electron.time.complete(queryForComplete).catch(() => []);
+                      featureCompletions = await (window.electron as any).time.complete(queryForComplete).catch(() => []);
                       if (featureCompletions.length > 0) {
                         completionCache.set('time', queryForComplete, featureCompletions);
                       }
                     }
                   } else {
-                    featureHelp = await window.electron.time.help().catch(() => null);
+                    featureHelp = await (window.electron as any).time.help().catch(() => null);
                   }
                 } else if (isTodoKeyword) {
                   featureType = 'todo';
                   const queryForComplete = actualQuery.trim();
                   if (queryForComplete) {
                     const cached = completionCache.get('todo', queryForComplete);
-                    if (cached) {
+                    if (cached && Array.isArray(cached)) {
                       featureCompletions = cached;
                     } else {
-                      featureCompletions = await window.electron.todo.complete(queryForComplete).catch(() => []);
+                      featureCompletions = await (window.electron as any).todo.complete(queryForComplete).catch(() => []);
                       if (featureCompletions.length > 0) {
                         completionCache.set('todo', queryForComplete, featureCompletions);
                       }
                     }
                   } else {
-                    featureHelp = await window.electron.todo.help().catch(() => null);
+                    featureHelp = await (window.electron as any).todo.help().catch(() => null);
                   }
                 }
               } catch (error) {
@@ -684,27 +359,22 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               }
             }
             
-            const [appsFromIPC, files, webResults, bookmarks, commands, clipboardResults] = await Promise.all([
-              // 直接调用 IPC 搜索应用，而不是使用 useAppSearch hook 的结果（避免防抖延迟）
-              isCommandMode ? Promise.resolve([]) : window.electron.app.search(actualQuery).catch(() => []),
-              // 只在输入 "file + 空格 + 关键字" 时才搜索文件
-              (isFileSearch && fileSearchEnabled && fileSearchQuery) 
-                ? window.electron.file.search(fileSearchQuery).catch(() => []) 
-                : Promise.resolve([]),
-              // 命令模式下不搜索网页
-              (isCommandMode || !shouldSearchWeb) ? Promise.resolve([]) : window.electron.web.search(actualQuery).catch(() => []),
-              isCommandMode ? Promise.resolve([]) : window.electron.bookmark.search(actualQuery).catch(() => []),
-              isCommandMode ? Promise.resolve([]) : window.electron.command.search(actualQuery).catch(() => []),
-              // 剪贴板搜索
-              isClipboardSearch 
-                ? (clipboardQuery 
-                    ? window.electron.clipboard.search(clipboardQuery, 20).catch(() => [])
-                    : window.electron.clipboard.getHistory(20).catch(() => []))
-                : Promise.resolve([]),
-            ]);
-            
-              // 获取默认浏览器（用于为书签/网页结果显示默认浏览器图标）
-            const defaultBrowser = await window.electron.browser.getDefault().catch(() => null);
+            // 调用搜索服务
+            const searchResults = await callSearchServices(
+              actualQuery,
+              detection,
+              shouldSearchWeb,
+              fileSearchEnabled
+            );
+            const {
+              appsFromIPC,
+              files,
+              webResults,
+              bookmarks,
+              commands,
+              clipboardResults,
+              defaultBrowser,
+            } = searchResults;
             
             console.log('🔍 [搜索结果]', {
               query: actualQuery,
@@ -759,13 +429,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             // 但是，如果只是输入了关键词（如 "bianma"），即使 calcResult 为 null，也应该显示补全
             const isOnlyKeyword = featureType && actualQuery.trim().toLowerCase() === queryLower && 
                                  (/^(?:bianma|jiema|jiami|jiemi|bm|jm|url|html|base64|md5|encode|decode|编码|解码)$/i.test(queryLower));
-            
-            // 检查是否输入了完整的编码解码命令格式（即使没有参数）
-            const isCompleteEncodeCommand = featureType === 'encode' && (
-              /^(?:url|html|base64)\s+(?:encode|decode|编码|解码)$/i.test(actualQuery.trim()) ||
-              /^(?:url|html|base64)(?:encode|decode|编码|解码)$/i.test(actualQuery.trim()) ||
-              /^md5$/i.test(actualQuery.trim())
-            );
             
             // 如果有任何功能模块结果（无论成功还是失败），不显示补全建议
             const hasEncodeResult = encodeResult !== null;
@@ -836,8 +499,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               }
               
               // 显示功能补全建议（提高优先级，确保显示在最前面）
-              // 如果输入了完整命令格式，使用过滤后的补全建议
-              const completionsToShow = isCompleteEncodeCommand ? filteredCompletions : featureCompletions;
+              const completionsToShow = featureCompletions;
               completionsToShow.forEach((suggestion: any, index: number) => {
                 // 提取参数信息（如果有）
                 const formatParts = suggestion.format.split(' ');
@@ -853,7 +515,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   'varname': 'command',
                   'todo': 'command',
                 };
-                const resultType = featureTypeMap[featureType] || 'command';
+                const resultType = featureTypeMap[featureType || ''] || 'command';
                 
                 // 根据功能类型选择图标（emoji，用于标题显示）
                 const featureIcons: Record<string, string> = {
@@ -865,7 +527,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
                   'time': '⏰',
                   'todo': '📋',
                 };
-                const icon = featureIcons[featureType] || '💡';
+                const icon = featureIcons[featureType || ''] || '💡';
                 
                 combinedResults.push({
                   id: `feature-complete-${featureType}-${index}`,
@@ -1088,7 +750,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
             // 时间工具结果（如果有）
             if (timeResult && timeResult.success) {
               // 将多行输出拆分成多条结果
-              const outputLines = timeResult.output.split('\n').filter(line => line.trim());
+              const outputLines = timeResult.output.split('\n').filter((line: string) => line.trim());
               console.log('🕐 [前端] 时间结果处理:', {
                 input: timeResult.input,
                 outputLength: timeResult.output.length,
@@ -1795,36 +1457,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
               }
             }
 
-            // 性能优化：使用排序函数，避免在 useMemo 中重复创建
-            const queryLowerForSort = query.toLowerCase();
-            const sortFunction = (a: SearchResultType, b: SearchResultType) => {
-              // 1. 优先级分数（priorityScore）优先 - 命令 > 应用 > 文件
-              const aPriority = a.priorityScore || 0;
-              const bPriority = b.priorityScore || 0;
-              if (aPriority !== bPriority) return bPriority - aPriority;
-              
-              // 2. 完全匹配优先
-              const aName = a.title.toLowerCase();
-              const bName = b.title.toLowerCase();
-              
-              if (aName === queryLowerForSort && bName !== queryLowerForSort) return -1;
-              if (bName === queryLowerForSort && aName !== queryLowerForSort) return 1;
-              
-              // 3. 开头匹配优先
-              const aStarts = aName.startsWith(queryLowerForSort);
-              const bStarts = bName.startsWith(queryLowerForSort);
-              if (aStarts && !bStarts) return -1;
-              if (bStarts && !aStarts) return 1;
-              
-              // 4. 按评分排序
-              return b.score - a.score;
-            };
-
-            combinedResults.sort(sortFunction);
-            setResults(combinedResults);
+            // 排序结果
+            const sortedResults = sortResults(combinedResults, query);
+            setResults(sortedResults);
             setSelectedIndex(0); // 重置选中索引为第一个
             setIgnoreHover(true); // 暂时忽略鼠标悬停，防止覆盖默认选中
-            setTimeout(() => setIgnoreHover(false), 200); // 200ms 后恢复悬停功能
+            setTimeout(() => setIgnoreHover(false), HOVER_IGNORE_DELAY);
       } catch (error) {
         console.error('Search error:', error);
         setResults([]);
@@ -1837,11 +1475,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
     };
 
     // 防抖搜索（统一防抖，所有搜索同时执行）
-    // 补全查询使用较短延迟（150ms），普通搜索使用较长延迟（300ms）
-    const debounceDelay = query.trim().length > 0 && (
+    // 补全查询使用较短延迟，普通搜索使用较长延迟
+    const isCompletionQuery = query.trim().length > 0 && (
       query.trim().startsWith('>') || // 命令模式
       /^(?:translate|翻译|fanyi|fy|en|zh|cn|url|html|base64|md5|encode|decode|编码|解码|bianma|jiema|pwd|password|密码|uuid|random|time|时间|timestamp|date|日期|uppercase|lowercase|大写|小写|title|camel|snake|reverse|反转|trim|count|统计|replace|extract|varname|变量名)/i.test(query.trim())
-    ) ? 150 : 300;
+    );
+    const debounceDelay = isCompletionQuery 
+      ? SEARCH_DEBOUNCE_DELAY_COMPLETION 
+      : SEARCH_DEBOUNCE_DELAY_NORMAL;
     
     console.log('⏱️ [防抖] 设置延迟:', debounceDelay, 'ms, query:', query);
     const timer = setTimeout(() => {
@@ -1867,253 +1508,20 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
     }
   };
 
-  const handleSelect = async (index: number) => {
-    setSelectedIndex(index);
-    if (results[index] && onExecute) {
-      const result = results[index];
-      
-      // 处理设置打开
-      if (result.action === 'settings:open') {
-        try {
-          // 打开设置窗口
-          await window.electron.invoke('open-settings');
-          console.log('Settings opened');
-          hideMainWindow();
-        } catch (error) {
-          console.error('Failed to open settings:', error);
-        }
-      }
-      // 处理应用启动
-      else if (result.action.startsWith('app:')) {
-        const appId = result.action.replace('app:', '');
-        try {
-          await window.electron.invoke('app-launch', appId);
-          console.log('App launched:', appId);
-          // 应用启动后，触发预览窗口刷新（启动次数会更新）
-          // 通过重新选择当前结果来触发预览更新
-          if (selectedIndex === index) {
-            // 延迟一下确保数据库已更新
-            setTimeout(() => {
-              setSelectedIndex(index); // 触发预览更新
-            }, 300);
-          }
-          hideMainWindow();
-        } catch (error) {
-          console.error('Failed to launch app:', error);
-        }
-      } 
-      // 处理文件打开
-      else if (result.action.startsWith('file:')) {
-        const filePath = result.action.replace('file:', '');
-        try {
-          await window.electron.file.open(filePath);
-          console.log('File opened:', filePath);
-          hideMainWindow();
-        } catch (error) {
-          console.error('Failed to open file:', error);
-        }
-      }
-      // 处理网页搜索
-      else if (result.action.startsWith('web:')) {
-        const url = result.action.replace('web:', '');
-        try {
-          await window.electron.web.open(url);
-          console.log('Web search opened:', url);
-          hideMainWindow();
-        } catch (error) {
-          console.error('Failed to open web search:', error);
-        }
-      }
-      // 处理浏览器打开
-      else if (result.action.startsWith('browser:')) {
-        // action 格式：browser:browserId:url
-        const match = result.action.match(/^browser:([^:]+):(.+)$/);
-        if (match) {
-          const url = match[2];
-          try {
-            await window.electron.invoke('browser-open-url', url);
-            console.log('Browser opened:', url);
-            hideMainWindow();
-          } catch (error) {
-            console.error('Failed to open browser:', error);
-          }
-        }
-      }
-      // 处理命令执行
-      else if (result.action.startsWith('command:')) {
-        const actionParts = result.action.split(':');
-        if (actionParts.length >= 3 && actionParts[1] === 'execute') {
-          // 命令执行：command:execute:commandId
-          const commandId = actionParts.slice(2).join(':');
-          try {
-            const result = await window.electron.command.execute(commandId);
-            if (result.success) {
-              console.log('Command executed:', commandId);
-            } else {
-              console.error('Command execution failed:', result.error);
-            }
-            hideMainWindow();
-          } catch (error) {
-            console.error('Failed to execute command:', error);
-          }
-        } else if (actionParts.length >= 3 && actionParts[1] === 'help') {
-          // 命令帮助：command:help:commandId（不执行，只显示帮助）
-          // 帮助已经在结果中显示了，这里不需要额外操作
-          console.log('Command help requested:', actionParts[2]);
-        } else if (actionParts[1] === 'list') {
-          // 显示所有命令（清空输入，重新显示命令列表）
-          setQuery('> ');
-        } else {
-          // 兼容旧格式：command:commandId
-        const commandId = result.action.replace('command:', '');
-        try {
-            const result = await window.electron.command.execute(commandId);
-            if (result.success) {
-          console.log('Command executed:', commandId);
-            } else {
-              console.error('Command execution failed:', result.error);
-            }
-          hideMainWindow();
-        } catch (error) {
-          console.error('Failed to execute command:', error);
-          }
-        }
-      }
-      // 处理书签打开
-      else if (result.action.startsWith('bookmark:')) {
-        const url = result.action.replace('bookmark:', '');
-        try {
-          await window.electron.invoke('browser-open-url', url);
-          console.log('Bookmark opened:', url);
-          hideMainWindow();
-        } catch (error) {
-          console.error('Failed to open bookmark:', error);
-        }
-      }
-      // 处理时间查询结果
-      else if (result.action === 'time:copy') {
-        // 将时间工具结果复制到剪贴板（支持 timeData 和 calcData）
-        try {
-          const timeData = (result as any).timeData;
-          const calcData = (result as any).calcData;
-          let textToCopy = '';
-          
-          if (timeData && timeData.output) {
-            textToCopy = timeData.output;
-          } else if (calcData && calcData.output) {
-            textToCopy = calcData.output;
-          }
-          
-          if (textToCopy) {
-            await navigator.clipboard.writeText(textToCopy);
-            console.log('Time result copied:', textToCopy);
-          }
-            hideMainWindow();
-          } catch (error) {
-            console.error('Failed to copy time result:', error);
-        }
-      }
-      // 处理剪贴板粘贴
-      else if (result.action.startsWith('clipboard:paste:')) {
-        const itemId = result.action.replace('clipboard:paste:', '');
-        try {
-          await window.electron.clipboard.paste(itemId);
-          console.log('Clipboard item pasted:', itemId);
-          hideMainWindow();
-        } catch (error) {
-          console.error('Failed to paste clipboard item:', error);
-        }
-      }
-      // 处理功能补全
-      else if (result.action.startsWith('feature:')) {
-        const actionParts = result.action.split(':');
-        if (actionParts[1] === 'complete') {
-          // 功能补全：设置输入框为补全文本，并在末尾添加空格以便用户继续输入
-          const completeText = actionParts.slice(3).join(':');
-          // 移除占位符（如 <长度>），然后添加空格
-          const formatText = completeText.replace(/<[^>]+>/g, '').trim();
-          setQuery(formatText + ' ');
-        } else if (actionParts[1] === 'example') {
-          // 功能示例：设置输入框为示例文本
-          const exampleText = actionParts.slice(3).join(':');
-          setQuery(exampleText);
-        } else if (actionParts[1] === 'help') {
-          // 功能帮助：不执行操作，帮助信息已显示
-          console.log('功能帮助已显示');
-        } else if (actionParts[1] === 'continue') {
-          // 继续输入：不执行操作
-          console.log('继续输入功能文本');
-        }
-      }
-      // 处理编码解码结果
-      else if (result.action === 'encode:copy') {
-        // 将编码解码结果复制到剪贴板
-        try {
-          const encodeData = (result as any).encodeData;
-          if (encodeData && encodeData.output) {
-            let textToCopy = encodeData.output;
-            
-            // 如果包含 "→"，只复制转换后的部分
-            if (textToCopy.includes(' → ')) {
-              const parts = textToCopy.split(' → ');
-              if (parts.length === 2) {
-                textToCopy = parts[1].trim();
-              }
-            }
-            
-            await navigator.clipboard.writeText(textToCopy);
-            console.log('Encode result copied:', textToCopy);
-          }
-          hideMainWindow();
-        } catch (error) {
-          console.error('Failed to copy encode result:', error);
-        }
-      }
-      // 处理字符串工具结果
-      else if (result.action === 'string:copy') {
-        // 将字符串工具结果复制到剪贴板
-        try {
-          const stringData = (result as any).stringData;
-          if (stringData && stringData.output) {
-            await navigator.clipboard.writeText(stringData.output);
-            console.log('String result copied:', stringData.output);
-          }
-          hideMainWindow();
-        } catch (error) {
-          console.error('Failed to copy string result:', error);
-        }
-      }
-      // 处理计算器结果
-      else if (result.action === 'calc:copy') {
-        // 将计算结果复制到剪贴板
-        try {
-          const calcData = (result as any).calcData;
-          if (calcData && calcData.output) {
-            let textToCopy = calcData.output;
-            
-            // 如果是编码解码结果（包含 "→"），只复制转换后的部分
-            if (textToCopy.includes(' → ')) {
-              const parts = textToCopy.split(' → ');
-              if (parts.length === 2) {
-                textToCopy = parts[1].trim();
-              }
-            }
-            
-            await navigator.clipboard.writeText(textToCopy);
-            console.log('Calculator result copied:', textToCopy);
-          }
-          hideMainWindow();
-        } catch (error) {
-          console.error('Failed to copy result:', error);
-        }
-      } else {
-        onExecute(result);
-        hideMainWindow();
-      }
-    }
-  };
+  // 创建事件处理器
+  const handleSelect = React.useCallback(
+    createSelectHandler(
+      results,
+      selectedIndex,
+      setSelectedIndex,
+      setQuery,
+      hideMainWindow,
+      onExecute
+    ),
+    [results, selectedIndex, hideMainWindow, onExecute]
+  );
 
-  // 按类型分组结果
+  // 按类型分组结果（用于键盘导航）
   const groupResultsByType = React.useMemo(() => {
     const grouped: Record<string, typeof results> = {};
     results.forEach((result) => {
@@ -2151,143 +1559,33 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onExecute }) => {
 
   // 键盘导航
   React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedIndex((prev) => Math.min(prev + 1, results.length - 1));
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedIndex((prev) => Math.max(prev - 1, 0));
-      } else if (e.key === 'Tab' && !e.shiftKey) {
-        // Tab 键：优先处理补全，如果没有补全建议则切换结果类型
-        e.preventDefault();
-        const currentResult = results[selectedIndex];
-        if (currentResult && currentResult.action.startsWith('feature:complete:')) {
-          // 如果有补全建议，执行补全
-          const actionParts = currentResult.action.split(':');
-          if (actionParts[1] === 'complete') {
-            const completeText = actionParts.slice(3).join(':');
-            const formatText = completeText.replace(/<[^>]+>/g, '').trim();
-            setQuery(formatText + ' ');
-            setSelectedIndex(0);
-          }
-        } else if (results.length > 0 && currentResult) {
-          // 否则在结果类型间切换
-          const nextType = getNextType(currentResult.type);
-          if (nextType) {
-            switchToType(nextType);
-          }
-        }
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        const trimmedQuery = query.trim();
-        
-        // 优先检查是否是 TODO 修改操作（创建、删除、编辑、完成）
-        // 这些操作应该直接执行，而不是执行选中的结果
-        const isTodoModifyOperation = /^(?:todo|待办)\s+(?:delete|remove|del|done|complete|finish|edit|update|完成|删除|移除|删|编辑|更新)\s+\d+/i.test(trimmedQuery) ||
-                                     /^(?:todo|待办)\s+(?!all|done|pending|search|全部|已完成|未完成|搜索)\S+/i.test(trimmedQuery);
-        
-        if (isTodoModifyOperation) {
-          // 执行 TODO 修改操作
-          console.log('🔍 [前端] 检测到 TODO 修改操作，执行:', trimmedQuery);
-          window.electron.todo.handleQuery(trimmedQuery, true).then((result: any) => {
-            console.log('🔍 [前端] TODO 修改操作结果:', result);
-            if (result && result.success) {
-              // 操作成功后，关闭窗口
-              hideMainWindow();
-            } else if (result) {
-              // 操作失败，重新搜索以更新结果（显示错误信息）
-              handleSearch(query);
-            }
-          }).catch((error) => {
-            console.error('❌ [前端] TODO 修改操作失败:', error);
-          });
-        } else if (results[selectedIndex]) {
-          // 如果有选中结果，执行选中结果的操作
-          handleSelect(selectedIndex);
-        } else if (results.length > 0) {
-          // 其他情况，执行第一个结果（如果有）
-          handleSelect(0);
-        }
-      }
-    };
-
-    const handleKeyRepeat = (e: KeyboardEvent) => {
-      // 处理长按导致的键盘重复事件
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedIndex((prev) => Math.min(prev + 1, results.length - 1));
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedIndex((prev) => Math.max(prev - 1, 0));
-      }
-    };
+    const handleKeyDown = createKeyboardHandler(
+      results,
+      selectedIndex,
+      setSelectedIndex,
+      setQuery,
+      query,
+      getNextType,
+      switchToType,
+      handleSelect,
+      hideMainWindow
+    );
 
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keydown', handleKeyRepeat);
     
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keydown', handleKeyRepeat);
     };
-  }, [results, selectedIndex, getNextType, switchToType]);
+  }, [results, selectedIndex, query, getNextType, switchToType, handleSelect, hideMainWindow]);
 
   // 获取当前选中的结果，用于预览
   const selectedResult = React.useMemo(() => {
     return results[selectedIndex] || null;
   }, [results, selectedIndex]);
 
-  // 管理预览窗口
-  const [previewWindowEnabled, setPreviewWindowEnabled] = React.useState(true);
+  // 使用预览窗口 hook
+  usePreviewWindow(selectedResult, query);
 
-  // 加载预览窗口设置（定期检查，以便实时响应设置变化）
-  React.useEffect(() => {
-    const loadPreviewSetting = async () => {
-      try {
-        const settings = await window.electron.settings.getAll();
-        setPreviewWindowEnabled(settings.previewWindowEnabled !== false); // 默认启用
-      } catch {
-        setPreviewWindowEnabled(true); // 默认启用
-      }
-    };
-
-    // 初始加载
-    loadPreviewSetting();
-
-    // 定期检查设置变化（每2秒检查一次，避免过于频繁）
-    const interval = setInterval(loadPreviewSetting, 2000);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, []);
-
-  React.useEffect(() => {
-    // 只有在有选中结果、查询不为空且预览窗口启用时才显示预览窗口
-    if (selectedResult && query && previewWindowEnabled) {
-      // 先更新内容，再显示窗口（确保内容准备好后再显示）
-      console.log('[MainLayout] 更新预览内容，选中结果:', selectedResult);
-      
-      // 先更新内容，确保窗口显示时就有内容
-      window.electron.preview.update(selectedResult, query).then(() => {
-        // 内容更新后再显示窗口
-        console.log('[MainLayout] 内容已更新，显示预览窗口');
-        return window.electron.preview.show();
-      }).catch(err => {
-        console.error('[MainLayout] 显示预览窗口失败:', err);
-      });
-    } else {
-      // 隐藏预览窗口
-      window.electron.preview.hide();
-    }
-
-    return () => {
-      // 清理时隐藏预览窗口
-      if (!selectedResult || !query || !previewWindowEnabled) {
-        window.electron.preview.hide();
-      }
-    };
-  }, [selectedResult, query, previewWindowEnabled]);
 
   // 监听刷新搜索的消息
   React.useEffect(() => {
