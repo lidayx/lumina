@@ -21,7 +21,7 @@ export const useFirstLaunch = () => {
           setIsFirstLaunch(true);
           
           // 设置备用超时
-          timeoutId = setTimeout(() => {
+          timeoutId = setTimeout(() => {  
             console.log('⏰ 超时30秒，强制清除loading');
             setIsFirstLaunch(false);
           }, FIRST_LAUNCH_TIMEOUT);
@@ -52,5 +52,6 @@ export const useFirstLaunch = () => {
 
   return isFirstLaunch;
 };
+
 
 

@@ -286,6 +286,85 @@ export const createSelectHandler = (
         return;
       }
       
+      // 处理翻译结果
+      if (result.action === 'translate:copy') {
+        try {
+          const calcData = (result as any).calcData;
+          let textToCopy = '';
+          
+          if (calcData?.output) {
+            textToCopy = calcData.output;
+            // 如果包含 " → " 分隔符，只复制译文部分
+            if (textToCopy.includes(' → ')) {
+              const parts = textToCopy.split(' → ');
+              if (parts.length === 2) {
+                textToCopy = parts[1].trim();
+              }
+            }
+          } else {
+            // 如果没有calcData，使用title
+            textToCopy = result.title || '';
+          }
+          
+          if (textToCopy) {
+            await navigator.clipboard.writeText(textToCopy.trim());
+            console.log('Translate result copied:', textToCopy);
+          }
+          hideMainWindow();
+        } catch (error) {
+          console.error('Failed to copy translate result:', error);
+        }
+        return;
+      }
+      
+      // 处理变量名生成结果
+      if (result.action === 'varname:copy') {
+        try {
+          const calcData = (result as any).calcData;
+          let textToCopy = '';
+          
+          if (calcData?.output) {
+            textToCopy = calcData.output;
+          } else {
+            // 如果没有calcData，使用title（变量名）
+            textToCopy = result.title || '';
+          }
+          
+          if (textToCopy) {
+            await navigator.clipboard.writeText(textToCopy.trim());
+            console.log('Variable name result copied:', textToCopy);
+          }
+          hideMainWindow();
+        } catch (error) {
+          console.error('Failed to copy variable name result:', error);
+        }
+        return;
+      }
+      
+      // 处理随机数生成结果
+      if (result.action === 'random:copy') {
+        try {
+          const calcData = (result as any).calcData;
+          let textToCopy = '';
+          
+          if (calcData?.output) {
+            textToCopy = calcData.output;
+          } else {
+            // 如果没有calcData，使用title
+            textToCopy = result.title || '';
+          }
+          
+          if (textToCopy) {
+            await navigator.clipboard.writeText(textToCopy.trim());
+            console.log('Random result copied:', textToCopy);
+          }
+          hideMainWindow();
+        } catch (error) {
+          console.error('Failed to copy random result:', error);
+        }
+        return;
+      }
+      
       // 处理 TODO 结果
       if (result.action.startsWith('todo:')) {
         if (result.action === 'todo:copy') {
